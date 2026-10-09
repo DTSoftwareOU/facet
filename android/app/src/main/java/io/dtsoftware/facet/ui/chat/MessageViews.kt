@@ -480,7 +480,7 @@ private fun ActionRow(item: ThreadItem, actions: MessageActions, showUsage: Bool
         Spacer(Modifier.weight(1f))
         val parts = buildList {
             if (showUsage && usage != null && (usage.inputTokens + usage.outputTokens) > 0) {
-                add("${Format.tokens(usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens)} in · ${Format.tokens(usage.outputTokens)} out")
+                add("${Format.tokens(usage.inputTokens)} in · ${Format.tokens(usage.outputTokens)} out")
             }
             if (showCost && m.costUsd != null) add(Format.cost(m.costUsd))
         }

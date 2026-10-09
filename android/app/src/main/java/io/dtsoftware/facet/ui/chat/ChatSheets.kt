@@ -457,8 +457,8 @@ fun UsageSheet(item: ThreadItem, onDismiss: () -> Unit) {
             val rows = buildList {
                 if (u != null) {
                     add(row("Input tokens", "%,d".format(u.inputTokens)))
-                    if (u.cacheReadTokens > 0) add(row("Cached input (read)", "%,d".format(u.cacheReadTokens)))
-                    if (u.cacheWriteTokens > 0) add(row("Cached input (written)", "%,d".format(u.cacheWriteTokens)))
+                    if (u.cacheReadTokens > 0) add(row("  of which read from cache", "%,d".format(u.cacheReadTokens)))
+                    if (u.cacheWriteTokens > 0) add(row("  of which written to cache", "%,d".format(u.cacheWriteTokens)))
                     add(row("Output tokens", "%,d".format(u.outputTokens)))
                     if (u.reasoningTokens > 0) add(row("Reasoning tokens (in output)", "%,d".format(u.reasoningTokens)))
                 }

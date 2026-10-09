@@ -283,6 +283,7 @@ class ChatEngine(
                     is StreamEvent.Completed -> {
                         stop = ev.stopReason
                         blocks = ev.blocks
+                        ev.blocks?.model?.takeIf { it.isNotBlank() }?.let { servedModel = it }
                     }
                     is StreamEvent.Failed -> error = ev.error
                 }
@@ -397,6 +398,7 @@ class ChatEngine(
             messages = messages,
             params = parseParams(conv.paramsJson),
             caps = model.caps,
+            modelMaxOutput = model.maxOutput,
         )
     }
 
