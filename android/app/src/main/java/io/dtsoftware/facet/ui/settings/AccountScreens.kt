@@ -202,7 +202,7 @@ private fun SignedInAccount(
                     Box(Modifier.fillMaxWidth(frac.coerceAtLeast(0.01f)).height(6.dp).clip(CircleShape).background(c.primary))
                 }
                 Spacer(Modifier.height(6.dp))
-                Text("${Format.bytes(a.usedBytes)} of ${Format.bytes(a.quotaBytes)} used for attachments", style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary)
+                Text("${Format.bytes(a.usedBytes)} of ${Format.bytes(a.quotaBytes)} sync storage used", style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary)
             }
         }
         SettingsGroup {

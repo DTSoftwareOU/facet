@@ -15,7 +15,8 @@ export interface Config {
   serverSecret: string;
   publicUrl: string;
   registrationOpen: boolean;
-  blobQuotaBytes: number;
+  /** Total encrypted storage per user: chat records plus attachment blobs. */
+  quotaBytes: number;
   /** Number of reverse-proxy hops whose X-Forwarded-For entries are trusted (0 = ignore the header). */
   trustProxy: number;
   smtpUrl: string | null;
@@ -65,7 +66,7 @@ export function defaultConfig(): Omit<Config, 'jwtSecret' | 'serverSecret'> {
     dataDir: path.resolve('data'),
     publicUrl: 'http://localhost:8787',
     registrationOpen: true,
-    blobQuotaBytes: 2 * 1024 * MiB,
+    quotaBytes: 100 * MiB,
     trustProxy: 1,
     smtpUrl: null,
     smtpFrom: 'Facet <no-reply@dtsoftware.io>',
@@ -131,7 +132,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     serverSecret: secret('SERVER_SECRET', env.SERVER_SECRET),
     publicUrl: (env.PUBLIC_URL || base.publicUrl).replace(/\/+$/, ''),
     registrationOpen: bool(env.REGISTRATION_OPEN, base.registrationOpen),
-    blobQuotaBytes: int('BLOB_QUOTA_BYTES', env.BLOB_QUOTA_BYTES, base.blobQuotaBytes),
+    quotaBytes: int('USER_QUOTA_BYTES', env.USER_QUOTA_BYTES, base.quotaBytes),
     trustProxy: proxyHops(env.TRUST_PROXY, base.trustProxy),
     smtpUrl: env.SMTP_URL || null,
     smtpFrom: env.SMTP_FROM || base.smtpFrom,

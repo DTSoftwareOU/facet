@@ -38,7 +38,13 @@ import okhttp3.OkHttpClient
 
 enum class SyncPhase { OFF, IDLE, SYNCING, OFFLINE, ERROR, PAUSED }
 
-data class SyncState(val phase: SyncPhase, val lastSyncAt: Long = 0, val message: String? = null)
+data class SyncState(
+    val phase: SyncPhase,
+    val lastSyncAt: Long = 0,
+    val message: String? = null,
+    /** The account's sync storage is full: some changes and files are waiting on this device. */
+    val storageFull: Boolean = false,
+)
 
 /**
  * Offline-first, end-to-end encrypted sync (docs/API.md "Sync"). Local rows carry a dirty flag;
@@ -70,6 +76,8 @@ class SyncEngine(
     private var streamJob: Job? = null
     @Volatile private var foreground = false
     private var lastAccountRefresh = 0L
+    @Volatile private var storageFull = false
+    @Volatile private var uploadedBytes = 0L
 
     private var cursor: Long
         get() = prefs.getLong(K_CURSOR, 0)
@@ -122,20 +130,23 @@ class SyncEngine(
         val key = auth.vaultKey() ?: return false
         val codec = RecordCodec(key, secrets)
         _state.value = _state.value.copy(phase = SyncPhase.SYNCING, message = null)
+        storageFull = false
+        uploadedBytes = 0
         return try {
             withContext(Dispatchers.IO) {
                 push(codec, key)
                 pull(codec)
                 purge(codec)
                 downloadPending(codec, key)
-                if (Clock.now() - lastAccountRefresh > 10 * 60_000) {
+                // Keep the storage meter current after uploads, and whenever space is tight.
+                if (storageFull || uploadedBytes > 0 || Clock.now() - lastAccountRefresh > 10 * 60_000) {
                     runCatching { auth.refreshAccount() }
                     lastAccountRefresh = Clock.now()
                 }
             }
             val now = Clock.now()
             prefs.edit().putLong(K_LAST, now).apply()
-            _state.value = SyncState(SyncPhase.IDLE, now)
+            _state.value = SyncState(SyncPhase.IDLE, now, if (storageFull) STORAGE_FULL else null, storageFull)
             true
         } catch (e: CancellationException) {
             throw e
@@ -170,7 +181,10 @@ class SyncEngine(
                     res.accepted.forEach { a -> byKey[a.type + "/" + a.id]?.onAccepted?.invoke() }
                     res.rejected.forEach { r -> r.current?.let { applyRemote(codec, it, force = true) } }
                 }
+                // Refused for space: those changes stay queued here until space is freed.
+                if (res.rejected.any { it.reason == "quota" }) storageFull = true
             }
+            if (storageFull) return
         }
     }
 
@@ -212,23 +226,35 @@ class SyncEngine(
         atts.dirty(LIMIT).forEach { e ->
             if (e.conversationId == null && !e.deleted) return@forEach // unsent draft
             var current = e
-            if (!e.deleted && !e.uploaded) {
+            if (!e.deleted && !e.uploaded && !e.localOnly) {
                 val file = attachments.file(e) ?: return@forEach
                 // Files over the server's blob limit stay on this device; only their record syncs.
                 if (file.length() <= MAX_SYNC_BLOB_BYTES) {
                     val blobId = codec.blobId(e.id)
                     val uploaded = try {
-                        val blob = FacetCrypto.encryptBlob(vaultKey, blobId, file.readBytes())
+                        val blob = FacetCrypto.encryptBlob(vaultKey, blobId, file.readBytes(), compressible = compressible(e.mimeType))
                         auth.authed { base, token -> api.putBlob(base, token, blobId, blob) }
+                        uploadedBytes += blob.size
                         true
                     } catch (err: kotlin.coroutines.cancellation.CancellationException) {
                         throw err
+                    } catch (err: ApiException) {
+                        if (err.code == "quota_exceeded") {
+                            // Sync storage is full: keep the file here and sync just its record.
+                            storageFull = true
+                            atts.markLocalOnly(e.id)
+                            null
+                        } else {
+                            false
+                        }
                     } catch (err: Exception) {
-                        false // e.g. storage quota full: retry next sync without holding up everything else
+                        false // e.g. a network blip: retry next sync without holding up everything else
                     }
-                    if (!uploaded) return@forEach
-                    atts.markUploaded(e.id)
-                    current = e.copy(uploaded = true)
+                    if (uploaded == false) return@forEach
+                    if (uploaded == true) {
+                        atts.markUploaded(e.id)
+                        current = e.copy(uploaded = true)
+                    }
                 }
             }
             out += Pending(codec.encode(current)) { atts.markClean(e.id, e.updatedAt) }
@@ -416,6 +442,37 @@ class SyncEngine(
         }.getOrDefault(false)
     }
 
+    // ---- storage ----
+
+    /** Frees cloud space: deletes a file's encrypted copy from the server and keeps it on this device. */
+    suspend fun keepOnDeviceOnly(attachmentId: String) = withContext(Dispatchers.IO) {
+        val a = db.attachments().get(attachmentId) ?: return@withContext
+        val key = auth.vaultKey()
+        if (a.uploaded && key != null && auth.isSignedIn) {
+            auth.authed { base, token -> api.deleteBlob(base, token, RecordCodec(key, secrets).blobId(a.id)) }
+        }
+        db.attachments().unsync(a.id, Clock.now())
+        requestSync()
+    }
+
+    /** Tries to upload files that were kept on this device (after you freed space). */
+    suspend fun retryDeviceOnlyFiles() = withContext(Dispatchers.IO) {
+        db.attachments().retryLocalOnly(Clock.now())
+        requestSync()
+    }
+
+    /** Frees space on this device: removes local copies of files that are safely on the server. */
+    suspend fun clearDownloadedCopies(): Long = withContext(Dispatchers.IO) {
+        var freed = 0L
+        db.attachments().downloadedCopies().forEach { a ->
+            val f = attachments.file(a) ?: return@forEach
+            freed += f.length()
+            attachments.deleteFile(a)
+            db.attachments().clearLocalFile(a.id)
+        }
+        freed
+    }
+
     // ---- account lifecycle ----
 
     /** Queues every local entity for upload (new account, or after an email reset). */
@@ -525,9 +582,17 @@ class SyncEngine(
         const val LIMIT = 200
         const val PAGE = 500
         const val MAX_ROUNDS = 25
+        const val STORAGE_FULL = "Your sync storage is full. New changes and files are kept on this device until you free up space in Settings → Data and storage."
         const val EAGER_DOWNLOAD_MAX = 6L * 1024 * 1024
     }
 }
 
 /** The sync server rejects encrypted blobs over 32 MiB; leave headroom for encryption overhead. */
 private const val MAX_SYNC_BLOB_BYTES = 31L * 1024 * 1024
+
+/** Already-compressed formats (JPEG, PNG, MP3, MP4, …) gain nothing from DEFLATE; text-like ones shrink a lot. */
+internal fun compressible(mimeType: String): Boolean {
+    val m = mimeType.lowercase()
+    return m.startsWith("text/") || m == "application/json" || m == "application/pdf" || m == "application/xml" ||
+        m == "image/svg+xml" || m == "audio/wav" || m == "audio/x-wav"
+}

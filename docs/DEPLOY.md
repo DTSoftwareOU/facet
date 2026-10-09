@@ -53,7 +53,7 @@ cd /opt/facet/deploy
 cp .env.example .env
 sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -base64 48)|" .env
 sed -i "s|^SERVER_SECRET=.*|SERVER_SECRET=$(openssl rand -base64 48)|" .env
-nano .env    # check FACET_DOMAIN, REGISTRATION_OPEN, BLOB_QUOTA_BYTES, optional SMTP
+nano .env    # check FACET_DOMAIN, REGISTRATION_OPEN, USER_QUOTA_BYTES, optional SMTP
 chmod 600 .env
 ```
 
@@ -150,7 +150,7 @@ signs mail for `dtsoftware.io` (SPF/DKIM), e.g. Postmark, Resend, Amazon SES or 
 | Task | Command |
 |---|---|
 | Close sign-ups | set `REGISTRATION_OPEN=false` in `.env`, `docker compose up -d` |
-| Change storage quota | set `BLOB_QUOTA_BYTES`, `docker compose up -d` |
+| Change storage quota | set `USER_QUOTA_BYTES` (default 100 MiB per user), `docker compose up -d` |
 | Logs | `docker compose logs --since 1h facet` |
 | Disk usage | `docker system df -v`, `docker compose exec facet du -sh /data` |
 | Shell in the container | `docker compose exec facet sh` |

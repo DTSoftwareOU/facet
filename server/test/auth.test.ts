@@ -58,7 +58,7 @@ describe('auth', () => {
     const r = await registerUser(t.app, email);
     assert.equal(r.user.email, email);
     assert.equal(r.user.displayName, 'Test User');
-    assert.deepEqual(r.user.storage, { usedBytes: 0, quotaBytes: 2147483648 });
+    assert.deepEqual(r.user.storage, { usedBytes: 0, quotaBytes: 100 * 1024 * 1024, recordBytes: 0, blobBytes: 0 });
     assert.ok(r.tokens.accessToken.split('.').length === 3);
     assert.ok(r.tokens.refreshToken.length >= 40);
     assert.ok(r.tokens.accessExpiresAt > Date.now());

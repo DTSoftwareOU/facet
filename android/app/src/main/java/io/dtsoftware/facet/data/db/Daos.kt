@@ -172,6 +172,29 @@ interface AttachmentDao {
     @Query("DELETE FROM attachments WHERE id = :id")
     suspend fun hardDelete(id: String)
 
+    @Query("SELECT * FROM attachments WHERE deleted = 0 AND conversationId IS NOT NULL ORDER BY sizeBytes DESC LIMIT :limit")
+    fun observeLargest(limit: Int): Flow<List<AttachmentEntity>>
+
+    @Query("SELECT COUNT(*) FROM attachments WHERE deleted = 0 AND localOnly = 1")
+    fun observeLocalOnlyCount(): Flow<Int>
+
+    @Query("UPDATE attachments SET localOnly = 1 WHERE id = :id")
+    suspend fun markLocalOnly(id: String)
+
+    /** Keeps a synced file on this device only: the record syncs again with uploaded = false. */
+    @Query("UPDATE attachments SET localOnly = 1, uploaded = 0, dirty = 1, updatedAt = :now WHERE id = :id")
+    suspend fun unsync(id: String, now: Long)
+
+    /** Gives files kept on this device another chance to upload (after space was freed). */
+    @Query("UPDATE attachments SET localOnly = 0, dirty = 1, updatedAt = :now WHERE localOnly = 1 AND deleted = 0")
+    suspend fun retryLocalOnly(now: Long)
+
+    @Query("SELECT * FROM attachments WHERE deleted = 0 AND uploaded = 1 AND localOnly = 0 AND localFile IS NOT NULL")
+    suspend fun downloadedCopies(): List<AttachmentEntity>
+
+    @Query("UPDATE attachments SET localFile = NULL WHERE id = :id")
+    suspend fun clearLocalFile(id: String)
+
     @Query("UPDATE attachments SET dirty = 1, uploaded = 0")
     suspend fun markAllDirty()
 

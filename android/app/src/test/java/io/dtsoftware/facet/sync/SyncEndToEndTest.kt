@@ -50,8 +50,11 @@ class SyncEndToEndTest {
     private val server = System.getProperty("facet.e2eServer") ?: "http://127.0.0.1:8788"
     private val http = OkHttpClient()
 
-    private fun serverUp(): Boolean = runCatching {
-        http.newCall(Request.Builder().url("$server/v1/health").build()).execute().use { it.isSuccessful }
+    /** A second server started with USER_QUOTA_BYTES=65536, for storage-full behavior. */
+    private val smallServer = System.getProperty("facet.e2eSmallQuotaServer") ?: "http://127.0.0.1:8789"
+
+    private fun serverUp(url: String = server): Boolean = runCatching {
+        http.newCall(Request.Builder().url("$url/v1/health").build()).execute().use { it.isSuccessful }
     }.getOrDefault(false)
 
     /** Separate preferences and files per simulated device. */
@@ -66,14 +69,14 @@ class SyncEndToEndTest {
         override fun open(sealed: String) = FacetCrypto.unb64(sealed.removePrefix("v1:"))
     }
 
-    private inner class Device(name: String) {
+    private inner class Device(name: String, url: String = server) {
         val ctx = DeviceContext(RuntimeEnvironment.getApplication(), name + Ids.new())
         val db: FacetDatabase = Room.inMemoryDatabaseBuilder(ctx, FacetDatabase::class.java).build()
         val secrets = PlainBox()
         val settings = SettingsStore(ctx)
         val api = SyncApi(http)
         val auth = AuthManager(ctx, api, secrets).apply {
-            setServerUrl(server)
+            setServerUrl(url)
             onProfileName = { name -> settings.updateSynced { it.copy(profileName = name) } }
         }
         val attachments = AttachmentStore(ctx, db) {}
@@ -204,5 +207,56 @@ class SyncEndToEndTest {
         // Delete the account.
         d.auth.deleteAccount("a brand new passphrase")
         assertFalse(d.auth.isSignedIn)
+    }
+
+    @Test
+    fun fullStorageKeepsFilesOnDeviceAndSyncKeepsWorking() = runBlocking {
+        assumeTrue("Small-quota Facet server not running at $smallServer", serverUp(smallServer))
+        val a = Device("qa", smallServer)
+        a.auth.register("quota-${Ids.new()}@example.com", "correct horse battery staple", null)
+        val conv = a.conversations.create(null, null, null, GenParams())
+        a.conversations.rename(conv.id, "Field notes")
+        val now = Clock.now()
+        a.conversations.insertMessage(MessageEntity(Ids.new(), conv.id, null, "user", "Hello", createdAt = now, updatedAt = now))
+
+        // A small file fits; a big one (incompressible, like MP3) doesn't and stays on this device.
+        fun file(bytes: Int, name: String, mime: String): String {
+            val id = Ids.new()
+            val data = ByteArray(bytes).also { java.util.Random(bytes.toLong()).nextBytes(it) }
+            File(a.attachments.dir, "$id.bin").writeBytes(data)
+            runBlocking {
+                a.db.attachments().upsert(
+                    AttachmentEntity(id, conv.id, "audio", mime, name, data.size.toLong(), localFile = "$id.bin", createdAt = now, updatedAt = now),
+                )
+            }
+            return id
+        }
+        val small = file(8_000, "note.mp3", "audio/mpeg")
+        val big = file(90_000, "song.mp3", "audio/mpeg")
+        a.syncOk()
+
+        assertTrue("small file synced", a.db.attachments().get(small)!!.uploaded)
+        val bigRow = a.db.attachments().get(big)!!
+        assertTrue("big file kept on this device: $bigRow / ${a.sync.state.value}", bigRow.localOnly && !bigRow.uploaded)
+        assertFalse("its record still synced", bigRow.dirty)
+        assertTrue(a.sync.state.value.storageFull)
+        val usage = a.auth.state.value as AccountState.SignedIn
+        assertEquals(65_536L, usage.quotaBytes)
+        assertTrue(usage.recordBytes > 0 && usage.blobBytes in 8_000L..9_000L)
+
+        // A second device sees both files; only the synced one can be downloaded.
+        val b = Device("qb", smallServer)
+        b.auth.login(a.auth.state.value.let { (it as AccountState.SignedIn).email }, "correct horse battery staple")
+        b.syncOk()
+        assertTrue(b.sync.ensureLocal(small))
+        assertFalse(b.sync.ensureLocal(big))
+
+        // Freeing the small file's cloud copy lowers usage and keeps it on device A.
+        a.sync.keepOnDeviceOnly(small)
+        a.syncOk()
+        assertTrue(a.db.attachments().get(small)!!.localOnly)
+        assertTrue(a.attachments.file(a.db.attachments().get(small)!!) != null)
+        a.auth.refreshAccount()
+        assertEquals(0L, (a.auth.state.value as AccountState.SignedIn).blobBytes)
     }
 }

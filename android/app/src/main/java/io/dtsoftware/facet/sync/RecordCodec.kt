@@ -215,7 +215,10 @@ class RecordCodec(private val vaultKey: ByteArray, private val secrets: SecretBo
         val p = AppJson.decodeFromString<AttPayload>(r.payload!!)
         return AttachmentEntity(
             r.id, p.conversationId, p.kind, p.mimeType, p.name, p.sizeBytes, p.width, p.height,
-            localFile = existing?.localFile, uploaded = p.uploaded, createdAt = p.createdAt, updatedAt = r.updatedAt,
+            localFile = existing?.localFile, uploaded = p.uploaded,
+            // "Kept on this device" is local state; it ends once some device has uploaded the file.
+            localOnly = existing?.localOnly == true && !p.uploaded,
+            createdAt = p.createdAt, updatedAt = r.updatedAt,
             deleted = false, dirty = false,
         )
     }

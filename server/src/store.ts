@@ -2,6 +2,7 @@ import type { Config } from './config.js';
 import { buf, bufOrNull, transaction, type Db } from './db.js';
 import { newId, randomToken, sha256 } from './crypto.js';
 import type { DeviceInput } from './validation.js';
+import { RECORD_OVERHEAD_BYTES } from './records.js';
 
 export interface UserRow {
   id: string;
@@ -21,6 +22,7 @@ export interface UserRow {
   seq: number;
   minSeq: number;
   blobBytes: number;
+  recordBytes: number;
 }
 
 export interface SessionRow {
@@ -56,7 +58,7 @@ export interface PublicUser {
   email: string;
   displayName: string | null;
   createdAt: number;
-  storage: { usedBytes: number; quotaBytes: number };
+  storage: { usedBytes: number; quotaBytes: number; recordBytes: number; blobBytes: number };
 }
 
 export interface PublicKdf {
@@ -86,6 +88,7 @@ function toUser(r: Row): UserRow {
     seq: r.seq as number,
     minSeq: r.min_seq as number,
     blobBytes: r.blob_bytes as number,
+    recordBytes: (r.record_bytes as number | undefined) ?? 0,
   };
 }
 
@@ -188,7 +191,9 @@ export class Store {
   wipeUserData(userId: string): void {
     this.db.prepare('DELETE FROM records WHERE user_id = ?').run(userId);
     this.db.prepare('DELETE FROM blobs WHERE user_id = ?').run(userId);
-    this.db.prepare('UPDATE users SET seq = 0, min_seq = 0, blob_bytes = 0, updated_at = ? WHERE id = ?').run(Date.now(), userId);
+    this.db
+      .prepare('UPDATE users SET seq = 0, min_seq = 0, blob_bytes = 0, record_bytes = 0, updated_at = ? WHERE id = ?')
+      .run(Date.now(), userId);
   }
 
   publicUser(u: UserRow): PublicUser {
@@ -197,7 +202,12 @@ export class Store {
       email: u.email,
       displayName: u.displayName,
       createdAt: u.createdAt,
-      storage: { usedBytes: u.blobBytes, quotaBytes: this.config.blobQuotaBytes },
+      storage: {
+        usedBytes: u.blobBytes + u.recordBytes,
+        quotaBytes: this.config.quotaBytes,
+        recordBytes: u.recordBytes,
+        blobBytes: u.blobBytes,
+      },
     };
   }
 
@@ -359,6 +369,15 @@ export class Store {
         this.db
           .prepare('UPDATE users SET min_seq = MAX(min_seq, ?) WHERE id = ?')
           .run(h.max_seq as number, h.user_id as string);
+      }
+      // Purged tombstones no longer count toward storage.
+      const freed = this.db
+        .prepare('SELECT user_id, SUM(size) + COUNT(*) * ? AS bytes FROM records WHERE deleted = 1 AND server_time < ? GROUP BY user_id')
+        .all(RECORD_OVERHEAD_BYTES, cutoff) as Row[];
+      for (const f of freed) {
+        this.db
+          .prepare('UPDATE users SET record_bytes = MAX(0, record_bytes - ?) WHERE id = ?')
+          .run(f.bytes as number, f.user_id as string);
       }
       return this.db.prepare('DELETE FROM records WHERE deleted = 1 AND server_time < ?').run(cutoff).changes as number;
     });

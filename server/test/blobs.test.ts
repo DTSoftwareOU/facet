@@ -9,7 +9,7 @@ describe('blobs', () => {
   let u: Registered;
   // Small quota so quota tests are cheap.
   before(async () => {
-    t = await makeApp({ blobQuotaBytes: 64 * 1024 });
+    t = await makeApp({ quotaBytes: 64 * 1024 });
     u = await registerUser(t.app);
   });
   after(async () => t.close());

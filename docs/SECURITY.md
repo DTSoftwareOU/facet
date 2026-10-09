@@ -80,7 +80,9 @@ envelope = version (0x01) || flags (1 byte) || nonce (12) || AES-GCM(vaultKey, b
 flags bit0 = body is raw DEFLATE (RFC 1951, no zlib header) compressed JSON
            (clients compress when JSON is larger than 1 KiB)
 flags bit1 = body is length-framed and padded: u32 big-endian length || data || zero padding,
-           total rounded up to 512 bytes (≤ 16 KiB) or 4 KiB (larger)
+           total = max(256, length + 4) rounded up with Padmé (PETS 2019): ≤ 12% overhead,
+           at most O(log log n) bits of length revealed
+           (clients compress JSON larger than 200 bytes when that saves space)
 aad      = ASCII "facet:rec:v1:" + wireType + ":" + wireId
 ```
 
@@ -103,7 +105,7 @@ body        = JSON { "t": type, "i": localId, "d": payload }   (payload omitted 
 - On open, clients recompute `wireId` from the decrypted `t`/`i` and reject a mismatch, so a
   server can't move a record to another id.
 - Deletions carry an encrypted body too (with `d` omitted), so other devices know what to delete.
-- All records are padded (flags bit1), so sizes reveal only a coarse bucket.
+- All records are padded (flags bit1, Padmé), so sizes reveal only a coarse bucket.
 - The display name is stored in the encrypted settings record; registration sends
   `displayName: null`.
 - `SyncEndToEndTest` scans the server's database and blob files after a sync and fails if any
@@ -112,13 +114,17 @@ body        = JSON { "t": type, "i": localId, "d": payload }   (payload omitted 
 ## Blob (attachment) encryption
 
 ```
-blob = version (0x01) || nonce (12) || AES-GCM(vaultKey, fileBytes, aad)
-aad  = ASCII "facet:blob:v1:" + blobId
-blobId = base64url-nopad( HMAC-SHA256(recordIdKey, "blob:" + attachmentId)[0..24] )
+blob v1 = 0x01 || nonce (12) || AES-GCM(vaultKey, fileBytes, "facet:blob:v1:" + blobId)
+blob v2 = 0x02 || flags (1) || nonce (12) || AES-GCM(vaultKey, body, "facet:blob:v2:" + flags + ":" + blobId)
+          flags bit0 = body is raw DEFLATE of the file (used for text, PDF, WAV… when it saves space)
+blobId  = base64url-nopad( HMAC-SHA256(recordIdKey, "blob:" + attachmentId)[0..24] )
 ```
 
-Uploaded as raw `application/octet-stream`. Max 32 MiB per blob. Per-user quota enforced by
-the server (default 2 GiB, configurable).
+The v2 flags are bound into the AAD, so a server can't flip them. Uploaded as raw
+`application/octet-stream`. Max 32 MiB per blob. One per-user quota covers records and blobs
+(default 100 MiB, `USER_QUOTA_BYTES`). Before upload, clients also shrink generated media:
+large renders are re-encoded as WebP and raw WAV as AAC. When the quota is full, files stay on
+the device ("this device only") and only their records sync.
 
 ## Local storage on Android
 

@@ -24,7 +24,7 @@ Every non-2xx response has this body:
 | 404 | `not_found` | Resource missing |
 | 409 | `email_taken` | Register with an existing email |
 | 413 | `too_large` | Record/blob/batch over limit |
-| 413 | `quota_exceeded` | Blob storage quota exceeded |
+| 413 | `quota_exceeded` | The user's storage quota (records + blobs) is full |
 | 429 | `rate_limited` | Slow down; `Retry-After` header in seconds |
 | 501 | `email_disabled` | SMTP isn't configured on this server |
 | 500 | `internal` | Server error |
@@ -43,7 +43,8 @@ type User = {
   email: string;
   displayName: string | null;
   createdAt: number;
-  storage: { usedBytes: number; quotaBytes: number };   // encrypted blob bytes vs. blob quota
+  storage: { usedBytes: number; quotaBytes: number;     // records + blobs vs. the per-user quota
+             recordBytes: number; blobBytes: number }; // the two parts of usedBytes
 };
 
 type Tokens = {
@@ -183,7 +184,8 @@ type RecordOut = RecordIn & { seq: number };
 
 ```json
 { "accepted": [ { "id": "…", "type": "conv", "seq": 42 } ],
-  "rejected": [ { "id": "…", "type": "msg", "reason": "stale", "current": RecordOut } ],
+  "rejected": [ { "id": "…", "type": "msg", "reason": "stale", "current": RecordOut },
+                { "id": "…", "type": "e", "reason": "quota" } ],
   "cursor": 42 }
 ```
 
@@ -192,6 +194,11 @@ Rules per record, keyed by `(type, id)`:
 - Present and `incoming.updatedAt >= stored.updatedAt` → overwrite (new `seq`).
 - Present and older → `rejected` with `reason: "stale"` and the current server copy.
 - A tombstone stays a tombstone unless a strictly newer non-deleted write arrives.
+- Quota: each record counts its ciphertext size plus 64 bytes toward the user's storage quota
+  (shared with blobs). A write that would grow usage past the quota is `rejected` with
+  `reason: "quota"` (no `current`); the rest of the batch still applies. Deletions and writes
+  that shrink a record always succeed, so clients can free space. Clients keep refused
+  changes queued and retry after space is freed.
 - `cursor` is the user's current max `seq` after the batch.
 
 ### `GET /v1/sync/pull?since=<seq>&limit=<n>`
@@ -257,7 +264,7 @@ Errors: `too_large`, `quota_exceeded`.
 | `SERVER_SECRET` | — (required, ≥ 32 chars) | Fake prelogin salts, misc HMACs |
 | `PUBLIC_URL` | `http://localhost:8787` | Used in emails |
 | `REGISTRATION_OPEN` | `true` | Allow sign-ups |
-| `BLOB_QUOTA_BYTES` | `2147483648` | Per-user blob quota |
+| `USER_QUOTA_BYTES` | `104857600` | Per-user storage quota: encrypted records + blobs (100 MiB) |
 | `TRUST_PROXY` | `true` | Read client IP from `X-Forwarded-For` (`true` = trust one proxy hop, `false` = ignore, or a hop count) |
 | `SMTP_URL` | — | e.g. `smtps://user:pass@smtp.example.com:465`; enables email reset |
 | `SMTP_FROM` | `Facet <no-reply@dtsoftware.io>` | Sender |

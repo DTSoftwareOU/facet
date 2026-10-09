@@ -30,6 +30,9 @@ sealed interface AccountState {
         val serverUrl: String,
         val usedBytes: Long,
         val quotaBytes: Long,
+        /** Of [usedBytes]: chats, settings and keys (records) vs. files (blobs). */
+        val recordBytes: Long = 0,
+        val blobBytes: Long = 0,
     ) : AccountState
 
     /** The session ended (revoked or expired). Local data is kept; sync is paused until sign-in. */
@@ -83,7 +86,7 @@ class AuthManager(
         if (prefs.getBoolean(K_EXPIRED, false)) return AccountState.Expired(email, serverUrl)
         return AccountState.SignedIn(
             userId, email, prefs.getString(K_NAME, null), serverUrl,
-            prefs.getLong(K_USED, 0), prefs.getLong(K_QUOTA, 0),
+            prefs.getLong(K_USED, 0), prefs.getLong(K_QUOTA, 0), prefs.getLong(K_RECORD_BYTES, 0), prefs.getLong(K_BLOB_BYTES, 0),
         )
     }
 
@@ -323,6 +326,8 @@ class AuthManager(
             .putString(K_NAME, user.displayName)
             .putLong(K_USED, user.storage.usedBytes)
             .putLong(K_QUOTA, user.storage.quotaBytes)
+            .putLong(K_RECORD_BYTES, user.storage.recordBytes)
+            .putLong(K_BLOB_BYTES, user.storage.blobBytes)
             .commit()
         _state.value = readState()
     }
@@ -379,6 +384,8 @@ class AuthManager(
         const val K_NAME = "display_name"
         const val K_USED = "storage_used"
         const val K_QUOTA = "storage_quota"
+        const val K_RECORD_BYTES = "storage_records"
+        const val K_BLOB_BYTES = "storage_blobs"
         const val K_ACCESS = "access"
         const val K_ACCESS_EXP = "access_exp"
         const val K_REFRESH = "refresh"

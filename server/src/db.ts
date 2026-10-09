@@ -86,6 +86,13 @@ const MIGRATIONS: string[] = [
     attempts INTEGER NOT NULL DEFAULT 0
   );
   `,
+  // v2 — one storage quota per user: chat records count alongside attachment blobs.
+  `
+  ALTER TABLE users ADD COLUMN record_bytes INTEGER NOT NULL DEFAULT 0;
+  UPDATE users SET record_bytes = (
+    SELECT COALESCE(SUM(size), 0) + COUNT(*) * 64 FROM records WHERE records.user_id = users.id
+  );
+  `,
 ];
 
 export function openDb(dataDir: string): Db {

@@ -436,18 +436,9 @@ fun PrivacyScreen(container: AppContainer, onBack: () -> Unit) {
 fun DataScreen(container: AppContainer, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val account by container.auth.state.collectAsStateWithLifecycle()
-    var localSize by remember { mutableStateOf<Long?>(null) }
     var confirmDeleteAll by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     val c = FacetTheme.colors
-    LaunchedEffect(Unit) {
-        localSize = withContext(Dispatchers.IO) {
-            val db = context.getDatabasePath("facet.db")
-            val files = listOf(db, File(db.path + "-wal"), File(db.path + "-shm"))
-            files.sumOf { if (it.exists()) it.length() else 0L } + (container.attachments.dir.listFiles()?.sumOf { it.length() } ?: 0L)
-        }
-    }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) scope.launch {
             val ok = runCatching { DataExport.writeAll(container, context, uri) }.isSuccess
@@ -455,17 +446,7 @@ fun DataScreen(container: AppContainer, onBack: () -> Unit) {
         }
     }
     SettingsPage("Data and storage", onBack) {
-        SettingsGroup(title = "Storage") {
-            SettingsRow("On this device", subtitle = localSize?.let { Format.bytes(it) } ?: "Calculating…", icon = R.drawable.ic_phone, showChevron = false)
-            (account as? AccountState.SignedIn)?.let { a ->
-                GroupDivider()
-                SettingsRow(
-                    "Encrypted files on the sync server",
-                    subtitle = "${Format.bytes(a.usedBytes)} of ${Format.bytes(a.quotaBytes)}",
-                    icon = R.drawable.ic_cloud, showChevron = false,
-                )
-            }
-        }
+        StorageSection(container)
         SettingsGroup(title = "Export") {
             SettingsRow(
                 "Export all data", subtitle = "Chats, assistants, prompts and settings as JSON. API keys are not included.",

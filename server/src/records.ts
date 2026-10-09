@@ -20,7 +20,8 @@ export interface RecordOut {
 
 export interface PushResult {
   accepted: { id: string; type: string; seq: number }[];
-  rejected: { id: string; type: string; reason: 'stale'; current: RecordOut }[];
+  /** 'stale': a newer version exists (see `current`). 'quota': the write would exceed the user's storage quota. */
+  rejected: { id: string; type: string; reason: 'stale' | 'quota'; current?: RecordOut }[];
   cursor: number;
   changed: boolean;
 }
@@ -33,6 +34,9 @@ export interface PullResult {
 }
 
 type Row = Record<string, unknown>;
+
+/** Counted per record on top of its ciphertext (ids, indexes), so many tiny records can't dodge the quota. */
+export const RECORD_OVERHEAD_BYTES = 64;
 
 function toOut(r: Row): RecordOut {
   const ct = bufOrNull(r.ct);
@@ -48,13 +52,21 @@ function toOut(r: Row): RecordOut {
 
 /** Encrypted record storage with last-writer-wins and a per-user change cursor. */
 export class RecordStore {
-  constructor(private readonly db: Db) {}
+  constructor(
+    private readonly db: Db,
+    private readonly quotaBytes: number = Number.MAX_SAFE_INTEGER,
+  ) {}
 
   push(userId: string, records: RecordIn[]): PushResult {
     return transaction(this.db, () => {
-      const user = this.db.prepare('SELECT seq FROM users WHERE id = ?').get(userId) as { seq: number } | undefined;
+      const user = this.db.prepare('SELECT seq, record_bytes, blob_bytes FROM users WHERE id = ?').get(userId) as
+        | { seq: number; record_bytes: number; blob_bytes: number }
+        | undefined;
       if (!user) throw new Error('user vanished during push');
       let seq = user.seq;
+      let recordBytes = user.record_bytes;
+      // Writes that free space always go through; growth is refused once the quota is reached.
+      const fits = (delta: number) => delta <= 0 || recordBytes + user.blob_bytes + delta <= this.quotaBytes;
       const now = Date.now();
       const accepted: PushResult['accepted'] = [];
       const rejected: PushResult['rejected'] = [];
@@ -73,8 +85,14 @@ export class RecordStore {
         const existing = select.get(userId, r.type, r.id) as Row | undefined;
         const size = r.ct?.length ?? 0;
         if (!existing) {
+          const delta = size + RECORD_OVERHEAD_BYTES;
+          if (!fits(delta)) {
+            rejected.push({ id: r.id, type: r.type, reason: 'quota' });
+            continue;
+          }
           seq += 1;
           insert.run(userId, r.type, r.id, r.updatedAt, r.deleted ? 1 : 0, r.ct, size, seq, now);
+          recordBytes += delta;
           accepted.push({ id: r.id, type: r.type, seq });
           continue;
         }
@@ -97,12 +115,20 @@ export class RecordStore {
           rejected.push({ id: r.id, type: r.type, reason: 'stale', current: toOut(existing) });
           continue;
         }
+        const delta = size - ((existing.size as number) ?? 0);
+        if (!fits(delta)) {
+          rejected.push({ id: r.id, type: r.type, reason: 'quota' });
+          continue;
+        }
         seq += 1;
         update.run(r.updatedAt, r.deleted ? 1 : 0, r.ct, size, seq, now, userId, r.type, r.id);
+        recordBytes += delta;
         accepted.push({ id: r.id, type: r.type, seq });
       }
 
-      if (seq !== user.seq) this.db.prepare('UPDATE users SET seq = ? WHERE id = ?').run(seq, userId);
+      if (seq !== user.seq || recordBytes !== user.record_bytes) {
+        this.db.prepare('UPDATE users SET seq = ?, record_bytes = ? WHERE id = ?').run(seq, Math.max(0, recordBytes), userId);
+      }
       return { accepted, rejected, cursor: seq, changed: seq !== user.seq };
     });
   }

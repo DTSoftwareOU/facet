@@ -35,8 +35,11 @@ export class BlobStore {
   async put(userId: string, id: string, data: Buffer): Promise<{ id: string; size: number }> {
     const target = this.filePath(userId, id);
     if (data.length > this.maxBlobBytes) throw errors.tooLarge(`Blob exceeds ${this.maxBlobBytes} bytes.`);
-    if (data.length < MIN_BLOB_BYTES || data[0] !== 0x01) {
-      throw errors.invalid('body: must be an encrypted blob envelope (version 0x01)');
+    // v1: 0x01 || nonce || ct.  v2: 0x02 || flags || nonce || ct (flags bit0 = DEFLATE before encryption).
+    const v1 = data[0] === 0x01 && data.length >= MIN_BLOB_BYTES;
+    const v2 = data[0] === 0x02 && data.length >= MIN_BLOB_BYTES + 1;
+    if (!v1 && !v2) {
+      throw errors.invalid('body: must be an encrypted blob envelope (version 0x01 or 0x02)');
     }
     await mkdir(this.userDir(userId), { recursive: true });
     const tmp = `${target}.${randomBytes(6).toString('hex')}.tmp`;
@@ -46,12 +49,12 @@ export class BlobStore {
         const existing = this.db.prepare('SELECT size FROM blobs WHERE user_id = ? AND id = ?').get(userId, id) as
           | { size: number }
           | undefined;
-        const user = this.db.prepare('SELECT blob_bytes FROM users WHERE id = ?').get(userId) as
-          | { blob_bytes: number }
+        const user = this.db.prepare('SELECT blob_bytes, record_bytes FROM users WHERE id = ?').get(userId) as
+          | { blob_bytes: number; record_bytes: number }
           | undefined;
         if (!user) throw errors.unauthorized();
         const total = user.blob_bytes - (existing?.size ?? 0) + data.length;
-        if (total > this.quotaBytes) throw errors.quotaExceeded();
+        if (data.length > (existing?.size ?? 0) && total + user.record_bytes > this.quotaBytes) throw errors.quotaExceeded();
         this.db
           .prepare(
             `INSERT INTO blobs (user_id, id, size, created_at) VALUES (?, ?, ?, ?)

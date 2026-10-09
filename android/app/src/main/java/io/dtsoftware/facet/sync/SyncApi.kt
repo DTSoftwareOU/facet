@@ -23,7 +23,7 @@ import kotlin.coroutines.resumeWithException
 // ---- Wire types (docs/API.md) ----
 
 @Serializable data class Kdf(val algorithm: String = "pbkdf2-sha256", val iterations: Int, val salt: String)
-@Serializable data class Storage(val usedBytes: Long = 0, val quotaBytes: Long = 0)
+@Serializable data class Storage(val usedBytes: Long = 0, val quotaBytes: Long = 0, val recordBytes: Long = 0, val blobBytes: Long = 0)
 @Serializable data class UserDto(
     val id: String,
     val email: String,

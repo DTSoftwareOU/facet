@@ -7,6 +7,7 @@ import android.graphics.Matrix
 import android.media.ExifInterface
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import android.provider.OpenableColumns
 import android.util.LruCache
 import android.webkit.MimeTypeMap
@@ -221,7 +222,11 @@ class AttachmentStore(
      * Saves a generated image, video or audio file as a conversation attachment, queued for
      * end-to-end encrypted sync like any other attachment.
      */
-    suspend fun storeGenerated(bytes: ByteArray, mimeType: String, name: String, conversationId: String): AttachmentEntity = withContext(Dispatchers.IO) {
+    suspend fun storeGenerated(original: ByteArray, originalMime: String, requestedName: String, conversationId: String): AttachmentEntity = withContext(Dispatchers.IO) {
+        // Stored and synced compactly: large renders become WebP, raw WAV becomes AAC.
+        val (bytes, mimeType) = compact(original, originalMime)
+        val name = if (mimeType == originalMime) requestedName
+        else requestedName.substringBeforeLast('.') + "." + io.dtsoftware.facet.llm.media.MediaGen.extensionFor(mimeType)
         val kind = when {
             mimeType.startsWith("image/") -> "image"
             mimeType.startsWith("video/") -> "video"
@@ -263,6 +268,29 @@ class AttachmentStore(
         entity
     }
 
+    private fun compact(bytes: ByteArray, mime: String): Pair<ByteArray, String> = when {
+        mime == "audio/wav" || mime == "audio/x-wav" ->
+            io.dtsoftware.facet.core.media.AudioCompressor.wavToM4a(bytes, context.cacheDir)?.let { it to "audio/mp4" } ?: (bytes to mime)
+        mime.startsWith("image/") && mime != "image/gif" && mime != "image/svg+xml" && bytes.size > COMPACT_IMAGE_BYTES ->
+            compactImage(bytes)?.let { it to "image/webp" } ?: (bytes to mime)
+        else -> bytes to mime
+    }
+
+    /** Re-encodes a large render as WebP (visually lossless at quality 90, typically 5-10x smaller than PNG). */
+    private fun compactImage(bytes: ByteArray): ByteArray? = runCatching {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0) return null
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= MAX_GENERATED_EDGE && bounds.outHeight / (sample * 2) >= MAX_GENERATED_EDGE) sample *= 2
+        val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+        val out = ByteArrayOutputStream()
+        val format = if (Build.VERSION.SDK_INT >= 30) Bitmap.CompressFormat.WEBP_LOSSY else @Suppress("DEPRECATION") Bitmap.CompressFormat.WEBP
+        bmp.compress(format, 90, out)
+        bmp.recycle()
+        out.toByteArray().takeIf { it.isNotEmpty() && it.size < bytes.size * 0.85 }
+    }.getOrNull()
+
     /** Stores bytes downloaded from the sync server for an attachment record. */
     suspend fun storeDownloaded(a: AttachmentEntity, bytes: ByteArray) = withContext(Dispatchers.IO) {
         val ext = when (a.kind) {
@@ -286,6 +314,8 @@ class AttachmentStore(
 
     companion object {
         const val MAX_EDGE = 1600
+        const val MAX_GENERATED_EDGE = 2048
+        const val COMPACT_IMAGE_BYTES = 150_000
         const val MAX_PDF = 32L * 1024 * 1024
         const val MAX_TEXT = 2L * 1024 * 1024
         val TEXT_EXTENSIONS = setOf(

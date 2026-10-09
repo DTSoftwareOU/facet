@@ -99,6 +99,8 @@ data class AttachmentEntity(
     val localFile: String? = null,
     /** True once the encrypted blob is on the sync server. */
     val uploaded: Boolean = false,
+    /** Kept on this device only: not uploaded (sync storage full, or the user chose to free cloud space). */
+    @ColumnInfo(defaultValue = "0") val localOnly: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
     val deleted: Boolean = false,

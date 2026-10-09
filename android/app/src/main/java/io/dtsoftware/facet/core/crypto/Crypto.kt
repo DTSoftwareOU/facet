@@ -33,7 +33,9 @@ object FacetCrypto {
 
     private const val NONCE = 12
     private const val TAG_BITS = 128
-    private const val COMPRESS_THRESHOLD = 1024
+    private const val COMPRESS_THRESHOLD = 200
+    private const val MIN_PADDED = 256
+    const val BLOB_V2: Byte = 0x02
     private const val AAD_VAULT = "facet:vault-key:v1"
     private const val AAD_VAULT_RECOVERY = "facet:vault-key-recovery:v1"
 
@@ -148,18 +150,25 @@ object FacetCrypto {
      */
     fun encryptRecord(vaultKey: ByteArray, type: String, id: String, json: String, nonce: ByteArray = randomBytes(NONCE), pad: Boolean = false): ByteArray {
         val raw = json.toByteArray(UTF_8)
-        val compress = raw.size > COMPRESS_THRESHOLD
-        var body = if (compress) deflate(raw) else raw
+        // Compress whenever it actually saves space (JSON usually shrinks 3-5x).
+        val deflated = if (raw.size > COMPRESS_THRESHOLD) deflate(raw).takeIf { it.size < raw.size } else null
+        val compress = deflated != null
+        var body = deflated ?: raw
         if (pad) body = frame(body)
         val flags = (if (compress) 0x01 else 0) or (if (pad) 0x02 else 0)
         return byteArrayOf(VERSION, flags.toByte()) + nonce + gcmEncrypt(vaultKey, body, recordAad(type, id), nonce)
     }
 
-    /** Pads to 512-byte buckets up to 16 KiB, then 4 KiB buckets. */
+    /**
+     * Padmé padding (Nikitin et al., PETS 2019): at most ~12% overhead (much less for large records)
+     * while leaking only O(log log n) bits of length; never below [MIN_PADDED] bytes.
+     */
     internal fun paddedSize(n: Int): Int {
-        val total = n + 4
-        val step = if (total <= 16 * 1024) 512 else 4096
-        return (total + step - 1) / step * step
+        val total = maxOf(n + 4, MIN_PADDED)
+        val e = 31 - Integer.numberOfLeadingZeros(total)
+        val s = 32 - Integer.numberOfLeadingZeros(e)
+        val mask = (1 shl (e - s)) - 1
+        return (total + mask) and mask.inv()
     }
 
     private fun frame(body: ByteArray): ByteArray {
@@ -192,12 +201,34 @@ object FacetCrypto {
 
     private fun blobAad(id: String) = "facet:blob:v1:$id".toByteArray(US_ASCII)
 
-    fun encryptBlob(vaultKey: ByteArray, blobId: String, bytes: ByteArray, nonce: ByteArray = randomBytes(NONCE)): ByteArray =
-        byteArrayOf(VERSION) + nonce + gcmEncrypt(vaultKey, bytes, blobAad(blobId), nonce)
+    private fun blobAadV2(id: String, flags: Int) = "facet:blob:v2:$flags:$id".toByteArray(US_ASCII)
 
-    fun decryptBlob(vaultKey: ByteArray, blobId: String, blob: ByteArray): ByteArray {
-        if (blob.size < 29 || blob[0] != VERSION) throw DecryptionException("Bad blob")
-        return gcmDecrypt(vaultKey, blob.copyOfRange(1, 13), blob.copyOfRange(13, blob.size), blobAad(blobId))
+    /**
+     * Encrypts an attachment. With [compressible], the bytes are DEFLATEd when that saves space and the
+     * v2 envelope records it (`0x02 || flags || nonce || ct`, flags bound into the AAD); otherwise v1.
+     */
+    fun encryptBlob(
+        vaultKey: ByteArray,
+        blobId: String,
+        bytes: ByteArray,
+        nonce: ByteArray = randomBytes(NONCE),
+        compressible: Boolean = false,
+    ): ByteArray {
+        val deflated = if (compressible) deflate(bytes).takeIf { it.size < bytes.size * 0.95 } else null
+        if (deflated == null) return byteArrayOf(VERSION) + nonce + gcmEncrypt(vaultKey, bytes, blobAad(blobId), nonce)
+        val flags = 0x01
+        return byteArrayOf(BLOB_V2, flags.toByte()) + nonce + gcmEncrypt(vaultKey, deflated, blobAadV2(blobId, flags), nonce)
+    }
+
+    fun decryptBlob(vaultKey: ByteArray, blobId: String, blob: ByteArray): ByteArray = when {
+        blob.size >= 29 && blob[0] == VERSION ->
+            gcmDecrypt(vaultKey, blob.copyOfRange(1, 13), blob.copyOfRange(13, blob.size), blobAad(blobId))
+        blob.size >= 30 && blob[0] == BLOB_V2 -> {
+            val flags = blob[1].toInt() and 0xFF
+            val body = gcmDecrypt(vaultKey, blob.copyOfRange(2, 14), blob.copyOfRange(14, blob.size), blobAadV2(blobId, flags))
+            if (flags and 0x01 != 0) inflate(body) else body
+        }
+        else -> throw DecryptionException("Bad blob")
     }
 
     // ---- Compression (raw DEFLATE, RFC 1951) ----
