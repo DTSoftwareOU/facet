@@ -1,6 +1,7 @@
 package io.dtsoftware.facet.data.db
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -15,9 +16,12 @@ import androidx.room.RoomDatabase
         FolderEntity::class,
         PromptEntity::class,
         ProviderEntity::class,
+        McpServerEntity::class,
+        SkillEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
 abstract class FacetDatabase : RoomDatabase() {
     abstract fun conversations(): ConversationDao
@@ -27,6 +31,8 @@ abstract class FacetDatabase : RoomDatabase() {
     abstract fun folders(): FolderDao
     abstract fun prompts(): PromptDao
     abstract fun providers(): ProviderDao
+    abstract fun mcpServers(): McpServerDao
+    abstract fun skills(): SkillDao
 
     companion object {
         fun create(context: Context): FacetDatabase =

@@ -67,6 +67,7 @@ class AppContainer(private val app: Application) {
     init {
         Notifications.createChannels(app)
         settings.onSyncedChanged = { sync.requestSync() }
+        auth.onProfileName = { name -> settings.updateSynced { it.copy(profileName = name) } }
         auth.onSignedIn = { fresh ->
             scope.launch {
                 if (fresh) sync.markEverythingDirty()

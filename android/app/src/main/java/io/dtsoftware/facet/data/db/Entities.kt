@@ -72,6 +72,8 @@ data class MessageEntity(
     val updatedAt: Long,
     val deleted: Boolean = false,
     val dirty: Boolean = true,
+    /** ToolTrace JSON: the tool steps of an assistant reply (calls, results, per-step provider blocks). */
+    val stepsJson: String? = null,
 )
 
 enum class MessageStatus { DONE, STREAMING, STOPPED, ERROR, REFUSED, TRUNCATED }
@@ -167,6 +169,59 @@ data class ProviderEntity(
     /** Map<modelId, ModelCaps> JSON of user overrides. */
     val capsOverridesJson: String = "{}",
     val sort: Int = 0,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val deleted: Boolean = false,
+    val dirty: Boolean = true,
+)
+
+@Entity(tableName = "mcp_servers", indices = [Index("dirty")])
+data class McpServerEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val url: String,
+    /** McpAuthMode name. */
+    val authMode: String = "NONE",
+    /** Map<String,String> JSON sealed with the local SecretBox ("" when none). */
+    val headersSealed: String = "",
+    /** McpOAuthState JSON sealed with the local SecretBox ("" when none). */
+    val oauthSealed: String = "",
+    val enabled: Boolean = true,
+    /** ToolApproval name: ALWAYS, WRITES, NEVER. */
+    val approval: String = "WRITES",
+    /** Cached List<McpTool> JSON (local only). */
+    @ColumnInfo(defaultValue = "[]") val toolsJson: String = "[]",
+    val toolsFetchedAt: Long = 0,
+    /** Server instructions from initialize (local only). */
+    val instructions: String? = null,
+    /** Last connection problem shown to the user (local only). */
+    val status: String? = null,
+    /** List<String> JSON of tool names the user turned off. */
+    @ColumnInfo(defaultValue = "[]") val disabledToolsJson: String = "[]",
+    /** List<String> JSON of tool names that never ask for approval. */
+    @ColumnInfo(defaultValue = "[]") val autoApprovedJson: String = "[]",
+    val sort: Int = 0,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val deleted: Boolean = false,
+    val dirty: Boolean = true,
+)
+
+@Entity(tableName = "skills", indices = [Index("dirty")])
+data class SkillEntity(
+    @PrimaryKey val id: String,
+    /** Short identifier used by the model, e.g. "meeting-notes". */
+    val name: String,
+    /** When to use the skill; shown to the model in the skill index. */
+    val description: String,
+    /** The full instructions (SKILL.md body). */
+    val instructions: String,
+    /** List<SkillResource> JSON: extra reference files bundled with the skill. */
+    @ColumnInfo(defaultValue = "[]") val resourcesJson: String = "[]",
+    val enabled: Boolean = true,
+    /** Always include the full instructions instead of loading on demand. */
+    val alwaysOn: Boolean = false,
+    val sourceUrl: String? = null,
     val createdAt: Long,
     val updatedAt: Long,
     val deleted: Boolean = false,

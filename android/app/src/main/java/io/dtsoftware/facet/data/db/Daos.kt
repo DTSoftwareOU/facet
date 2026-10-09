@@ -318,3 +318,82 @@ interface ProviderDao {
     @Query("DELETE FROM providers")
     suspend fun clear()
 }
+
+@Dao
+interface McpServerDao {
+    @Query("SELECT id FROM mcp_servers WHERE dirty = 0")
+    suspend fun cleanIds(): List<String>
+
+    @Query("SELECT * FROM mcp_servers WHERE deleted = 0 ORDER BY sort, createdAt")
+    fun observeAll(): Flow<List<McpServerEntity>>
+
+    @Query("SELECT * FROM mcp_servers WHERE deleted = 0 ORDER BY sort, createdAt")
+    suspend fun all(): List<McpServerEntity>
+
+    @Query("SELECT * FROM mcp_servers WHERE id = :id")
+    suspend fun get(id: String): McpServerEntity?
+
+    @Query("SELECT * FROM mcp_servers WHERE id = :id")
+    fun observe(id: String): Flow<McpServerEntity?>
+
+    @Upsert suspend fun upsert(entity: McpServerEntity)
+
+    @Query("UPDATE mcp_servers SET toolsJson = :toolsJson, toolsFetchedAt = :fetchedAt, instructions = :instructions, status = NULL WHERE id = :id")
+    suspend fun setTools(id: String, toolsJson: String, fetchedAt: Long, instructions: String?)
+
+    @Query("UPDATE mcp_servers SET status = :status WHERE id = :id")
+    suspend fun setStatus(id: String, status: String?)
+
+    @Query("SELECT * FROM mcp_servers WHERE dirty = 1 LIMIT :limit")
+    suspend fun dirty(limit: Int): List<McpServerEntity>
+
+    @Query("UPDATE mcp_servers SET dirty = 0 WHERE id = :id AND updatedAt = :updatedAt")
+    suspend fun markClean(id: String, updatedAt: Long)
+
+    @Query("DELETE FROM mcp_servers WHERE deleted = 1 AND dirty = 0")
+    suspend fun purgeTombstones()
+
+    @Query("DELETE FROM mcp_servers WHERE id = :id")
+    suspend fun hardDelete(id: String)
+
+    @Query("UPDATE mcp_servers SET dirty = 1")
+    suspend fun markAllDirty()
+
+    @Query("DELETE FROM mcp_servers")
+    suspend fun clear()
+}
+
+@Dao
+interface SkillDao {
+    @Query("SELECT id FROM skills WHERE dirty = 0")
+    suspend fun cleanIds(): List<String>
+
+    @Query("SELECT * FROM skills WHERE deleted = 0 ORDER BY name COLLATE NOCASE")
+    fun observeAll(): Flow<List<SkillEntity>>
+
+    @Query("SELECT * FROM skills WHERE deleted = 0 ORDER BY name COLLATE NOCASE")
+    suspend fun all(): List<SkillEntity>
+
+    @Query("SELECT * FROM skills WHERE id = :id")
+    suspend fun get(id: String): SkillEntity?
+
+    @Upsert suspend fun upsert(entity: SkillEntity)
+
+    @Query("SELECT * FROM skills WHERE dirty = 1 LIMIT :limit")
+    suspend fun dirty(limit: Int): List<SkillEntity>
+
+    @Query("UPDATE skills SET dirty = 0 WHERE id = :id AND updatedAt = :updatedAt")
+    suspend fun markClean(id: String, updatedAt: Long)
+
+    @Query("DELETE FROM skills WHERE deleted = 1 AND dirty = 0")
+    suspend fun purgeTombstones()
+
+    @Query("DELETE FROM skills WHERE id = :id")
+    suspend fun hardDelete(id: String)
+
+    @Query("UPDATE skills SET dirty = 1")
+    suspend fun markAllDirty()
+
+    @Query("DELETE FROM skills")
+    suspend fun clear()
+}

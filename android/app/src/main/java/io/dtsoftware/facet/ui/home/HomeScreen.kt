@@ -93,6 +93,7 @@ fun HomeScreen(
     val drawerState by drawerVm.state.collectAsStateWithLifecycle()
     val account by container.auth.state.collectAsStateWithLifecycle()
     val sync by container.sync.state.collectAsStateWithLifecycle()
+    val synced by container.settings.synced.collectAsStateWithLifecycle()
     val currentId by vm.currentId.collectAsStateWithLifecycle()
     val wide = LocalConfiguration.current.screenWidthDp >= 840
     val drawer = rememberDrawerState(DrawerValue.Closed)
@@ -167,7 +168,7 @@ fun HomeScreen(
     )
 
     val drawerContent: @Composable () -> Unit = {
-        DrawerContent(drawerState, drawerVm, currentId, account, sync, callbacks)
+        DrawerContent(drawerState, drawerVm, currentId, account, sync, callbacks, profileName = synced.profileName)
     }
     val chat: @Composable () -> Unit = {
         ChatScreen(

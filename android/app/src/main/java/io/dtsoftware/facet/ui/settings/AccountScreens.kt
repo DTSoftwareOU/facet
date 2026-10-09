@@ -42,6 +42,7 @@ import io.dtsoftware.facet.sync.AccountState
 import io.dtsoftware.facet.sync.SessionDto
 import io.dtsoftware.facet.sync.SyncPhase
 import io.dtsoftware.facet.sync.SyncWorker
+import io.dtsoftware.facet.sync.shownName
 import io.dtsoftware.facet.ui.components.ButtonStyle
 import io.dtsoftware.facet.ui.components.EmptyState
 import io.dtsoftware.facet.ui.components.FacetButton
@@ -162,6 +163,7 @@ private fun SignedInAccount(
     val c = FacetTheme.colors
     val scope = rememberCoroutineScope()
     val sync by container.sync.state.collectAsStateWithLifecycle()
+    val synced by container.settings.synced.collectAsStateWithLifecycle()
     var renaming by remember { mutableStateOf(false) }
     var passwordSheet by remember { mutableStateOf(false) }
     var recoverySheet by remember { mutableStateOf(false) }
@@ -171,9 +173,9 @@ private fun SignedInAccount(
 
     SettingsPage("Account", onBack) {
         Column(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            UserAvatar(a.displayName ?: a.email, size = 72.dp)
+            UserAvatar(a.shownName(synced.profileName), size = 72.dp)
             Spacer(Modifier.height(14.dp))
-            Text(a.displayName ?: a.email.substringBefore('@'), style = FacetTheme.type.titleL, color = c.text)
+            Text(a.shownName(synced.profileName), style = FacetTheme.type.titleL, color = c.text)
             Text(a.email, style = FacetTheme.type.body, color = c.textSecondary)
         }
         Column(Modifier.fillMaxWidth().clip(FacetShapes.group).background(c.surface).padding(16.dp)) {
@@ -204,7 +206,7 @@ private fun SignedInAccount(
             }
         }
         SettingsGroup {
-            SettingsRow("Display name", subtitle = a.displayName ?: "Not set", icon = R.drawable.ic_user, onClick = { renaming = true })
+            SettingsRow("Display name", subtitle = synced.profileName.ifBlank { a.displayName ?: "Not set" }, icon = R.drawable.ic_user, onClick = { renaming = true })
             GroupDivider()
             SettingsRow("Change password", icon = R.drawable.ic_lock, onClick = { passwordSheet = true })
             GroupDivider()
@@ -224,7 +226,7 @@ private fun SignedInAccount(
     }
 
     if (renaming) {
-        TextInputDialog("Display name", a.displayName.orEmpty(), "Save", { name -> scope.launch { runCatching { container.auth.updateDisplayName(name) } } }, { renaming = false })
+        TextInputDialog("Display name", synced.profileName.ifBlank { a.displayName.orEmpty() }, "Save", { name -> container.auth.updateDisplayName(name) }, { renaming = false })
     }
     if (passwordSheet) ChangePasswordSheet(container) { passwordSheet = false }
     if (recoverySheet) {

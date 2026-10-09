@@ -52,6 +52,7 @@ import io.dtsoftware.facet.R
 import io.dtsoftware.facet.core.util.Format
 import io.dtsoftware.facet.data.prefs.ModelRef
 import io.dtsoftware.facet.sync.AccountState
+import io.dtsoftware.facet.sync.shownName
 import io.dtsoftware.facet.ui.Routes
 import io.dtsoftware.facet.ui.chat.ModelPickerSheet
 import io.dtsoftware.facet.ui.components.ButtonStyle
@@ -104,6 +105,7 @@ fun SettingsPage(title: String, onBack: () -> Unit, subtitle: String? = null, co
 fun SettingsScreen(container: AppContainer, onBack: () -> Unit, navigate: (Any) -> Unit) {
     val account by container.auth.state.collectAsStateWithLifecycle()
     val providers by container.providers.observeAll().collectAsStateWithLifecycle(emptyList())
+    val synced by container.settings.synced.collectAsStateWithLifecycle()
     val c = FacetTheme.colors
     SettingsPage("Settings", onBack) {
         Row(
@@ -117,10 +119,10 @@ fun SettingsScreen(container: AppContainer, onBack: () -> Unit, navigate: (Any) 
         ) {
             when (val a = account) {
                 is AccountState.SignedIn -> {
-                    UserAvatar(a.displayName ?: a.email, size = 48.dp)
+                    UserAvatar(a.shownName(synced.profileName), size = 48.dp)
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(a.displayName ?: a.email.substringBefore('@'), style = FacetTheme.type.titleM, color = c.text)
+                        Text(a.shownName(synced.profileName), style = FacetTheme.type.titleM, color = c.text)
                         Text(a.email, style = FacetTheme.type.labelM.copy(fontWeight = FontWeight.Normal), color = c.textSecondary)
                     }
                     FacetIcon(R.drawable.ic_shield, "End-to-end encrypted", tint = c.primary, size = 20.dp)

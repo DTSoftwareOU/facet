@@ -19,6 +19,13 @@ import io.dtsoftware.facet.data.repo.AssistantRepository
 import io.dtsoftware.facet.data.repo.AttachmentStore
 import io.dtsoftware.facet.data.repo.ConversationRepository
 import io.dtsoftware.facet.data.repo.ProviderRepository
+import io.dtsoftware.facet.domain.tools.PreparedTools
+import io.dtsoftware.facet.domain.tools.ToolCallRecord
+import io.dtsoftware.facet.domain.tools.ToolKind
+import io.dtsoftware.facet.domain.tools.ToolOutcome
+import io.dtsoftware.facet.domain.tools.ToolRegistry
+import io.dtsoftware.facet.domain.tools.ToolStep
+import io.dtsoftware.facet.domain.tools.ToolTrace
 import io.dtsoftware.facet.llm.ChatMessage
 import io.dtsoftware.facet.llm.ChatRequest
 import io.dtsoftware.facet.llm.Citation
@@ -41,16 +48,37 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+
+enum class ToolStatus { PREPARING, AWAITING_APPROVAL, RUNNING, DONE, ERROR, DENIED }
+
+enum class ApprovalDecision { ALLOW, ALWAYS, DENY }
+
+/** A tool call as shown while a reply streams (and rebuilt from [ToolTrace] afterwards). */
+data class ToolActivity(
+    val id: String,
+    val name: String,
+    val kind: ToolKind,
+    val label: String,
+    val status: ToolStatus,
+    val argumentsJson: String = "",
+    val result: String? = null,
+    val serverName: String? = null,
+)
 
 /** In-flight state of a streaming assistant turn, overlaid on the stored message by the UI. */
 data class LiveTurn(
@@ -66,6 +94,7 @@ data class LiveTurn(
     val searchCount: Int = 0,
     val citations: List<Citation> = emptyList(),
     val notice: String? = null,
+    val tools: List<ToolActivity> = emptyList(),
     val startedAt: Long = Clock.now(),
 )
 
@@ -75,9 +104,9 @@ data class NewChatSpec(val assistantId: String?, val model: ModelRef, val params
 class ChatException(message: String) : Exception(message)
 
 /**
- * Orchestrates conversations: builds provider requests from the visible branch, streams the
- * reply into [live], persists the result, computes cost, and titles new chats.
- * Generations run in the application scope so they survive leaving the screen.
+ * Orchestrates conversations: builds provider requests from the visible branch, runs the tool loop
+ * (search, skills, MCP), streams the reply into [live], persists the result, computes cost, and
+ * titles new chats. Generations run in the application scope so they survive leaving the screen.
  */
 class ChatEngine(
     private val scope: CoroutineScope,
@@ -88,6 +117,8 @@ class ChatEngine(
     private val settings: SettingsStore,
     private val pricing: PricingCatalog,
     private val sync: SyncEngine,
+    private val tools: ToolRegistry,
+    private val mcpAutoApprove: suspend (serverId: String, tool: String) -> Unit = { _, _ -> },
 ) {
     private val _live = MutableStateFlow<Map<String, LiveTurn>>(emptyMap())
     val live: StateFlow<Map<String, LiveTurn>> = _live.asStateFlow()
@@ -100,6 +131,7 @@ class ChatEngine(
     var onReplyFinished: ((conversationId: String, title: String, preview: String) -> Unit)? = null
 
     private val jobs = ConcurrentHashMap<String, Job>()
+    private val approvals = ConcurrentHashMap<String, CompletableDeferred<ApprovalDecision>>()
 
     fun isGenerating(conversationId: String) = conversationId in _active.value
 
@@ -112,6 +144,11 @@ class ChatEngine(
 
     fun stop(conversationId: String) {
         jobs[conversationId]?.cancel()
+    }
+
+    /** Answers a pending tool approval shown in the chat. */
+    fun respondToApproval(callId: String, decision: ApprovalDecision) {
+        approvals.remove(callId)?.complete(decision)
     }
 
     // ---- public actions ----
@@ -229,107 +266,175 @@ class ChatEngine(
         return provider to providers.modelInfo(provider, modelId)
     }
 
-    private suspend fun generate(conversationId: String, reply: MessageEntity, provider: ProviderEntity, model: ModelInfo) {
-        val text = StringBuilder()
+    /** Mutable state of one reply across its tool steps. */
+    private class ReplyState {
+        val allText = StringBuilder()
+        var stepText = StringBuilder()
         val thinking = StringBuilder()
         var thinkingStart: Long? = null
         var thinkingMs = 0L
-        var usage: Usage? = null
+        var usageBase = Usage()
+        var stepUsage: Usage? = null
         var blocks: ProviderBlocks? = null
         var stop: StopReason? = null
         var error: LlmError? = null
         val citations = LinkedHashMap<String, Citation>()
-        var servedModel = model.id
-        var lastPersist = 0L
+        val activities = LinkedHashMap<String, ToolActivity>()
+        val steps = ArrayList<ToolStep>()
+        var servedModel: String = ""
 
         fun endThinking() {
             thinkingStart?.let { thinkingMs += Clock.now() - it }
             thinkingStart = null
         }
 
+        val usage: Usage? get() = stepUsage?.let { usageBase + it } ?: usageBase.takeIf { it.inputTokens + it.outputTokens > 0 }
+    }
+
+    private suspend fun generate(conversationId: String, reply: MessageEntity, provider: ProviderEntity, model: ModelInfo) {
+        val st = ReplyState().apply { servedModel = model.id }
+        var lastPersist = 0L
+
         fun publish(transform: (LiveTurn) -> LiveTurn) {
             _live.update { map -> map[reply.id]?.let { map + (reply.id to transform(it)) } ?: map }
         }
 
+        fun publishTools() = publish { it.copy(tools = st.activities.values.toList(), citations = st.citations.values.toList()) }
+
         try {
-            val request = buildRequest(conversationId, reply, model)
-            providers.client(provider).stream(request).collect { ev ->
-                when (ev) {
-                    is StreamEvent.Started -> servedModel = ev.model
-                    is StreamEvent.TextDelta -> {
-                        if (thinkingStart != null) endThinking()
-                        text.append(ev.text)
-                        publish { it.copy(text = text.toString(), thinkingActive = false, thinkingMs = thinkingMs, searching = false) }
+            val base = buildRequest(conversationId, reply, model)
+            val prepared: PreparedTools = runCatching { tools.prepare(base.params, model.caps) }.getOrDefault(PreparedTools(emptyList(), null))
+            val system = listOfNotNull(base.system, prepared.systemAddendum).joinToString("\n\n").ifBlank { null }
+            var messages = base.messages
+            var round = 0
+            val client = providers.client(provider)
+
+            while (true) {
+                val request = base.copy(system = system, messages = messages, tools = prepared.defs.map { it.spec })
+                val calls = ArrayList<StreamEvent.ToolCallReady>()
+                st.stepText = StringBuilder()
+                st.stop = null
+                st.blocks = null
+                st.stepUsage = null
+                val textPrefix = st.allText.toString()
+
+                client.stream(request).collect { ev ->
+                    when (ev) {
+                        is StreamEvent.Started -> st.servedModel = ev.model
+                        is StreamEvent.TextDelta -> {
+                            if (st.thinkingStart != null) st.endThinking()
+                            st.stepText.append(ev.text)
+                            val shown = joinText(textPrefix, st.stepText.toString())
+                            publish { it.copy(text = shown, thinkingActive = false, thinkingMs = st.thinkingMs, searching = false) }
+                        }
+                        is StreamEvent.ThinkingDelta -> {
+                            if (st.thinkingStart == null) st.thinkingStart = Clock.now()
+                            st.thinking.append(ev.text)
+                            publish { it.copy(thinking = st.thinking.toString(), thinkingActive = true, thinkingStartedAt = it.thinkingStartedAt ?: st.thinkingStart) }
+                        }
+                        StreamEvent.ThinkingStarted -> {
+                            if (st.thinkingStart == null) st.thinkingStart = Clock.now()
+                            publish { it.copy(thinkingActive = true, thinkingStartedAt = it.thinkingStartedAt ?: st.thinkingStart) }
+                        }
+                        StreamEvent.ThinkingEnded -> {
+                            st.endThinking()
+                            publish { it.copy(thinkingActive = false, thinkingMs = st.thinkingMs) }
+                        }
+                        is StreamEvent.WebSearch -> publish {
+                            it.copy(
+                                searching = !ev.done,
+                                searchQuery = ev.query ?: it.searchQuery,
+                                searchCount = if (!ev.done) it.searchCount + 1 else it.searchCount,
+                            )
+                        }
+                        is StreamEvent.Citations -> {
+                            ev.citations.forEach { c -> st.citations.putIfAbsent(c.url, c) }
+                            publish { it.copy(citations = st.citations.values.toList()) }
+                        }
+                        is StreamEvent.UsageUpdate -> st.stepUsage = ev.usage
+                        is StreamEvent.Notice -> publish { it.copy(notice = ev.text) }
+                        is StreamEvent.ToolCallStarted -> {
+                            val def = prepared.byName[ev.name]
+                            st.activities[ev.id] = ToolActivity(
+                                ev.id, ev.name, def?.kind ?: ToolKind.MCP, preparingLabel(def?.kind, def?.serverName, def?.remoteName ?: ev.name),
+                                ToolStatus.PREPARING, serverName = def?.serverName,
+                            )
+                            publishTools()
+                        }
+                        is StreamEvent.ToolCallReady -> {
+                            calls += ev
+                            val def = prepared.byName[ev.name]
+                            val existing = st.activities[ev.id]
+                            st.activities[ev.id] = (existing ?: ToolActivity(ev.id, ev.name, def?.kind ?: ToolKind.MCP, preparingLabel(def?.kind, def?.serverName, def?.remoteName ?: ev.name), ToolStatus.PREPARING, serverName = def?.serverName))
+                                .copy(argumentsJson = ev.argumentsJson, label = runningLabel(def, ev.argumentsJson))
+                            publishTools()
+                        }
+                        is StreamEvent.Completed -> {
+                            st.stop = ev.stopReason
+                            st.blocks = ev.blocks
+                            ev.blocks?.model?.takeIf { it.isNotBlank() }?.let { st.servedModel = it }
+                        }
+                        is StreamEvent.Failed -> st.error = ev.error
                     }
-                    is StreamEvent.ThinkingDelta -> {
-                        if (thinkingStart == null) thinkingStart = Clock.now()
-                        thinking.append(ev.text)
-                        publish { it.copy(thinking = thinking.toString(), thinkingActive = true, thinkingStartedAt = it.thinkingStartedAt ?: thinkingStart) }
+                    val now = Clock.now()
+                    if (now - lastPersist > 1_000) {
+                        lastPersist = now
+                        conversations.updateStreaming(reply.id, joinText(textPrefix, st.stepText.toString()), st.thinking.toString().ifEmpty { null })
                     }
-                    StreamEvent.ThinkingStarted -> {
-                        if (thinkingStart == null) thinkingStart = Clock.now()
-                        publish { it.copy(thinkingActive = true, thinkingStartedAt = it.thinkingStartedAt ?: thinkingStart) }
-                    }
-                    StreamEvent.ThinkingEnded -> {
-                        endThinking()
-                        publish { it.copy(thinkingActive = false, thinkingMs = thinkingMs) }
-                    }
-                    is StreamEvent.WebSearch -> publish {
-                        it.copy(
-                            searching = !ev.done,
-                            searchQuery = ev.query ?: it.searchQuery,
-                            searchCount = if (!ev.done) it.searchCount + 1 else it.searchCount,
-                        )
-                    }
-                    is StreamEvent.Citations -> {
-                        ev.citations.forEach { c -> citations.putIfAbsent(c.url, c) }
-                        publish { it.copy(citations = citations.values.toList()) }
-                    }
-                    is StreamEvent.UsageUpdate -> usage = ev.usage
-                    is StreamEvent.Notice -> publish { it.copy(notice = ev.text) }
-                    is StreamEvent.Completed -> {
-                        stop = ev.stopReason
-                        blocks = ev.blocks
-                        ev.blocks?.model?.takeIf { it.isNotBlank() }?.let { servedModel = it }
-                    }
-                    is StreamEvent.Failed -> error = ev.error
                 }
-                val now = Clock.now()
-                if (now - lastPersist > 1_000) {
-                    lastPersist = now
-                    conversations.updateStreaming(reply.id, text.toString(), thinking.toString().ifEmpty { null })
+
+                st.usageBase = st.usage ?: st.usageBase
+                st.stepUsage = null
+                st.allText.setLength(0)
+                st.allText.append(joinText(textPrefix, st.stepText.toString()))
+
+                if (st.error != null || st.stop != StopReason.TOOL_USE || calls.isEmpty()) break
+                if (round >= MAX_TOOL_ROUNDS) {
+                    publish { it.copy(notice = "Stopped after $MAX_TOOL_ROUNDS rounds of tool use.") }
+                    st.stop = StopReason.END
+                    break
                 }
+                round++
+
+                val records = coroutineScope {
+                    calls.map { call -> async { runTool(call, prepared, st, reply.id) { publishTools() } } }.awaitAll()
+                }
+                st.steps += ToolStep(st.stepText.toString(), records, st.blocks)
+                val assistantParts = buildList<Part> {
+                    st.stepText.toString().takeIf { it.isNotBlank() }?.let { add(Part.Text(it)) }
+                    calls.forEach { add(Part.ToolCall(it.id, it.name, it.argumentsJson)) }
+                }
+                messages = messages +
+                    ChatMessage(Role.ASSISTANT, assistantParts, st.blocks) +
+                    ChatMessage(Role.USER, records.map { Part.ToolResult(it.id, it.name, it.result, it.isError) })
+                conversations.updateStreaming(reply.id, st.allText.toString(), st.thinking.toString().ifEmpty { null })
             }
         } catch (e: CancellationException) {
-            endThinking()
-            withContext(NonCancellable) {
-                finish(reply, text, thinking, thinkingMs, usage, null, citations.values.toList(), servedModel, provider, model, MessageStatus.STOPPED, null)
-            }
+            st.endThinking()
+            withContext(NonCancellable) { finish(reply, st, provider, model, MessageStatus.STOPPED, includeFinalBlocks = false) }
             throw e
         } catch (e: ChatException) {
-            error = LlmError(ErrorKind.BAD_REQUEST, e.message ?: "Couldn't send this message.")
+            st.error = LlmError(ErrorKind.BAD_REQUEST, e.message ?: "Couldn't send this message.")
         } catch (e: LlmException) {
-            error = e.error
+            st.error = e.error
         } catch (e: IOException) {
-            error = LlmError(ErrorKind.NETWORK, "Couldn't reach ${provider.label}. Check your connection and try again.")
+            st.error = LlmError(ErrorKind.NETWORK, "Couldn't reach ${provider.label}. Check your connection and try again.")
         } catch (e: Exception) {
-            error = LlmError(ErrorKind.UNKNOWN, "Something went wrong: ${e.message ?: e.javaClass.simpleName}")
+            st.error = LlmError(ErrorKind.UNKNOWN, "Something went wrong: ${e.message ?: e.javaClass.simpleName}")
         }
-        endThinking()
+        st.endThinking()
         val status = when {
-            error != null -> MessageStatus.ERROR
-            stop == StopReason.REFUSAL -> MessageStatus.REFUSED
-            stop == StopReason.MAX_TOKENS -> MessageStatus.TRUNCATED
-            stop == StopReason.CANCELLED -> MessageStatus.STOPPED
+            st.error != null -> MessageStatus.ERROR
+            st.stop == StopReason.REFUSAL -> MessageStatus.REFUSED
+            st.stop == StopReason.MAX_TOKENS -> MessageStatus.TRUNCATED
+            st.stop == StopReason.CANCELLED -> MessageStatus.STOPPED
             else -> MessageStatus.DONE
         }
-        withContext(NonCancellable) {
-            finish(reply, text, thinking, thinkingMs, usage, blocks, citations.values.toList(), servedModel, provider, model, status, error)
-        }
+        withContext(NonCancellable) { finish(reply, st, provider, model, status, includeFinalBlocks = true) }
         if (status == MessageStatus.DONE) {
             val conv = conversations.get(conversationId)
             if (conv != null) {
-                onReplyFinished?.invoke(conversationId, conv.title, text.take(160).toString())
+                onReplyFinished?.invoke(conversationId, conv.title, st.allText.take(160).toString())
                 if (!conv.titleSet && settings.synced.value.autoTitle) {
                     scope.launch { runCatching { generateTitle(conversationId) } }
                 }
@@ -337,37 +442,108 @@ class ChatEngine(
         }
     }
 
+    /** Runs one tool call (after approval when required) and records it. */
+    private suspend fun runTool(
+        call: StreamEvent.ToolCallReady,
+        prepared: PreparedTools,
+        st: ReplyState,
+        replyId: String,
+        onUpdate: () -> Unit,
+    ): ToolCallRecord {
+        val def = prepared.byName[call.name]
+        fun update(transform: (ToolActivity) -> ToolActivity) {
+            synchronized(st.activities) { st.activities[call.id]?.let { st.activities[call.id] = transform(it) } }
+            onUpdate()
+        }
+        if (def == null) {
+            val msg = "There is no tool named \"${call.name}\". Use only the tools provided."
+            update { it.copy(status = ToolStatus.ERROR, result = msg) }
+            return ToolCallRecord(call.id, call.name, ToolKind.MCP.name, call.name, call.argumentsJson, msg, true)
+        }
+        if (def.needsApproval) {
+            update { it.copy(status = ToolStatus.AWAITING_APPROVAL) }
+            val pending = CompletableDeferred<ApprovalDecision>()
+            approvals[call.id] = pending
+            val decision = pending.await()
+            if (decision == ApprovalDecision.ALWAYS) runCatching { mcpAutoApprove(def.serverId!!, def.remoteName!!) }
+            if (decision == ApprovalDecision.DENY) {
+                val msg = "The user declined this tool call. Don't retry it; continue without it or ask the user how to proceed."
+                update { it.copy(status = ToolStatus.DENIED, result = msg) }
+                return ToolCallRecord(call.id, call.name, def.kind.name, runningLabel(def, call.argumentsJson), call.argumentsJson, msg, true, serverName = def.serverName)
+            }
+        }
+        update { it.copy(status = ToolStatus.RUNNING) }
+        val start = Clock.now()
+        val outcome = try {
+            withTimeout(TOOL_TIMEOUT_MS) { tools.execute(def, call.argumentsJson) }
+        } catch (e: CancellationException) {
+            if (e is kotlinx.coroutines.TimeoutCancellationException) ToolOutcome("The tool timed out after ${TOOL_TIMEOUT_MS / 1000} s.", true) else throw e
+        } catch (e: Exception) {
+            ToolOutcome(e.message ?: "The tool failed.", true)
+        }
+        val result = outcome.content.let { if (it.length > ToolRegistry.MAX_RESULT_CHARS) it.take(ToolRegistry.MAX_RESULT_CHARS) + "\n\n[Output truncated.]" else it }
+        synchronized(st.citations) { outcome.citations.forEach { c -> st.citations.putIfAbsent(c.url, c) } }
+        val label = outcome.label ?: runningLabel(def, call.argumentsJson)
+        update { it.copy(status = if (outcome.isError) ToolStatus.ERROR else ToolStatus.DONE, label = label, result = result.take(2_000)) }
+        return ToolCallRecord(call.id, call.name, def.kind.name, label, call.argumentsJson, result, outcome.isError, Clock.now() - start, def.serverName)
+    }
+
+    private fun preparingLabel(kind: ToolKind?, serverName: String?, name: String) = when (kind) {
+        ToolKind.SEARCH -> "Searching the web"
+        ToolKind.FETCH -> "Reading a page"
+        ToolKind.SKILL -> "Loading a skill"
+        else -> if (serverName != null) "$serverName: $name" else name
+    }
+
+    private fun runningLabel(def: io.dtsoftware.facet.domain.tools.ToolDef?, args: String): String {
+        val obj = runCatching { AppJson.parseToJsonElement(args).let { it as kotlinx.serialization.json.JsonObject } }.getOrNull()
+        fun s(k: String) = (obj?.get(k) as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
+        return when (def?.kind) {
+            ToolKind.SEARCH -> "Searching “${s("query").take(60)}”"
+            ToolKind.FETCH -> "Reading ${runCatching { java.net.URI(s("url")).host?.removePrefix("www.") }.getOrNull() ?: "a page"}"
+            ToolKind.SKILL -> if (s("name").isNotBlank()) "Using skill ${s("name")}" else "Reading ${s("path")}"
+            ToolKind.MCP -> "${def.serverName}: ${def.remoteName}"
+            null -> "Tool"
+        }
+    }
+
+    private fun joinText(prefix: String, step: String): String = when {
+        prefix.isBlank() -> step
+        step.isBlank() -> prefix
+        else -> prefix.trimEnd() + "\n\n" + step.trimStart()
+    }
+
     private suspend fun finish(
         reply: MessageEntity,
-        text: CharSequence,
-        thinking: CharSequence,
-        thinkingMs: Long,
-        usage: Usage?,
-        blocks: ProviderBlocks?,
-        citations: List<Citation>,
-        servedModel: String,
+        st: ReplyState,
         provider: ProviderEntity,
         model: ModelInfo,
         status: MessageStatus,
-        error: LlmError?,
+        includeFinalBlocks: Boolean,
     ) {
         val kind = ProviderKind.fromId(provider.kind)
-        val price = if (servedModel == model.id) model.pricing ?: pricing.priceFor(kind, servedModel) else pricing.priceFor(kind, servedModel)
+        val served = st.servedModel.ifBlank { model.id }
+        val price = if (served == model.id) model.pricing ?: pricing.priceFor(kind, served) else pricing.priceFor(kind, served)
+        val usage = st.usage
         val cost = if (usage != null && price != null) pricing.cost(price, usage) else null
         val current = conversations.message(reply.id) ?: reply
+        val text = st.allText.toString().ifBlank { st.stepText.toString() }
+        val trace = st.steps.takeIf { it.isNotEmpty() }?.let { ToolTrace(it, st.stepText.toString()) }
+        val err = st.error
         conversations.updateMessage(
             current.copy(
-                content = text.toString(),
-                thinking = thinking.toString().ifBlank { null },
-                thinkingMs = thinkingMs.takeIf { it > 0 },
-                blocksJson = blocks?.let { AppJson.encodeToString(it) },
-                citationsJson = citations.takeIf { it.isNotEmpty() }?.let { AppJson.encodeToString(it) },
-                modelId = servedModel,
-                modelName = if (servedModel == model.id) model.displayName else servedModel,
+                content = text,
+                thinking = st.thinking.toString().ifBlank { null },
+                thinkingMs = st.thinkingMs.takeIf { it > 0 },
+                blocksJson = if (includeFinalBlocks) st.blocks?.let { AppJson.encodeToString(it) } else null,
+                citationsJson = st.citations.values.toList().takeIf { it.isNotEmpty() }?.let { AppJson.encodeToString(it) },
+                modelId = served,
+                modelName = if (served == model.id) model.displayName else served,
                 status = status.name,
-                errorJson = error?.let { AppJson.encodeToString(MessageError(it.kind.name, it.message, it.detail)) },
+                errorJson = err?.let { AppJson.encodeToString(MessageError(it.kind.name, it.message, it.detail)) },
                 usageJson = usage?.let { AppJson.encodeToString(it) },
                 costUsd = cost,
+                stepsJson = trace?.let { AppJson.encodeToString(it) },
             ),
         )
         conversations.update(reply.conversationId, touchActivity = true) { it }
@@ -380,24 +556,41 @@ class ChatEngine(
         val tree = MessageTree(all)
         val path = tree.pathTo(reply.parentId ?: throw ChatException("Nothing to reply to."))
         val messages = ArrayList<ChatMessage>()
-        for (m in path) {
-            val msg = when (m.role) {
-                "user" -> ChatMessage(Role.USER, userParts(m, model))
-                else -> {
-                    val status = runCatching { MessageStatus.valueOf(m.status) }.getOrDefault(MessageStatus.DONE)
-                    if (m.content.isBlank() || status == MessageStatus.ERROR || status == MessageStatus.REFUSED) continue
-                    val replayable = status == MessageStatus.DONE || status == MessageStatus.TRUNCATED
-                    val blocks = if (replayable) m.blocksJson?.let { runCatching { AppJson.decodeFromString<ProviderBlocks>(it) }.getOrNull() } else null
-                    ChatMessage(Role.ASSISTANT, listOf(Part.Text(m.content)), blocks)
-                }
-            }
+        fun add(msg: ChatMessage) {
             val last = messages.lastOrNull()
-            if (last != null && last.role == msg.role) {
+            val hasToolParts = { m: ChatMessage -> m.parts.any { it is Part.ToolCall || it is Part.ToolResult } }
+            if (last != null && last.role == msg.role && !hasToolParts(last) && !hasToolParts(msg)) {
                 messages[messages.lastIndex] = last.copy(parts = last.parts + msg.parts, blocks = null)
             } else {
                 messages += msg
             }
         }
+        for (m in path) {
+            if (m.role == "user") {
+                add(ChatMessage(Role.USER, userParts(m, model)))
+                continue
+            }
+            val status = runCatching { MessageStatus.valueOf(m.status) }.getOrDefault(MessageStatus.DONE)
+            if (status == MessageStatus.ERROR || status == MessageStatus.REFUSED) continue
+            val trace = m.stepsJson?.let { runCatching { AppJson.decodeFromString<ToolTrace>(it) }.getOrNull() }
+            val replayable = status == MessageStatus.DONE || status == MessageStatus.TRUNCATED
+            val blocks = if (replayable) m.blocksJson?.let { runCatching { AppJson.decodeFromString<ProviderBlocks>(it) }.getOrNull() } else null
+            if (trace != null) {
+                for (step in trace.steps) {
+                    val parts = buildList<Part> {
+                        step.text.takeIf { it.isNotBlank() }?.let { add(Part.Text(it)) }
+                        step.calls.forEach { add(Part.ToolCall(it.id, it.name, it.argumentsJson)) }
+                    }
+                    add(ChatMessage(Role.ASSISTANT, parts, step.blocks))
+                    add(ChatMessage(Role.USER, step.calls.map { Part.ToolResult(it.id, it.name, it.result, it.isError) }))
+                }
+                if (trace.finalText.isNotBlank()) add(ChatMessage(Role.ASSISTANT, listOf(Part.Text(trace.finalText)), blocks))
+            } else {
+                if (m.content.isBlank()) continue
+                add(ChatMessage(Role.ASSISTANT, listOf(Part.Text(m.content)), blocks))
+            }
+        }
+        // A reply cut off mid-tool-loop can leave the history ending on an assistant tool call; models need a result.
         val assistant = assistants.get(conv.assistantId)
         return ChatRequest(
             model = model.id,
@@ -482,4 +675,17 @@ class ChatEngine(
             .trim().trim('"', '\'', '“', '”', '*', '#', ' ').removeSuffix(".").take(60)
         if (title.isNotBlank()) conversations.update(conversationId) { it.copy(title = title, titleSet = true) }
     }
+
+    companion object {
+        const val MAX_TOOL_ROUNDS = 12
+        const val TOOL_TIMEOUT_MS = 130_000L
+    }
 }
+
+private operator fun Usage.plus(o: Usage) = Usage(
+    inputTokens + o.inputTokens,
+    outputTokens + o.outputTokens,
+    cacheReadTokens + o.cacheReadTokens,
+    cacheWriteTokens + o.cacheWriteTokens,
+    reasoningTokens + o.reasoningTokens,
+)

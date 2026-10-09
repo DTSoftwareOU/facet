@@ -126,8 +126,8 @@ class SyncEngine(
             withContext(Dispatchers.IO) {
                 push(codec, key)
                 pull(codec)
-                purge()
-                downloadPending(key)
+                purge(codec)
+                downloadPending(codec, key)
                 if (Clock.now() - lastAccountRefresh > 10 * 60_000) {
                     runCatching { auth.refreshAccount() }
                     lastAccountRefresh = Clock.now()
@@ -214,13 +214,18 @@ class SyncEngine(
             var current = e
             if (!e.deleted && !e.uploaded) {
                 val file = attachments.file(e) ?: return@forEach
-                val blob = FacetCrypto.encryptBlob(vaultKey, e.id, file.readBytes())
-                auth.authed { base, token -> api.putBlob(base, token, e.id, blob) }
+                val blobId = codec.blobId(e.id)
+                val blob = FacetCrypto.encryptBlob(vaultKey, blobId, file.readBytes())
+                auth.authed { base, token -> api.putBlob(base, token, blobId, blob) }
                 atts.markUploaded(e.id)
                 current = e.copy(uploaded = true)
             }
             out += Pending(codec.encode(current)) { atts.markClean(e.id, e.updatedAt) }
         }
+        val mcp = db.mcpServers()
+        mcp.dirty(LIMIT).forEach { e -> out += Pending(codec.encode(e)) { mcp.markClean(e.id, e.updatedAt) } }
+        val skills = db.skills()
+        skills.dirty(LIMIT).forEach { e -> out += Pending(codec.encode(e)) { skills.markClean(e.id, e.updatedAt) } }
         val messages = db.messages()
         messages.dirty(LIMIT * 2).forEach { e -> out += Pending(codec.encode(e)) { messages.markClean(e.id, e.updatedAt) } }
         return out
@@ -242,8 +247,8 @@ class SyncEngine(
             }
             db.withTransaction {
                 for (r in res.records) {
-                    applyRemote(codec, r, force = false)
-                    seen?.getOrPut(r.type) { HashSet() }?.add(r.id)
+                    val opened = applyRemote(codec, r, force = false)
+                    if (opened != null) seen?.getOrPut(opened.type) { HashSet() }?.add(opened.id)
                 }
             }
             since = res.cursor
@@ -253,13 +258,15 @@ class SyncEngine(
         seen?.let { deleteUnseen(it) }
     }
 
-    private suspend fun applyRemote(codec: RecordCodec, r: RecordDto, force: Boolean) {
+    /** Decrypts and applies one pulled record (last writer wins). Returns the opened record, or null if unreadable. */
+    private suspend fun applyRemote(codec: RecordCodec, raw: RecordDto, force: Boolean): OpenedRecord? {
         try {
+            val r = codec.open(raw) ?: return null
             when (r.type) {
                 RecordType.CONVERSATION -> {
                     val dao = db.conversations()
                     val local = dao.get(r.id)
-                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return r
                     if (r.deleted) {
                         dao.hardDelete(r.id)
                         db.messages().hardDeleteConversation(r.id)
@@ -270,14 +277,14 @@ class SyncEngine(
                 RecordType.MESSAGE -> {
                     val dao = db.messages()
                     val local = dao.get(r.id)
-                    if (local != null && local.status == MessageStatus.STREAMING.name) return
-                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (local != null && local.status == MessageStatus.STREAMING.name) return r
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return r
                     if (r.deleted) dao.hardDelete(r.id) else dao.upsert(codec.message(r))
                 }
                 RecordType.ATTACHMENT -> {
                     val dao = db.attachments()
                     val local = dao.get(r.id)
-                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return r
                     if (r.deleted) {
                         local?.let { attachments.deleteFile(it) }
                         dao.hardDelete(r.id)
@@ -288,25 +295,25 @@ class SyncEngine(
                 RecordType.ASSISTANT -> {
                     val dao = db.assistants()
                     val local = dao.get(r.id)
-                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return r
                     if (r.deleted) dao.hardDelete(r.id) else dao.upsert(codec.assistant(r))
                 }
                 RecordType.FOLDER -> {
                     val dao = db.folders()
                     val local = dao.get(r.id)
-                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return r
                     if (r.deleted) dao.hardDelete(r.id) else dao.upsert(codec.folder(r))
                 }
                 RecordType.PROMPT -> {
                     val dao = db.prompts()
                     val local = dao.get(r.id)
-                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return r
                     if (r.deleted) dao.hardDelete(r.id) else dao.upsert(codec.prompt(r))
                 }
                 RecordType.PROVIDER -> {
                     val dao = db.providers()
                     val local = dao.get(r.id)
-                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return r
                     if (r.deleted) dao.hardDelete(r.id) else dao.upsert(codec.provider(r, local))
                 }
                 RecordType.SETTINGS -> if (!r.deleted) {
@@ -315,13 +322,29 @@ class SyncEngine(
                         settings.applyRemoteSynced(remote)
                     }
                 }
+                RecordType.MCP -> {
+                    val dao = db.mcpServers()
+                    val local = dao.get(r.id)
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return r
+                    if (r.deleted) dao.hardDelete(r.id) else dao.upsert(codec.mcpServer(r, local))
+                }
+                RecordType.SKILL -> {
+                    val dao = db.skills()
+                    val local = dao.get(r.id)
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return r
+                    if (r.deleted) dao.hardDelete(r.id) else dao.upsert(codec.skill(r))
+                }
                 else -> Unit // Unknown type from a newer client: ignore.
             }
+            return r
         } catch (e: DecryptionException) {
-            Log.w(TAG, "skipping undecryptable ${r.type} record")
+            Log.w(TAG, "skipping undecryptable record")
         } catch (e: kotlinx.serialization.SerializationException) {
-            Log.w(TAG, "skipping malformed ${r.type} record")
+            Log.w(TAG, "skipping malformed record")
+        } catch (e: IllegalArgumentException) {
+            Log.w(TAG, "skipping malformed record")
         }
+        return null
     }
 
     /** After a server reset, local clean rows the server no longer has are deleted. */
@@ -338,9 +361,13 @@ class SyncEngine(
         gone(RecordType.FOLDER, db.folders().cleanIds()).forEach { db.folders().hardDelete(it) }
         gone(RecordType.PROMPT, db.prompts().cleanIds()).forEach { db.prompts().hardDelete(it) }
         gone(RecordType.PROVIDER, db.providers().cleanIds()).forEach { db.providers().hardDelete(it) }
+        gone(RecordType.MCP, db.mcpServers().cleanIds()).forEach { db.mcpServers().hardDelete(it) }
+        gone(RecordType.SKILL, db.skills().cleanIds()).forEach { db.skills().hardDelete(it) }
     }
 
-    private suspend fun purge() {
+    private suspend fun purge(codec: RecordCodec) {
+        db.mcpServers().purgeTombstones()
+        db.skills().purgeTombstones()
         db.conversations().purgeTombstones()
         db.messages().purgeTombstones()
         db.assistants().purgeTombstones()
@@ -348,17 +375,18 @@ class SyncEngine(
         db.prompts().purgeTombstones()
         db.providers().purgeTombstones()
         db.attachments().purgeable().forEach { a ->
-            if (a.uploaded) runCatching { auth.authed { base, token -> api.deleteBlob(base, token, a.id) } }
+            if (a.uploaded) runCatching { auth.authed { base, token -> api.deleteBlob(base, token, codec.blobId(a.id)) } }
             attachments.deleteFile(a)
             db.attachments().hardDelete(a.id)
         }
     }
 
-    private suspend fun downloadPending(vaultKey: ByteArray) {
+    private suspend fun downloadPending(codec: RecordCodec, vaultKey: ByteArray) {
         db.attachments().pendingDownload(EAGER_DOWNLOAD_MAX, 20).forEach { a ->
             runCatching {
-                val blob = auth.authed { base, token -> api.getBlob(base, token, a.id) }
-                attachments.storeDownloaded(a, FacetCrypto.decryptBlob(vaultKey, a.id, blob))
+                val blobId = codec.blobId(a.id)
+                val blob = auth.authed { base, token -> api.getBlob(base, token, blobId) }
+                attachments.storeDownloaded(a, FacetCrypto.decryptBlob(vaultKey, blobId, blob))
             }
         }
     }
@@ -370,8 +398,9 @@ class SyncEngine(
         if (!a.uploaded || !auth.isSignedIn) return@withContext false
         val key = auth.vaultKey() ?: return@withContext false
         runCatching {
-            val blob = auth.authed { base, token -> api.getBlob(base, token, a.id) }
-            attachments.storeDownloaded(a, FacetCrypto.decryptBlob(key, a.id, blob))
+            val blobId = RecordCodec(key, secrets).blobId(a.id)
+            val blob = auth.authed { base, token -> api.getBlob(base, token, blobId) }
+            attachments.storeDownloaded(a, FacetCrypto.decryptBlob(key, blobId, blob))
             true
         }.getOrDefault(false)
     }
@@ -388,6 +417,8 @@ class SyncEngine(
             db.folders().markAllDirty()
             db.prompts().markAllDirty()
             db.providers().markAllDirty()
+            db.mcpServers().markAllDirty()
+            db.skills().markAllDirty()
         }
         settings.markSyncedDirty()
         cursor = 0
@@ -403,6 +434,8 @@ class SyncEngine(
             db.folders().clear()
             db.prompts().clear()
             db.providers().clear()
+            db.mcpServers().clear()
+            db.skills().clear()
         }
         attachments.clearAll()
         settings.resetSynced()

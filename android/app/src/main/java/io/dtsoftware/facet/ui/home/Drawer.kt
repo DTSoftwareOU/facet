@@ -54,6 +54,7 @@ import io.dtsoftware.facet.data.repo.Assistant
 import io.dtsoftware.facet.sync.AccountState
 import io.dtsoftware.facet.sync.SyncPhase
 import io.dtsoftware.facet.sync.SyncState
+import io.dtsoftware.facet.sync.shownName
 import io.dtsoftware.facet.ui.chat.MenuItem
 import io.dtsoftware.facet.ui.components.AssistantAvatar
 import io.dtsoftware.facet.ui.components.FacetIcon
@@ -146,6 +147,7 @@ fun DrawerContent(
     sync: SyncState,
     callbacks: DrawerCallbacks,
     modifier: Modifier = Modifier,
+    profileName: String = "",
 ) {
     val c = FacetTheme.colors
     Column(
@@ -261,7 +263,7 @@ fun DrawerContent(
             }
         }
         Hairline(Modifier.fillMaxWidth())
-        AccountFooter(account, sync, callbacks)
+        AccountFooter(account, sync, callbacks, profileName)
     }
 }
 
@@ -347,7 +349,7 @@ private fun ConversationRow(
 }
 
 @Composable
-private fun AccountFooter(account: AccountState, sync: SyncState, callbacks: DrawerCallbacks) {
+private fun AccountFooter(account: AccountState, sync: SyncState, callbacks: DrawerCallbacks, profileName: String) {
     val c = FacetTheme.colors
     Row(
         Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
@@ -359,10 +361,10 @@ private fun AccountFooter(account: AccountState, sync: SyncState, callbacks: Dra
         ) {
             when (account) {
                 is AccountState.SignedIn -> {
-                    UserAvatar(account.displayName ?: account.email, size = 34.dp)
+                    UserAvatar(account.shownName(profileName), size = 34.dp)
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(account.displayName ?: account.email, style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(account.shownName(profileName), style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         SyncLine(sync)
                     }
                 }

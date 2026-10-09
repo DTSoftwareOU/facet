@@ -36,6 +36,10 @@ sealed interface AccountState {
     data class Expired(val email: String, val serverUrl: String) : AccountState
 }
 
+/** The name to show: the encrypted profile name, else the server's display name, else the email's local part. */
+fun AccountState.SignedIn.shownName(profileName: String): String =
+    profileName.ifBlank { displayName ?: email.substringBefore('@') }
+
 /** User-facing auth failure. */
 class AuthException(message: String) : Exception(message)
 
@@ -59,6 +63,9 @@ class AuthManager(
 
     /** Called after sign-in/sign-up so the sync engine can start. Arg: true when local data should be uploaded. */
     var onSignedIn: ((freshAccount: Boolean) -> Unit)? = null
+
+    /** Stores the display name in end-to-end encrypted settings (never sent to the server in plaintext). */
+    var onProfileName: ((String) -> Unit)? = null
 
     val serverUrl: String
         get() = prefs.getString(K_SERVER, null) ?: BuildConfig.DEFAULT_SYNC_URL
@@ -104,7 +111,7 @@ class AuthManager(
                 serverUrl,
                 RegisterReq(
                     email = cleanEmail,
-                    displayName = displayName?.trim()?.takeIf { it.isNotEmpty() },
+                    displayName = null,
                     kdf = Kdf(iterations = iterations, salt = FacetCrypto.b64(salt)),
                     authHash = FacetCrypto.b64(keys.authHash),
                     wrappedVaultKey = FacetCrypto.b64(FacetCrypto.wrapVaultKey(keys.wrapKey, vaultKey)),
@@ -117,6 +124,7 @@ class AuthManager(
             )
         }
         saveSession(res.user, res.tokens, vaultKey)
+        displayName?.trim()?.takeIf { it.isNotEmpty() }?.let { onProfileName?.invoke(it) }
         onSignedIn?.invoke(true)
         RecoveryCode.format(recovery)
     }
@@ -202,9 +210,8 @@ class AuthManager(
         clearSession()
     }
 
-    suspend fun updateDisplayName(name: String?) {
-        val user = authed { base, token -> api.updateDisplayName(base, token, name?.trim()?.takeIf { it.isNotEmpty() }) }
-        saveUser(user)
+    fun updateDisplayName(name: String?) {
+        onProfileName?.invoke(name?.trim().orEmpty())
     }
 
     suspend fun refreshAccount() {

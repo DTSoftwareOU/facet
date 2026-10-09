@@ -41,6 +41,8 @@ data class ModelRef(val providerId: String, val modelId: String)
 /** Preferences that follow the account across devices (synced as the "settings" record). */
 @Serializable
 data class SyncedPrefs(
+    /** Display name. Kept here (end-to-end encrypted) instead of on the sync server. */
+    val profileName: String = "",
     val aboutMe: String = "",
     val responseStyle: String = "",
     val customInstructionsEnabled: Boolean = true,
@@ -48,6 +50,8 @@ data class SyncedPrefs(
     val defaultParams: GenParams = GenParams(),
     val titleModel: ModelRef? = null,
     val autoTitle: Boolean = true,
+    /** Use the model's own web search when it has one; otherwise Facet's search tool. */
+    val preferNativeSearch: Boolean = true,
     val updatedAt: Long = 0,
 )
 

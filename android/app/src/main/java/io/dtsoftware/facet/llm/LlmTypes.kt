@@ -112,6 +112,10 @@ data class GenParams(
     val topP: Float? = null,
     val maxOutputTokens: Int? = null,
     val webSearch: Boolean = false,
+    /** Offer MCP tools and skills to the model in this chat. */
+    val tools: Boolean = true,
+    /** MCP server ids turned off for this chat. */
+    val disabledMcpServers: List<String> = emptyList(),
 )
 
 enum class Role { USER, ASSISTANT }

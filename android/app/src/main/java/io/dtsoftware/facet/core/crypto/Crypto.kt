@@ -142,19 +142,48 @@ object FacetCrypto {
 
     private fun recordAad(type: String, id: String) = "facet:rec:v1:$type:$id".toByteArray(US_ASCII)
 
-    fun encryptRecord(vaultKey: ByteArray, type: String, id: String, json: String, nonce: ByteArray = randomBytes(NONCE)): ByteArray {
+    /**
+     * Encrypts a record body. With [pad], the (possibly compressed) body is framed with a 4-byte length
+     * and zero-padded to a size bucket (flags bit1) so ciphertext length doesn't reveal content length.
+     */
+    fun encryptRecord(vaultKey: ByteArray, type: String, id: String, json: String, nonce: ByteArray = randomBytes(NONCE), pad: Boolean = false): ByteArray {
         val raw = json.toByteArray(UTF_8)
         val compress = raw.size > COMPRESS_THRESHOLD
-        val body = if (compress) deflate(raw) else raw
-        val flags: Byte = if (compress) 0x01 else 0x00
-        return byteArrayOf(VERSION, flags) + nonce + gcmEncrypt(vaultKey, body, recordAad(type, id), nonce)
+        var body = if (compress) deflate(raw) else raw
+        if (pad) body = frame(body)
+        val flags = (if (compress) 0x01 else 0) or (if (pad) 0x02 else 0)
+        return byteArrayOf(VERSION, flags.toByte()) + nonce + gcmEncrypt(vaultKey, body, recordAad(type, id), nonce)
+    }
+
+    /** Pads to 512-byte buckets up to 16 KiB, then 4 KiB buckets. */
+    internal fun paddedSize(n: Int): Int {
+        val total = n + 4
+        val step = if (total <= 16 * 1024) 512 else 4096
+        return (total + step - 1) / step * step
+    }
+
+    private fun frame(body: ByteArray): ByteArray {
+        val out = ByteArray(paddedSize(body.size))
+        out[0] = (body.size ushr 24).toByte(); out[1] = (body.size ushr 16).toByte()
+        out[2] = (body.size ushr 8).toByte(); out[3] = body.size.toByte()
+        System.arraycopy(body, 0, out, 4, body.size)
+        return out
+    }
+
+    private fun unframe(padded: ByteArray): ByteArray {
+        if (padded.size < 4) throw DecryptionException("Bad padding")
+        val n = ((padded[0].toInt() and 0xFF) shl 24) or ((padded[1].toInt() and 0xFF) shl 16) or
+            ((padded[2].toInt() and 0xFF) shl 8) or (padded[3].toInt() and 0xFF)
+        if (n < 0 || n > padded.size - 4) throw DecryptionException("Bad padding")
+        return padded.copyOfRange(4, 4 + n)
     }
 
     fun decryptRecord(vaultKey: ByteArray, type: String, id: String, envelope: ByteArray): String {
         if (envelope.size < 30 || envelope[0] != VERSION) throw DecryptionException("Bad record envelope")
         val flags = envelope[1].toInt()
         val nonce = envelope.copyOfRange(2, 14)
-        val body = gcmDecrypt(vaultKey, nonce, envelope.copyOfRange(14, envelope.size), recordAad(type, id))
+        var body = gcmDecrypt(vaultKey, nonce, envelope.copyOfRange(14, envelope.size), recordAad(type, id))
+        if (flags and 0x02 != 0) body = unframe(body)
         val raw = if (flags and 0x01 != 0) inflate(body) else body
         return String(raw, UTF_8)
     }
