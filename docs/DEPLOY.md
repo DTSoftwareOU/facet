@@ -158,6 +158,28 @@ signs mail for `dtsoftware.io` (SPF/DKIM), e.g. Postmark, Resend, Amazon SES or 
 The server is a single process with SQLite in WAL mode; it comfortably handles thousands of
 users on a small VPS. Rate limits are kept in memory, so run one replica.
 
+## Behind an existing nginx
+
+If the server already runs nginx on ports 80/443 (as the dtsoftware.io VPS does), skip Caddy and
+use `deploy/nginx/`: the container listens on `127.0.0.1:8788` and nginx serves the site,
+downloads and API.
+
+```sh
+# Code in /opt/facet (server/ and deploy/), site in /var/www/facet, APKs in /var/www/facet-downloads
+cd /opt/facet/deploy/nginx
+cp ../.env.example .env            # fill in JWT_SECRET and SERVER_SECRET (openssl rand -base64 48)
+docker compose up -d --build
+cp facet.conf /etc/nginx/sites-available/facet
+ln -s /etc/nginx/sites-available/facet /etc/nginx/sites-enabled/facet
+nginx -t && systemctl reload nginx
+certbot --nginx -d facet.dtsoftware.io --redirect
+```
+
+The DNS records must be **DNS only** (grey cloud in Cloudflare) so certbot can validate and the
+server sees real client addresses for its rate limits. Publish a new APK by replacing
+`/var/www/facet-downloads/facet-latest.apk` (and its `.sha256`). Update the server with
+`docker compose up -d --build` after copying the new `server/` code.
+
 ## Self-hosting elsewhere
 
 Anyone can run their own server: same steps with their own `FACET_DOMAIN`. In the app, open
