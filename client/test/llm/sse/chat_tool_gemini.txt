@@ -1,0 +1,6 @@
+data: {"id":"g1","object":"chat.completion.chunk","model":"gemini-2.5-flash","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"function":{"arguments":"{\"city\":\"Kyiv\"}","name":"get_weather"},"id":"","type":"function"}]},"finish_reason":null}]}
+
+data: {"id":"g1","object":"chat.completion.chunk","model":"gemini-2.5-flash","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"function":{"arguments":"{\"city\":\"Oslo\"}","name":"get_weather"},"id":"","type":"function"}]},"finish_reason":"stop"}]}
+
+data: [DONE]
+

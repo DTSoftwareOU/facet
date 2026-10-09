@@ -1,0 +1,14 @@
+data: {"id":"c2","object":"chat.completion.chunk","model":"llama-3.3-70b","choices":[{"index":0,"delta":{"role":"assistant","content":"Checking."},"finish_reason":null}]}
+
+data: {"id":"c2","object":"chat.completion.chunk","model":"llama-3.3-70b","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_x1","type":"function","function":{"name":"get_weather","arguments":""}}]},"finish_reason":null}]}
+
+data: {"id":"c2","object":"chat.completion.chunk","model":"llama-3.3-70b","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"city\""}}]},"finish_reason":null}]}
+
+data: {"id":"c2","object":"chat.completion.chunk","model":"llama-3.3-70b","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":": \"Lima\"}"}}]},"finish_reason":null}]}
+
+data: {"id":"c2","object":"chat.completion.chunk","model":"llama-3.3-70b","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}
+
+data: {"id":"c2","object":"chat.completion.chunk","model":"llama-3.3-70b","choices":[],"usage":{"prompt_tokens":30,"completion_tokens":12,"total_tokens":42}}
+
+data: [DONE]
+

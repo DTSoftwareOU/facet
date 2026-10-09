@@ -59,7 +59,8 @@
       <a class="nav-optional" href="#models">Models</a>
       <a class="nav-optional" href="#security">Security</a>
       <a class="nav-optional" href="/self-host.html">Self-host</a>
-      <a class="btn btn-primary btn-small" href="/download/facet-latest.apk">Download</a>
+      <a class="nav-optional" href="#download">Download</a>
+      <a class="btn btn-primary btn-small" href="/app/">Open Facet</a>
     </nav>
   </div>
 </header>
@@ -81,18 +82,22 @@
           </svg>
         </div>
         <h1 id="hero-title">Every model.<br> One private home.</h1>
-        <p class="lede">Facet is an open-source AI chat app for Android. Bring your own OpenAI, Anthropic, Google or OpenRouter key, pick any model, and keep every conversation end-to-end encrypted across your devices.</p>
+        <p class="lede">Facet is an open-source AI chat app for Android, Windows and the web. Bring your own OpenAI, Anthropic, Google or OpenRouter key, pick any model, and keep every conversation end-to-end encrypted across your devices.</p>
         <div class="hero-actions">
-          <a class="btn btn-primary" href="/download/facet-latest.apk">
-            <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>
-            Download for Android
+          <a class="btn btn-primary" href="/app/">
+            <svg class="ico" aria-hidden="true"><use href="#i-globe"/></svg>
+            Use it in your browser
           </a>
-          <a class="btn btn-quiet" href="/self-host.html" data-repo-path="">
-            <svg class="ico" aria-hidden="true"><use href="#i-code"/></svg>
-            View source
+          <a class="btn btn-quiet" href="/download/windows/Facet-Setup.exe">
+            <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>
+            Windows
+          </a>
+          <a class="btn btn-quiet" href="/download/facet-latest.apk">
+            <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>
+            Android
           </a>
         </div>
-        <p class="hero-note">Free and open source under Apache-2.0. Requires Android 8.0 or later.</p>
+        <p class="hero-note">Free and open source under Apache-2.0. Windows 10 or later, Android 8.0 or later, or any modern browser. The Windows app can also run commands and edit files on your computer, with your approval.</p>
       </div>
 
       <!-- PRODUCT MOCKUP: HTML/CSS stand-in for a real screenshot of the Facet chat screen.
@@ -289,13 +294,13 @@
     </div>
   </section>
 
-  <section class="section" id="start" aria-labelledby="start-title">
+  <section class="section" id="download" aria-labelledby="start-title">
     <div class="wrap">
       <h2 id="start-title">Get started in three steps.</h2>
       <ol class="steps">
         <li>
-          <h3>Install Facet</h3>
-          <p>Download the APK and open it on any phone running Android 8.0 or later.</p>
+          <h3>Open or install Facet</h3>
+          <p>Use it in your browser, install the Windows app, or open the APK on any phone running Android 8.0 or later. Your chats follow you between all three.</p>
         </li>
         <li>
           <h3>Add an API key</h3>
@@ -307,11 +312,20 @@
         </li>
       </ol>
       <div class="cta-row">
-        <a class="btn btn-primary" href="/download/facet-latest.apk">
+        <a class="btn btn-primary" href="/app/">
+          <svg class="ico" aria-hidden="true"><use href="#i-globe"/></svg>
+          Open the web app
+        </a>
+        <a class="btn btn-quiet" href="/download/windows/Facet-Setup.exe">
+          <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>
+          Download for Windows
+        </a>
+        <a class="btn btn-quiet" href="/download/facet-latest.apk">
           <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>
           Download for Android
         </a>
       </div>
+      <p class="hero-note">The Windows installer isn't code-signed yet, so Windows may show a SmartScreen notice: choose “More info”, then “Run anyway”.</p>
     </div>
   </section>
 

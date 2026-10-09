@@ -1,0 +1,4 @@
+data: {"id":"c3","object":"chat.completion.chunk","model":"llama-3.3-70b","choices":[{"index":0,"delta":{"role":"assistant","content":"Lima is 20°C."},"finish_reason":"stop"}]}
+
+data: [DONE]
+

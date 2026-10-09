@@ -12,9 +12,18 @@ receives the user's password.
 | Malicious or compromised server operator (including us) | Same as above; the password and vault key never leave the client. The operator can see only: the account email, how many records exist with their padded sizes and change times, signed-in device names, and IP addresses. Record types and ids are opaque, content lengths are padded, and display names live inside the encrypted settings. |
 | Network attacker | TLS (Caddy, automatic HTTPS). Ciphertext is authenticated (GCM) and bound to its record id and type via AAD, so records can't be swapped. |
 | Stolen phone (locked) | Android full-disk encryption; API keys and the vault key are additionally wrapped with a non-exportable Android Keystore key; optional biometric app lock. |
+| Stolen Windows PC (signed out of Windows) | API keys, tokens and the vault key are sealed with Windows DPAPI (Electron `safeStorage`), tied to the Windows account. |
 
 Not protected: a compromised unlocked device, or a malicious build of the app. LLM requests
 go straight to the chosen provider under that provider's own privacy terms.
+
+**The web app** (`/app/`) runs the same client code and the same cryptography, so the server
+still only ever receives ciphertext. One difference is inherent to websites: the code is
+delivered by the server on every visit, so a malicious or compromised operator could serve
+modified code to a specific user. The installed apps (Android, Windows) don't have this
+exposure: their code is on the device and only changes when you install an update. The web
+app is served with a strict Content-Security-Policy (no inline or third-party scripts), but
+for the strongest guarantee use an installed app.
 
 ## Primitives
 
@@ -137,6 +146,43 @@ that still doesn't fit waits on its device and uploads once there's room.
   encrypted records.
 - Conversations live in the app's private Room database (protected by Android file-based
   encryption). Optional biometric app lock and `FLAG_SECURE` app-switcher hiding.
+
+## Local storage on Windows and the web
+
+The Windows app and the web app share one TypeScript client (`client/`); the Windows app wraps
+it in Electron (`desktop/`).
+
+- Data lives in the browser engine's IndexedDB: chats, messages, files (as blobs), providers,
+  MCP servers, skills and settings, the same tables as the Android Room database.
+- Secrets (vault key, refresh and access tokens, API keys, MCP headers and OAuth state) are sealed
+  before they're stored. **Windows:** DPAPI through Electron `safeStorage` (`d1:` prefix; if DPAPI
+  is unavailable, AES-256-GCM with a random key in the app's data folder, `d0:`). **Web:** AES-256-GCM
+  with a non-extractable Web Crypto key kept in IndexedDB (`v1:`), so page scripts can use it but
+  can't read it out.
+- Open tabs and windows share one session. Token refreshes are serialized with a Web Lock and
+  re-read storage, so two tabs never present the same rotated refresh token. One tab keeps the
+  change stream open; every tab sees changes through the shared database.
+- Model, MCP and search requests go straight from the browser or the Windows app to the provider.
+  On the website the browser enforces CORS, so providers that don't allow web pages (marked
+  "Windows and Android only" in the app) can't be used there. When the page reader can't load a
+  page directly in the browser, it reads it through Jina Reader (`r.jina.ai`), which sees the page
+  address (not the chat); the tool result says so.
+
+## Computer access (Windows app)
+
+Models can use the computer through local tools: `run_command` (PowerShell), `read_file`,
+`write_file`, `edit_file`, `list_directory`, `glob`, `grep`, `open_path` and background-process
+helpers. They run in the app's main process, in each chat's working folder, and never pass
+through the sync server.
+
+- By default, reading and searching files runs without asking; commands and file changes show an
+  approval card with the exact command or edit ("Allow", "Allow for this chat", "Deny"). The user
+  can require approval for everything, or nothing; YOLO mode skips approvals.
+- The renderer reaches these tools only through the preload's narrow `window.facetDesktop` API.
+  The window runs with context isolation, a sandboxed preload, no Node integration, a strict CSP,
+  no navigation away from the app, and every IPC message is checked against the app's origin.
+- Local MCP servers (stdio) are started the same way and stay on that computer: their rows are
+  never synced.
 
 ## Flows
 

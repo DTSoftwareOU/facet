@@ -47,7 +47,7 @@
     </div>
 
     <h2>Who this covers</h2>
-    <p>Facet is made by DT Software (“we”, “us”). This policy covers the Facet Android app, the hosted sync service at <code>facet.dtsoftware.io</code>, and this website. If you connect the app to a sync server run by someone else, that server’s operator is responsible for it and their policy applies to the data it holds.</p>
+    <p>Facet is made by DT Software (“we”, “us”). This policy covers the Facet apps for Android and Windows, the Facet web app at <code>facet.dtsoftware.io/app</code>, the hosted sync service at <code>facet.dtsoftware.io</code>, and this website. If you connect the app to a sync server run by someone else, that server’s operator is responsible for it and their policy applies to the data it holds.</p>
 
     <h2>Using Facet without an account</h2>
     <p>You can use Facet without signing up. In that case your conversations, settings and API keys are stored only on your phone and we receive none of it.</p>
@@ -96,7 +96,7 @@
 
     <h2>Security</h2>
     <p>Traffic to the sync service is encrypted with TLS. Your password never leaves your device: the app derives keys from it with 600,000 rounds of PBKDF2-SHA256 and sends the server only a derived authentication key, which the server hashes again before storing.</p>
-    <p>Because we can’t decrypt your data, we also can’t recover it for you. If you forget your password, your recovery code restores access. If you lose both, the only option is an email reset, which keeps your account but permanently deletes your encrypted data. On the phone, API keys and your vault key are additionally protected by the Android Keystore, and you can turn on a biometric app lock.</p>
+    <p>Because we can’t decrypt your data, we also can’t recover it for you. If you forget your password, your recovery code restores access. If you lose both, the only option is an email reset, which keeps your account but permanently deletes your encrypted data. On the phone, API keys and your vault key are additionally protected by the Android Keystore, and you can turn on a biometric app lock. In the Windows app they're protected by Windows (DPAPI); in the web app, by a key your browser keeps for this site. The web app's code is delivered by our server each time you open it, so it relies on that server being honest in a way the installed apps don't.</p>
 
     <h2>App permissions</h2>
     <ul>

@@ -1,6 +1,11 @@
 package io.dtsoftware.facet.llm
 
+import io.dtsoftware.facet.llm.internal.arr
+import io.dtsoftware.facet.llm.internal.bool
+import io.dtsoftware.facet.llm.internal.obj
+import io.dtsoftware.facet.llm.internal.stringOrNull
 import java.util.Locale
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Capability inference and display names for model ids. Live metadata (Anthropic Models API,
@@ -318,7 +323,8 @@ object ModelCatalog {
     private val visionHints = listOf(
         "vision", "-vl", "vl-", "pixtral", "llava", "llama-4", "llama4", "scout", "maverick", "gemma-3", "gemma3",
         "gemini", "gpt-4o", "gpt-4.1", "gpt-5", "claude", "grok-4", "grok-2-vision", "qwen2.5-vl", "qwen3-vl",
-        "mistral-medium", "mistral-small-3", "minicpm-v", "moondream", "internvl", "glm-4.5v", "kimi-vl",
+        "mistral-medium", "mistral-small-3", "mistral-large-3", "mistral-large-2512", "magistral-medium", "magistral-small",
+        "ministral-3", "minicpm-v", "moondream", "internvl", "glm-4.5v", "kimi-vl",
     )
 
     fun looksVision(id: String): Boolean {
@@ -388,6 +394,39 @@ object ModelCatalog {
             }
         }
     }
+
+    /**
+     * Refines name-based [base] capabilities with what an OpenAI-compatible provider's model list
+     * reports, when it reports anything: Mistral's `capabilities`, Fireworks' `supports_*` flags,
+     * `input_modalities` (Hugging Face, xAI, OpenRouter-style routers), Vercel's `tags`, and
+     * Hugging Face's per-provider `supports_tools`. Reported values win over the guesses.
+     */
+    fun metadataCaps(base: ModelCaps, m: JsonObject): ModelCaps {
+        var caps = base
+        fun reasons() { if (caps.reasoning.kind == ReasoningKind.NONE && !caps.reasoning.summaries) caps = caps.copy(reasoning = ReasoningSupport(summaries = true)) }
+        m.obj("capabilities")?.let { c ->
+            (c.bool("vision") ?: c.bool("image_input") ?: c.bool("supports_vision"))?.let { caps = caps.copy(vision = it) }
+            (c.bool("function_calling") ?: c.bool("tools") ?: c.bool("tool_calling") ?: c.bool("supports_tools"))?.let { caps = caps.copy(tools = it) }
+            if (c.bool("reasoning") == true || c.bool("thinking") == true) reasons()
+        }
+        (m.bool("supports_image_input") ?: m.bool("supports_vision") ?: m.bool("vision"))?.let { caps = caps.copy(vision = it) }
+        (m.bool("supports_tools") ?: m.bool("supports_function_calling"))?.let { caps = caps.copy(tools = it) }
+        if (m.bool("supports_reasoning") == true) reasons()
+        val inputs = (m.obj("architecture")?.arr("input_modalities") ?: m.arr("input_modalities"))?.mapNotNull { it.stringOrNull()?.lowercase(Locale.ROOT) }
+        if (!inputs.isNullOrEmpty()) caps = caps.copy(vision = "image" in inputs, pdf = caps.pdf || "file" in inputs || "pdf" in inputs)
+        val tags = m.arr("tags")?.mapNotNull { it.stringOrNull()?.lowercase(Locale.ROOT) }.orEmpty()
+        if ("vision" in tags || "image-input" in tags) caps = caps.copy(vision = true)
+        if ("file-input" in tags) caps = caps.copy(pdf = true)
+        if ("tool-use" in tags || "tools" in tags) caps = caps.copy(tools = true)
+        if ("reasoning" in tags) reasons()
+        val providerTools = m.arr("providers")?.mapNotNull { (it as? JsonObject)?.bool("supports_tools") }.orEmpty()
+        if (providerTools.isNotEmpty()) caps = caps.copy(tools = providerTools.any { it })
+        return caps
+    }
+
+    /** False when the model list says a model can't chat (Mistral `completion_chat`, Fireworks `supports_chat`). */
+    fun chatByMetadata(m: JsonObject): Boolean? =
+        m.obj("capabilities")?.bool("completion_chat") ?: m.bool("supports_chat")
 
     fun perplexityModels(): List<ModelInfo> = listOf(
         "sonar" to "Sonar",

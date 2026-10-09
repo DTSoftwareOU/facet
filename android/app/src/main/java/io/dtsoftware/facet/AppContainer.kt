@@ -101,11 +101,13 @@ class AppContainer(private val app: Application) {
         scope.launch {
             if (settings.local.value.pricingFeed) runCatching { pricing.refreshIfStale(24 * 60 * 60 * 1000L) }
         }
-        // Providers and MCP servers that arrive by sync (or were just added) fetch their model/tool lists once.
+        // Providers that arrive by sync (or were just added) fetch their model lists, and lists older
+        // than a day refresh once per launch, so new models and corrected capabilities show up.
         scope.launch {
             val attempted = HashSet<String>()
             providers.observeAll().collect { list ->
-                list.filter { it.enabled && it.modelsFetchedAt == 0L && !SearchKind.isSearch(it.kind) && attempted.add(it.id) }
+                val stale = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+                list.filter { it.enabled && it.modelsFetchedAt < stale && !SearchKind.isSearch(it.kind) && attempted.add(it.id) }
                     .forEach { p -> launch { runCatching { providers.refreshModels(p.id) } } }
             }
         }

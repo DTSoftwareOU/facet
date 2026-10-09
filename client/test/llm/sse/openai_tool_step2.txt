@@ -1,0 +1,12 @@
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_2","model":"gpt-5.5","status":"in_progress","output":[]}}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_2","output_index":0,"content_index":0,"delta":"Oslo is 9°C."}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"msg_2","type":"message","role":"assistant","content":[{"type":"output_text","text":"Oslo is 9°C.","annotations":[]}]}}
+
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_2","model":"gpt-5.5","status":"completed","output":[{"id":"msg_2","type":"message","role":"assistant","content":[{"type":"output_text","text":"Oslo is 9°C.","annotations":[]}]}],"usage":{"input_tokens":80,"output_tokens":6}}}
+

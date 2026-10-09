@@ -1,0 +1,78 @@
+{
+  "name": "facet-desktop",
+  "productName": "Facet",
+  "version": "1.0.0",
+  "description": "Facet for Windows: the end-to-end encrypted, bring-your-own-key AI chat app, with access to your computer.",
+  "license": "Apache-2.0",
+  "author": "DT Software",
+  "homepage": "https://facet.dtsoftware.io",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:renderer": "npm --prefix ../client run build:desktop",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "start": "npm run build:renderer && npm run build && electron .",
+    "test": "node scripts/build.mjs --tests && node --test \"dist/test/*.test.js\"",
+    "icons": "electron scripts/make-icons.cjs",
+    "dist": "npm run build:renderer && npm run build && electron-builder --win nsis"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.0",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "build": {
+    "appId": "io.dtsoftware.facet",
+    "productName": "Facet",
+    "copyright": "Copyright © 2026 DT Software",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/main.js",
+      "dist/preload.js",
+      "dist/grep-worker.js",
+      "renderer/**/*",
+      "build/icon.png",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "dist/main.js"
+    },
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "Facet-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Facet",
+      "uninstallDisplayName": "Facet",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://facet.dtsoftware.io/download/windows/"
+    }
+  }
+}

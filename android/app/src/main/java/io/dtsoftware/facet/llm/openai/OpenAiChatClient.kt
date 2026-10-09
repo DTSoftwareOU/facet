@@ -115,12 +115,13 @@ internal class OpenAiChatClient(
                 val rawId = m.str("id") ?: m.str("name") ?: return@mapNotNull null
                 val id = rawId.removePrefix("models/")
                 val output = outputOf(id, m.str("type")) ?: return@mapNotNull null
+                if (output == ModelOutput.TEXT && ModelCatalog.chatByMetadata(m) == false) return@mapNotNull null
                 ModelInfo(
                     id = id,
                     displayName = m.str("display_name")?.takeIf { kind == ProviderKind.GOOGLE }
                         ?: ModelCatalog.displayName(kind, id),
                     contextWindow = (m.long("context_length") ?: m.long("context_window") ?: m.long("max_context_length"))?.toInt(),
-                    caps = if (output == ModelOutput.TEXT) ModelCatalog.compatCaps(kind, id) else ModelCaps(tools = false),
+                    caps = if (output == ModelOutput.TEXT) ModelCatalog.metadataCaps(ModelCatalog.compatCaps(kind, id), m) else ModelCaps(tools = false),
                     pricing = pricing?.priceFor(kind, id),
                     createdAt = m.long("created")?.times(1000),
                     output = output,

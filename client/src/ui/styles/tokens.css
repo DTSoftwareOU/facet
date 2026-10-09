@@ -1,0 +1,150 @@
+/* Facet design tokens (docs/DESIGN.md): Basalt (dark), Quartz (light), Obsidian (black). */
+
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('../assets/fonts/instrument-sans-latin.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('../assets/fonts/instrument-serif-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('../assets/fonts/instrument-serif-italic-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../assets/fonts/jetbrains-mono-latin.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #11151b;
+  --surface: #171c24;
+  --surface-high: #1e242e;
+  --surface-highest: #262d39;
+  --outline: #2c3441;
+  --outline-variant: #222833;
+  --text: #e8ecf2;
+  --text-2: #a3acba;
+  --text-3: #6f7a8a;
+  --primary: #49d3c1;
+  --on-primary: #04201c;
+  --primary-container: #12352f;
+  --on-primary-container: #a6f0e5;
+  --error: #ff7a7a;
+  --error-container: #3a1d22;
+  --success: #5bd69b;
+  --warning: #f2c66d;
+  --user-bubble: #1e242e;
+  --code-bg: #0d1117;
+  --code-header: #161b23;
+  --inline-code-bg: #232a35;
+  --scrim: rgba(5, 7, 9, 0.6);
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --gem-table: #f4f7fb;
+  --gem-outline: transparent;
+
+  --syn-plain: #dde3ec;
+  --syn-keyword: #c79bff;
+  --syn-string: #8fd9a8;
+  --syn-number: #f2c66d;
+  --syn-comment: #6f7a8a;
+  --syn-function: #7fb2ff;
+  --syn-type: #5fd7c7;
+  --syn-annotation: #f0a27a;
+  --syn-punct: #9aa4b3;
+  --syn-tag: #ff8f8f;
+  --syn-attr: #f2c66d;
+}
+
+:root[data-theme='black'] {
+  --bg: #000000;
+  --surface: #0a0c10;
+  --surface-high: #13171d;
+  --surface-highest: #1b2028;
+  --outline: #232a34;
+  --outline-variant: #171b22;
+  --user-bubble: #14181f;
+  --code-bg: #07090c;
+  --code-header: #0f1318;
+  --inline-code-bg: #1a1f27;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-high: #eceff3;
+  --surface-highest: #e2e6ec;
+  --outline: #d3d8df;
+  --outline-variant: #e3e6eb;
+  --text: #12161c;
+  --text-2: #4f5968;
+  --text-3: #8590a0;
+  --primary: #087a6c;
+  --on-primary: #ffffff;
+  --primary-container: #d5f2ec;
+  --on-primary-container: #043b34;
+  --error: #c93636;
+  --error-container: #fbe4e4;
+  --success: #1f8a55;
+  --warning: #a87412;
+  --user-bubble: #e7ebf0;
+  --code-bg: #f0f2f5;
+  --code-header: #e6e9ee;
+  --inline-code-bg: #e6e9ee;
+  --scrim: rgba(16, 20, 24, 0.4);
+  --shadow: 0 12px 40px rgba(16, 20, 24, 0.16);
+  --gem-table: #ffffff;
+  --gem-outline: rgba(133, 144, 160, 0.35);
+
+  --syn-plain: #1d232b;
+  --syn-keyword: #7a3fc7;
+  --syn-string: #1e7a43;
+  --syn-number: #9a6200;
+  --syn-comment: #7d8796;
+  --syn-function: #2257c9;
+  --syn-type: #0b7c6e;
+  --syn-annotation: #b4531f;
+  --syn-punct: #55606f;
+  --syn-tag: #c0392b;
+  --syn-attr: #9a6200;
+}
+
+:root {
+  /* The labradorite palette: the gem and brand moments only. */
+  --gold: #f2c66d;
+  --flash: #6e9bff;
+  --deep: #3a5bd9;
+  --glint: #49d3c1;
+
+  --font-sans: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  /* Radii by hierarchy, never one radius everywhere. */
+  --r-composer: 26px;
+  --r-sheet: 28px;
+  --r-bubble: 22px;
+  --r-group: 18px;
+  --r-code: 14px;
+  --r-chip: 12px;
+  --r-pill: 999px;
+
+  --chat-scale: 1;
+  --ease-emph: cubic-bezier(0.2, 0, 0, 1);
+  --ease-decel: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --sidebar-w: 284px;
+  --column: 760px;
+}

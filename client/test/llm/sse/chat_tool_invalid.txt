@@ -1,0 +1,6 @@
+data: {"id":"c4","object":"chat.completion.chunk","model":"deepseek-chat","choices":[{"index":0,"delta":{"role":"assistant","content":null,"reasoning_content":"Look it up.","tool_calls":[{"index":0,"id":"call_bad","type":"function","function":{"name":"get_weather","arguments":"{\"city\": \"Li"}}]},"finish_reason":null}]}
+
+data: {"id":"c4","object":"chat.completion.chunk","model":"deepseek-chat","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}
+
+data: [DONE]
+

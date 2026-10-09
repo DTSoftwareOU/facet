@@ -5,7 +5,8 @@ This puts the website, APK downloads and the zero-knowledge sync server on one h
 | Path | Served by |
 |---|---|
 | `https://facet.dtsoftware.io/` | Static site from `web/` |
-| `https://facet.dtsoftware.io/download/<file>` | Files in `deploy/downloads/` (APKs) |
+| `https://facet.dtsoftware.io/app/` | The web app, built from `client/` |
+| `https://facet.dtsoftware.io/download/<file>` | Files in `deploy/downloads/` (APKs, the Windows installer) |
 | `https://facet.dtsoftware.io/v1/*` | Facet Sync server (Node.js, SQLite) |
 
 Caddy terminates TLS and renews Let's Encrypt certificates automatically. The server stores
@@ -179,6 +180,34 @@ The DNS records must be **DNS only** (grey cloud in Cloudflare) so certbot can v
 server sees real client addresses for its rate limits. Publish a new APK by replacing
 `/var/www/facet-downloads/facet-latest.apk` (and its `.sha256`). Update the server with
 `docker compose up -d --build` after copying the new `server/` code.
+
+## Web app and Windows app
+
+The web app is a static build of `client/`. It's served at `/app/` and talks to the sync API on
+the same origin, so it needs no configuration. With the nginx setup above (`deploy/nginx/facet.conf`
+has the `/app/` locations and the security headers):
+
+```sh
+cd client && npm ci && npm run build
+rsync -a --delete dist/ root@server:/var/www/facet-web/app/
+```
+
+No restart is needed. `index.html` is served with `Cache-Control: no-cache` and the hashed
+assets as immutable, so browsers pick up a new release on their next visit.
+
+The Windows installer is built from `desktop/` (`npm run dist`, which builds `client/` for the
+desktop first). Upload the installer, its `.blockmap` and `latest.yml` to
+`/var/www/facet-downloads/windows/`, and point the stable download name at the new version:
+
+```sh
+cd desktop/release
+scp Facet-Setup-1.0.0.exe Facet-Setup-1.0.0.exe.blockmap latest.yml root@server:/var/www/facet-downloads/windows/
+ssh root@server 'cd /var/www/facet-downloads/windows && ln -sf Facet-Setup-1.0.0.exe Facet-Setup.exe'
+```
+
+Installed copies check `latest.yml` at start-up and every six hours, download the update in the
+background, and install it when the app restarts. Bump `version` in `desktop/package.json` for each
+release. The installer isn't code-signed, so Windows SmartScreen shows a notice on first run.
 
 ## Self-hosting elsewhere
 
