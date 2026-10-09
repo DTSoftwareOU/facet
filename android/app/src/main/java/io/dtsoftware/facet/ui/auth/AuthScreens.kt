@@ -68,20 +68,24 @@ import kotlinx.coroutines.launch
 /** Full-screen form layout shared by auth screens. */
 @Composable
 private fun AuthLayout(onBack: (() -> Unit)?, content: @Composable ColumnScope.() -> Unit) {
-    Box(Modifier.fillMaxSize().background(FacetTheme.colors.background).statusBarsPadding().imePadding()) {
-        Column(
-            Modifier
-                .align(Alignment.TopCenter)
-                .widthIn(max = 480.dp)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(top = 56.dp, bottom = 32.dp)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            content = content,
-        )
-        if (onBack != null) FacetIconButton(R.drawable.ic_arrow_left, "Back", onBack, modifier = Modifier.padding(6.dp))
+    Column(Modifier.fillMaxSize().background(FacetTheme.colors.background).statusBarsPadding().imePadding()) {
+        // Fixed top bar so scrolled content never slides under the back button.
+        Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 6.dp), contentAlignment = Alignment.CenterStart) {
+            if (onBack != null) FacetIconButton(R.drawable.ic_arrow_left, "Back", onBack)
+        }
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+            Column(
+                Modifier
+                    .widthIn(max = 480.dp)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 4.dp, bottom = 32.dp)
+                    .navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                content = content,
+            )
+        }
     }
 }
 

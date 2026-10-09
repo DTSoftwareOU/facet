@@ -59,6 +59,20 @@ beautiful home that syncs across all your devices.
 - Self-healing requests: if a provider rejects a parameter for a given model, Facet drops
   that parameter, remembers the quirk for that model, and retries once.
 
+### Tools (work with any tool-capable model, synced across devices)
+- Web search for every model: native provider search when available (OpenAI, Anthropic,
+  OpenRouter, Perplexity), otherwise Facet's own `web_search` + `fetch_page` tools backed by
+  the user's Brave, Tavily, Exa, Jina or SearXNG key. Results are cited.
+- MCP: remote Model Context Protocol servers (Streamable HTTP with legacy SSE fallback),
+  static-token or OAuth 2.1 sign-in (discovery, dynamic client registration, PKCE, refresh).
+  Tool lists are cached so tools are ready in every new chat and after restarts; per-tool
+  switches; approvals (always ask / ask for changes / never) with an inline approval card.
+- Skills: SKILL.md-compatible instruction packs (frontmatter name + description, Markdown body,
+  bundled reference files). The model loads a skill on demand via `use_skill`; skills can also
+  be "always on". Import from a file, a .zip, or a URL; starter examples included.
+- Agent loop: up to 12 tool rounds per reply, parallel tool calls, tool activity shown live and
+  stored with the reply; the exact tool exchange is replayed in later turns.
+
 ### Organization
 - Drawer with chats grouped by Today / Yesterday / Previous 7 days / Previous 30 days / month.
 - Full-text search across all messages (SQLite FTS4) with highlighted snippets.

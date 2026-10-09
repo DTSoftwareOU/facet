@@ -1,0 +1,186 @@
+package io.dtsoftware.facet.domain
+
+import androidx.room.Room
+import io.dtsoftware.facet.core.crypto.FacetCrypto
+import io.dtsoftware.facet.core.crypto.SecretBox
+import io.dtsoftware.facet.core.util.AppJson
+import io.dtsoftware.facet.core.util.Clock
+import io.dtsoftware.facet.data.db.FacetDatabase
+import io.dtsoftware.facet.data.db.McpServerEntity
+import io.dtsoftware.facet.data.db.MessageStatus
+import io.dtsoftware.facet.data.prefs.ModelRef
+import io.dtsoftware.facet.data.prefs.SettingsStore
+import io.dtsoftware.facet.data.repo.AssistantRepository
+import io.dtsoftware.facet.data.repo.AttachmentStore
+import io.dtsoftware.facet.data.repo.ConversationRepository
+import io.dtsoftware.facet.data.repo.ProviderRepository
+import io.dtsoftware.facet.domain.tools.McpManager
+import io.dtsoftware.facet.domain.tools.SkillRepository
+import io.dtsoftware.facet.domain.tools.ToolTrace
+import io.dtsoftware.facet.domain.tools.ToolRegistry
+import io.dtsoftware.facet.domain.tools.WebSearch
+import io.dtsoftware.facet.llm.ApiStyle
+import io.dtsoftware.facet.llm.ChatRequest
+import io.dtsoftware.facet.llm.GenParams
+import io.dtsoftware.facet.llm.InMemoryQuirkStore
+import io.dtsoftware.facet.llm.LlmClient
+import io.dtsoftware.facet.llm.ModelInfo
+import io.dtsoftware.facet.llm.Part
+import io.dtsoftware.facet.llm.PricingCatalog
+import io.dtsoftware.facet.llm.ProviderBlocks
+import io.dtsoftware.facet.llm.ProviderConfig
+import io.dtsoftware.facet.llm.ProviderKind
+import io.dtsoftware.facet.llm.Role
+import io.dtsoftware.facet.llm.StopReason
+import io.dtsoftware.facet.llm.StreamEvent
+import io.dtsoftware.facet.mcp.McpTool
+import io.dtsoftware.facet.sync.AuthManager
+import io.dtsoftware.facet.sync.SyncApi
+import io.dtsoftware.facet.sync.SyncEngine
+import java.util.Collections
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import okhttp3.OkHttpClient
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+
+/** The tool loop end to end with a scripted model: call → run tool → feed result → answer → replay later. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = android.app.Application::class)
+class AgentLoopTest {
+    private class PlainBox : SecretBox {
+        override fun seal(plain: ByteArray) = "v1:" + FacetCrypto.b64(plain)
+        override fun open(sealed: String) = FacetCrypto.unb64(sealed.removePrefix("v1:"))
+    }
+
+    /** Scripted model: if the last message has no tool results, call [toolName]; otherwise answer. */
+    private class ScriptedClient(override val config: ProviderConfig, val toolName: () -> String, val args: String) : LlmClient {
+        val requests: MutableList<ChatRequest> = Collections.synchronizedList(ArrayList())
+        override suspend fun listModels() = emptyList<ModelInfo>()
+        override suspend fun verify() = Result.success(Unit)
+        override fun stream(request: ChatRequest): Flow<StreamEvent> = flow {
+            requests += request
+            emit(StreamEvent.Started(request.model))
+            val last = request.messages.last()
+            val results = last.parts.filterIsInstance<Part.ToolResult>()
+            if (request.utility) {
+                emit(StreamEvent.TextDelta("Lisbon trip"))
+                emit(StreamEvent.Completed(StopReason.END, null))
+            } else if (results.isEmpty() && last.role == Role.USER && request.messages.count { m -> m.parts.any { it is Part.ToolResult } } == 0) {
+                emit(StreamEvent.TextDelta("Let me check."))
+                emit(StreamEvent.ToolCallStarted("call_1", toolName()))
+                emit(StreamEvent.ToolCallReady("call_1", toolName(), args))
+                emit(StreamEvent.Completed(StopReason.TOOL_USE, ProviderBlocks(ApiStyle.OPENAI_CHAT, request.model, "[]")))
+            } else {
+                val r = results.firstOrNull()
+                emit(StreamEvent.TextDelta(if (r != null) "Answer using ${r.content.length} chars (error=${r.isError})." else "Plain answer."))
+                emit(StreamEvent.Completed(StopReason.END, null))
+            }
+        }
+    }
+
+    private class Env {
+        val ctx = RuntimeEnvironment.getApplication()
+        val db: FacetDatabase = Room.inMemoryDatabaseBuilder(ctx, FacetDatabase::class.java).build()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val secrets = PlainBox()
+        val http = OkHttpClient()
+        val settings = SettingsStore(ctx).apply { updateSynced { it.copy(autoTitle = false) } }
+        val conversations = ConversationRepository(db) {}
+        val providers = ProviderRepository(db, secrets, http, InMemoryQuirkStore(), PricingCatalog(null, null)) {}
+        val assistants = AssistantRepository(db) {}
+        val attachments = AttachmentStore(ctx, db) {}
+        val api = SyncApi(http)
+        val auth = AuthManager(ctx, api, secrets)
+        val sync = SyncEngine(ctx, scope, db, auth, api, settings, attachments, secrets, http)
+        val skills = SkillRepository(db, http) {}
+        val mcp = McpManager(ctx, db, secrets, http, scope) {}
+        val tools = ToolRegistry(WebSearch(http), providers, mcp, skills, settings)
+        val chat = ChatEngine(scope, conversations, providers, assistants, attachments, settings, PricingCatalog(null, null), sync, tools)
+
+        suspend fun awaitIdle() = withTimeout(10_000) {
+            delay(100)
+            while (chat.active.value.isNotEmpty()) delay(50)
+        }
+    }
+
+    @Test
+    fun skillToolRoundTripAndReplay() = runBlocking {
+        val env = Env()
+        val p = env.providers.add(ProviderKind.CUSTOM, "Test", "http://localhost", "", emptyMap())
+        env.skills.save(null, "lisbon-guide", "Use for Lisbon trips.", "Recommend Manteigaria for pastel de nata.")
+        val client = ScriptedClient(env.providers.config(p), { "use_skill" }, """{"name":"lisbon-guide"}""")
+        env.providers.clientOverride = { client }
+
+        val convId = env.chat.send(null, "Plan Lisbon", emptyList(), io.dtsoftware.facet.domain.NewChatSpec(null, ModelRef(p.id, "m1"), GenParams()))
+        env.awaitIdle()
+
+        // Request 1 offered the skill tool; request 2 carried the call and its result.
+        assertTrue(client.requests[0].tools.any { it.name == "use_skill" && it.description.contains("lisbon-guide") })
+        val second = client.requests[1].messages
+        val call = second[second.size - 2]
+        val result = second.last()
+        assertEquals(Role.ASSISTANT, call.role)
+        assertTrue(call.parts.any { it is Part.ToolCall && it.name == "use_skill" })
+        assertTrue((result.parts.single() as Part.ToolResult).content.contains("Manteigaria"))
+
+        val reply = env.conversations.messages(convId).last { it.role == "assistant" }
+        assertEquals(MessageStatus.DONE.name, reply.status)
+        assertTrue(reply.content.startsWith("Let me check."))
+        assertTrue(reply.content.contains("Answer using"))
+        val trace = AppJson.decodeFromString<ToolTrace>(reply.stepsJson!!)
+        assertEquals(1, trace.steps.size)
+        assertEquals("Used skill lisbon-guide", trace.steps[0].calls[0].label)
+        assertTrue(trace.finalText.startsWith("Answer using"))
+
+        // A follow-up replays the stored tool exchange exactly.
+        env.chat.send(convId, "Thanks", emptyList(), null)
+        env.awaitIdle()
+        val replay = client.requests.last().messages
+        val replayCall = replay.first { m -> m.parts.any { it is Part.ToolCall } }
+        val replayResult = replay.first { m -> m.parts.any { it is Part.ToolResult } }
+        assertEquals(call.parts.filterIsInstance<Part.ToolCall>(), replayCall.parts.filterIsInstance<Part.ToolCall>())
+        assertEquals(result.parts, replayResult.parts)
+    }
+
+    @Test
+    fun deniedApprovalSkipsTheTool() = runBlocking {
+        val env = Env()
+        val p = env.providers.add(ProviderKind.CUSTOM, "Test", "http://localhost", "", emptyMap())
+        val now = Clock.now()
+        env.db.mcpServers().upsert(
+            McpServerEntity(
+                id = "srv", name = "Acme", url = "https://mcp.acme.invalid/mcp", approval = "ALWAYS",
+                toolsJson = AppJson.encodeToString(listOf(McpTool("create_issue", description = "Create an issue"))),
+                toolsFetchedAt = now, createdAt = now, updatedAt = now,
+            ),
+        )
+        val client = ScriptedClient(env.providers.config(p), { "mcp_acme_create_issue" }, """{"title":"Bug"}""")
+        env.providers.clientOverride = { client }
+        val convId = env.chat.send(null, "File a bug", emptyList(), io.dtsoftware.facet.domain.NewChatSpec(null, ModelRef(p.id, "m1"), GenParams()))
+
+        // Wait for the approval prompt, then deny it.
+        withTimeout(10_000) {
+            while (env.chat.live.value.values.none { t -> t.tools.any { it.status == ToolStatus.AWAITING_APPROVAL } }) delay(30)
+        }
+        env.chat.respondToApproval("call_1", ApprovalDecision.DENY)
+        env.awaitIdle()
+
+        val reply = env.conversations.messages(convId).last { it.role == "assistant" }
+        val trace = AppJson.decodeFromString<ToolTrace>(reply.stepsJson!!)
+        assertTrue(trace.steps[0].calls[0].isError)
+        assertTrue(trace.steps[0].calls[0].result.startsWith("The user declined"))
+        assertTrue(reply.content.contains("error=true"))
+    }
+}

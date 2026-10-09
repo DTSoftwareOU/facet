@@ -137,7 +137,12 @@ class ProviderRepository(
         headers = headers(p),
     )
 
+    /** Test hook: replaces real provider clients. */
+    @androidx.annotation.VisibleForTesting
+    internal var clientOverride: ((ProviderEntity) -> LlmClient)? = null
+
     fun client(p: ProviderEntity): LlmClient {
+        clientOverride?.let { return it(p) }
         clientCache[p.id]?.let { (stamp, client) -> if (stamp == p.updatedAt) return client }
         val client = LlmClients.create(config(p), http, quirks, pricing)
         clientCache[p.id] = p.updatedAt to client

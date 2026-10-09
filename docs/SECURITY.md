@@ -9,7 +9,7 @@ receives the user's password.
 | Protected against | How |
 |---|---|
 | Server database leak | Content is AES-256-GCM ciphertext under a key the server never has. Login verifiers are scrypt hashes of a key derived from the password with 600k PBKDF2 rounds. |
-| Malicious or compromised server operator | Same as above; the password and vault key never leave the client. The operator can see: email, display name, record counts/sizes/timestamps/types, device names, IPs. |
+| Malicious or compromised server operator (including us) | Same as above; the password and vault key never leave the client. The operator can see only: the account email, how many records exist with their padded sizes and change times, signed-in device names, and IP addresses. Record types and ids are opaque, content lengths are padded, and display names live inside the encrypted settings. |
 | Network attacker | TLS (Caddy, automatic HTTPS). Ciphertext is authenticated (GCM) and bound to its record id and type via AAD, so records can't be swapped. |
 | Stolen phone (locked) | Android full-disk encryption; API keys and the vault key are additionally wrapped with a non-exportable Android Keystore key; optional biometric app lock. |
 
@@ -79,17 +79,42 @@ Every synced entity is a JSON document encrypted with `vaultKey`:
 envelope = version (0x01) || flags (1 byte) || nonce (12) || AES-GCM(vaultKey, body, aad)
 flags bit0 = body is raw DEFLATE (RFC 1951, no zlib header) compressed JSON
            (clients compress when JSON is larger than 1 KiB)
-aad      = ASCII "facet:rec:v1:" + type + ":" + id
+flags bit1 = body is length-framed and padded: u32 big-endian length || data || zero padding,
+           total rounded up to 512 bytes (≤ 16 KiB) or 4 KiB (larger)
+aad      = ASCII "facet:rec:v1:" + wireType + ":" + wireId
 ```
 
 Transported as `ct` (b64). The server validates only: b64 decodes, length ≥ 30 bytes,
 first byte = 0x01, size ≤ 2 MiB decoded.
+
+### Opaque record addressing (metadata protection)
+
+The server must not learn what kind of thing a record is, when it was created, or how long it
+is. Clients therefore never send logical types or local ids:
+
+```
+recordIdKey = HKDF(vaultKey, info="facet:record-id:v1")
+wireType    = "e"                                              (every record)
+wireId      = base64url-nopad( HMAC-SHA256(recordIdKey, "rec:" + type + ":" + localId)[0..24] )
+body        = JSON { "t": type, "i": localId, "d": payload }   (payload omitted for deletions)
+```
+
+- Local ids are time-sortable; the HMAC hides that from the server, and differs per account.
+- On open, clients recompute `wireId` from the decrypted `t`/`i` and reject a mismatch, so a
+  server can't move a record to another id.
+- Deletions carry an encrypted body too (with `d` omitted), so other devices know what to delete.
+- All records are padded (flags bit1), so sizes reveal only a coarse bucket.
+- The display name is stored in the encrypted settings record; registration sends
+  `displayName: null`.
+- `SyncEndToEndTest` scans the server's database and blob files after a sync and fails if any
+  message text, title, key, token, skill or name appears in readable form.
 
 ## Blob (attachment) encryption
 
 ```
 blob = version (0x01) || nonce (12) || AES-GCM(vaultKey, fileBytes, aad)
 aad  = ASCII "facet:blob:v1:" + blobId
+blobId = base64url-nopad( HMAC-SHA256(recordIdKey, "blob:" + attachmentId)[0..24] )
 ```
 
 Uploaded as raw `application/octet-stream`. Max 32 MiB per blob. Per-user quota enforced by
@@ -100,6 +125,8 @@ the server (default 2 GiB, configurable).
 - A non-exportable AES-256-GCM key `facet_local_v1` lives in the Android Keystore.
 - The vault key and every API key are stored encrypted with it (`v1:` + b64(nonce||ct)).
 - Session tokens are stored the same way.
+- MCP server headers and OAuth tokens are sealed the same way locally and travel only inside
+  encrypted records.
 - Conversations live in the app's private Room database (protected by Android file-based
   encryption). Optional biometric app lock and `FLAG_SECURE` app-switcher hiding.
 

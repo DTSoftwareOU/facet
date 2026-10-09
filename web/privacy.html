@@ -60,9 +60,9 @@
     <h2>What the sync service stores</h2>
     <p>If you create an account, the sync service stores:</p>
     <ul>
-      <li><strong>Account details:</strong> your email address, an optional display name, and when the account was created.</li>
+      <li><strong>Account details:</strong> your email address and when the account was created. Your display name, if you set one, is stored inside your encrypted settings, not in plain text.</li>
       <li><strong>Sign-in data:</strong> the parameters used to derive keys from your password (a random salt and an iteration count), a hash of a key derived from your password, and your vault key in encrypted form (plus a second encrypted copy that only your recovery code can unlock). We never receive your password or your recovery code.</li>
-      <li><strong>Encrypted content:</strong> your conversations, messages, attachments, assistants, saved prompts, settings and API keys, stored as ciphertext. Alongside each item we store its type (for example “message”), its size, timestamps and a sequence number used for syncing.</li>
+      <li><strong>Encrypted content:</strong> your conversations, messages, attachments, assistants, saved prompts, settings and API keys, stored as ciphertext. Each item is stored under a random-looking identifier with its size rounded up to hide its exact length, the time it last changed, and a sequence number used for syncing. We can’t tell whether an item is a message, a chat, a file or a setting.</li>
       <li><strong>Sessions:</strong> for each signed-in device, its name and platform (for example “Pixel 9, Android”), its IP address, and when it signed in and was last active.</li>
       <li><strong>Server logs:</strong> IP address, time, requested path and response status for each request, used to keep the service secure and to fix problems.</li>
     </ul>
