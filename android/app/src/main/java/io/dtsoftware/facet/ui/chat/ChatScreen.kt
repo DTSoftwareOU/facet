@@ -72,8 +72,10 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -137,6 +139,8 @@ fun ChatScreen(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val haptics = LocalHapticFeedback.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val speaker = rememberSpeaker()
@@ -252,6 +256,9 @@ fun ChatScreen(
         if (vm.send(text)) {
             input = TextFieldValue("")
             speaker.stop()
+            // Put the keyboard away so the reply has the whole screen.
+            keyboard?.hide()
+            focusManager.clearFocus()
         }
     }
 
