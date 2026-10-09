@@ -383,7 +383,13 @@ fun McpServerEditScreen(container: AppContainer, serverId: String?, onDone: () -
                 Text("Approvals", style = FacetTheme.type.labelM, color = FacetTheme.colors.textTertiary, modifier = Modifier.padding(start = 12.dp, bottom = 8.dp))
                 val approval = container.mcp.approval(e)
                 Segmented(ToolApproval.entries, approval, { it.label }, { a -> scope.launch { container.mcp.setApproval(e.id, a) } })
-                Text(approval.blurb, style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = FacetTheme.colors.textTertiary, modifier = Modifier.padding(start = 12.dp, top = 6.dp))
+                val yolo = container.settings.synced.collectAsStateWithLifecycle().value.yoloMode
+                Text(
+                    if (yolo) "YOLO mode is on, so these tools run without asking. Turn it off in Settings to use approvals." else approval.blurb,
+                    style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal),
+                    color = if (yolo) FacetTheme.colors.warning else FacetTheme.colors.textTertiary,
+                    modifier = Modifier.padding(start = 12.dp, top = 6.dp),
+                )
             }
             val tools = container.mcp.tools(e)
             if (tools.isNotEmpty()) {

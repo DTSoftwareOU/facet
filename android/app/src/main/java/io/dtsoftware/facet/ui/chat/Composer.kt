@@ -7,6 +7,8 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -102,6 +104,8 @@ fun Composer(
     sendOnEnter: Boolean,
     modifier: Modifier = Modifier,
     searchAvailable: Boolean = false,
+    yolo: Boolean = false,
+    onYoloOff: () -> Unit = {},
 ) {
     val c = FacetTheme.colors
     val canSend = (value.text.isNotBlank() || attachments.isNotEmpty()) && caps != null
@@ -172,6 +176,9 @@ fun Composer(
                 if (caps != null && caps.reasoning.kind != ReasoningKind.NONE) {
                     EffortChip(caps, params, onParams)
                 }
+                AnimatedVisibility(yolo && caps?.tools == true, enter = fadeIn() + scaleIn(initialScale = 0.6f), exit = fadeOut() + scaleOut(targetScale = 0.6f)) {
+                    YoloBadge(onYoloOff, Modifier.padding(start = 6.dp))
+                }
                 Spacer(Modifier.weight(1f))
                 AnimatedVisibility(value.text.isBlank() && attachments.isEmpty() && !generating, enter = fadeIn(), exit = fadeOut()) {
                     FacetIconButton(
@@ -184,6 +191,23 @@ fun Composer(
                 SendButton(enabled = canSend && !voice.listening, generating = generating, onSend = onSend, onStop = onStop)
             }
         }
+    }
+}
+
+/** Shown while YOLO mode is on: tools run without asking. Tapping it turns the mode off. */
+@Composable
+private fun YoloBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = FacetTheme.colors
+    Box(
+        modifier
+            .size(34.dp)
+            .clip(FacetShapes.chip)
+            .background(c.warning.copy(alpha = 0.16f))
+            .border(1.dp, c.warning.copy(alpha = 0.55f), FacetShapes.chip)
+            .clickable(onClickLabel = "Turn off YOLO mode", onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        FacetIcon(R.drawable.ic_rocket, "YOLO mode is on", tint = c.warning, size = 17.dp)
     }
 }
 

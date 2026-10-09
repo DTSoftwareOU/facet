@@ -52,6 +52,8 @@ data class SyncedPrefs(
     val autoTitle: Boolean = true,
     /** Use the model's own web search when it has one; otherwise Facet's search tool. */
     val preferNativeSearch: Boolean = true,
+    /** YOLO mode: run every tool call without asking, and let the model take more tool rounds. */
+    val yoloMode: Boolean = false,
     val updatedAt: Long = 0,
 )
 

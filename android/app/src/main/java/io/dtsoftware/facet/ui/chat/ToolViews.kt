@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -182,9 +185,16 @@ private fun ToolRow(a: ToolActivity) {
 @Composable
 private fun ApprovalCard(a: ToolActivity, onApproval: (String, ApprovalDecision) -> Unit) {
     val c = FacetTheme.colors
+    // The card waits on the user: scroll it fully into view once it has expanded.
+    val requester = remember { BringIntoViewRequester() }
+    LaunchedEffect(a.id) {
+        kotlinx.coroutines.delay(320)
+        requester.bringIntoView()
+    }
     Column(
         Modifier
             .fillMaxWidth()
+            .bringIntoViewRequester(requester)
             .padding(vertical = 6.dp)
             .clip(FacetShapes.group)
             .background(c.surface)

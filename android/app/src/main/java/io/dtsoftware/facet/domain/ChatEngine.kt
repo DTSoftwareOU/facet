@@ -58,6 +58,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -132,6 +134,15 @@ class ChatEngine(
 
     private val jobs = ConcurrentHashMap<String, Job>()
     private val approvals = ConcurrentHashMap<String, CompletableDeferred<ApprovalDecision>>()
+
+    init {
+        // Turning on YOLO mode (here or on another device) also answers approvals already waiting.
+        scope.launch {
+            settings.synced.map { it.yoloMode }.distinctUntilChanged().collect { yolo ->
+                if (yolo) approvals.keys.toList().forEach { respondToApproval(it, ApprovalDecision.ALLOW) }
+            }
+        }
+    }
 
     fun isGenerating(conversationId: String) = conversationId in _active.value
 
@@ -389,8 +400,8 @@ class ChatEngine(
                 st.allText.append(joinText(textPrefix, st.stepText.toString()))
 
                 if (st.error != null || st.stop != StopReason.TOOL_USE || calls.isEmpty()) break
-                if (round >= MAX_TOOL_ROUNDS) {
-                    publish { it.copy(notice = "Stopped after $MAX_TOOL_ROUNDS rounds of tool use.") }
+                if (round >= prepared.maxRounds) {
+                    publish { it.copy(notice = "Stopped after ${prepared.maxRounds} rounds of tool use.") }
                     st.stop = StopReason.END
                     break
                 }
@@ -460,10 +471,11 @@ class ChatEngine(
             update { it.copy(status = ToolStatus.ERROR, result = msg) }
             return ToolCallRecord(call.id, call.name, ToolKind.MCP.name, call.name, call.argumentsJson, msg, true)
         }
-        if (def.needsApproval) {
+        if (def.needsApproval && !settings.synced.value.yoloMode) {
             update { it.copy(status = ToolStatus.AWAITING_APPROVAL) }
             val pending = CompletableDeferred<ApprovalDecision>()
             approvals[call.id] = pending
+            if (settings.synced.value.yoloMode) respondToApproval(call.id, ApprovalDecision.ALLOW)
             val decision = pending.await()
             if (decision == ApprovalDecision.ALWAYS) runCatching { mcpAutoApprove(def.serverId!!, def.remoteName!!) }
             if (decision == ApprovalDecision.DENY) {
@@ -483,7 +495,7 @@ class ChatEngine(
         }
         val result = outcome.content.let { if (it.length > ToolRegistry.MAX_RESULT_CHARS) it.take(ToolRegistry.MAX_RESULT_CHARS) + "\n\n[Output truncated.]" else it }
         synchronized(st.citations) { outcome.citations.forEach { c -> st.citations.putIfAbsent(c.url, c) } }
-        val label = outcome.label ?: runningLabel(def, call.argumentsJson)
+        val label = outcome.label ?: runningLabel(def, call.argumentsJson, done = true)
         update { it.copy(status = if (outcome.isError) ToolStatus.ERROR else ToolStatus.DONE, label = label, result = result.take(2_000)) }
         return ToolCallRecord(call.id, call.name, def.kind.name, label, call.argumentsJson, result, outcome.isError, Clock.now() - start, def.serverName)
     }
@@ -495,13 +507,13 @@ class ChatEngine(
         else -> if (serverName != null) "$serverName: $name" else name
     }
 
-    private fun runningLabel(def: io.dtsoftware.facet.domain.tools.ToolDef?, args: String): String {
+    private fun runningLabel(def: io.dtsoftware.facet.domain.tools.ToolDef?, args: String, done: Boolean = false): String {
         val obj = runCatching { AppJson.parseToJsonElement(args).let { it as kotlinx.serialization.json.JsonObject } }.getOrNull()
         fun s(k: String) = (obj?.get(k) as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
         return when (def?.kind) {
-            ToolKind.SEARCH -> "Searching “${s("query").take(60)}”"
-            ToolKind.FETCH -> "Reading ${runCatching { java.net.URI(s("url")).host?.removePrefix("www.") }.getOrNull() ?: "a page"}"
-            ToolKind.SKILL -> if (s("name").isNotBlank()) "Using skill ${s("name")}" else "Reading ${s("path")}"
+            ToolKind.SEARCH -> (if (done) "Searched" else "Searching") + " “${s("query").take(60)}”"
+            ToolKind.FETCH -> (if (done) "Read " else "Reading ") + (runCatching { java.net.URI(s("url")).host?.removePrefix("www.") }.getOrNull() ?: "a page")
+            ToolKind.SKILL -> if (s("name").isNotBlank()) (if (done) "Used skill " else "Using skill ") + s("name") else (if (done) "Read " else "Reading ") + s("path")
             ToolKind.MCP -> "${def.serverName}: ${def.remoteName}"
             null -> "Tool"
         }
@@ -677,7 +689,6 @@ class ChatEngine(
     }
 
     companion object {
-        const val MAX_TOOL_ROUNDS = 12
         const val TOOL_TIMEOUT_MS = 130_000L
     }
 }

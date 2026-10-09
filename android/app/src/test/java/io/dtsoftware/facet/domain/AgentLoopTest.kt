@@ -44,6 +44,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import okhttp3.OkHttpClient
@@ -158,14 +159,7 @@ class AgentLoopTest {
     fun deniedApprovalSkipsTheTool() = runBlocking {
         val env = Env()
         val p = env.providers.add(ProviderKind.CUSTOM, "Test", "http://localhost", "", emptyMap())
-        val now = Clock.now()
-        env.db.mcpServers().upsert(
-            McpServerEntity(
-                id = "srv", name = "Acme", url = "https://mcp.acme.invalid/mcp", approval = "ALWAYS",
-                toolsJson = AppJson.encodeToString(listOf(McpTool("create_issue", description = "Create an issue"))),
-                toolsFetchedAt = now, createdAt = now, updatedAt = now,
-            ),
-        )
+        env.addAcmeServer()
         val client = ScriptedClient(env.providers.config(p), { "mcp_acme_create_issue" }, """{"title":"Bug"}""")
         env.providers.clientOverride = { client }
         val convId = env.chat.send(null, "File a bug", emptyList(), io.dtsoftware.facet.domain.NewChatSpec(null, ModelRef(p.id, "m1"), GenParams()))
@@ -182,5 +176,61 @@ class AgentLoopTest {
         assertTrue(trace.steps[0].calls[0].isError)
         assertTrue(trace.steps[0].calls[0].result.startsWith("The user declined"))
         assertTrue(reply.content.contains("error=true"))
+    }
+
+    private suspend fun Env.addAcmeServer() {
+        val now = Clock.now()
+        db.mcpServers().upsert(
+            McpServerEntity(
+                id = "srv", name = "Acme", url = "https://mcp.acme.invalid/mcp", approval = "ALWAYS",
+                toolsJson = AppJson.encodeToString(listOf(McpTool("create_issue", description = "Create an issue"))),
+                toolsFetchedAt = now, createdAt = now, updatedAt = now,
+            ),
+        )
+    }
+
+    @Test
+    fun yoloModeRunsToolsWithoutAsking() = runBlocking {
+        val env = Env()
+        env.settings.updateSynced { it.copy(yoloMode = true) }
+        val p = env.providers.add(ProviderKind.CUSTOM, "Test", "http://localhost", "", emptyMap())
+        env.addAcmeServer()
+
+        val prepared = env.tools.prepare(GenParams(), io.dtsoftware.facet.llm.ModelCaps(tools = true))
+        assertTrue(prepared.defs.single { it.remoteName == "create_issue" }.needsApproval.not())
+        assertEquals(ToolRegistry.YOLO_TOOL_ROUNDS, prepared.maxRounds)
+
+        val client = ScriptedClient(env.providers.config(p), { "mcp_acme_create_issue" }, """{"title":"Bug"}""")
+        env.providers.clientOverride = { client }
+        val seen = Collections.synchronizedSet(HashSet<ToolStatus>())
+        val watcher = env.scope.launch { env.chat.live.collect { m -> m.values.forEach { t -> t.tools.forEach { seen += it.status } } } }
+        val convId = env.chat.send(null, "File a bug", emptyList(), io.dtsoftware.facet.domain.NewChatSpec(null, ModelRef(p.id, "m1"), GenParams()))
+        env.awaitIdle()
+        watcher.cancel()
+
+        // The call ran straight away (the fake server is unreachable, so it fails, but it was never held for approval).
+        assertTrue(ToolStatus.AWAITING_APPROVAL !in seen)
+        val call = AppJson.decodeFromString<ToolTrace>(env.conversations.messages(convId).last { it.role == "assistant" }.stepsJson!!).steps[0].calls[0]
+        assertTrue(!call.result.startsWith("The user declined"))
+    }
+
+    @Test
+    fun turningOnYoloAnswersAWaitingApproval() = runBlocking {
+        val env = Env()
+        val p = env.providers.add(ProviderKind.CUSTOM, "Test", "http://localhost", "", emptyMap())
+        env.addAcmeServer()
+        assertEquals(ToolRegistry.MAX_TOOL_ROUNDS, env.tools.prepare(GenParams(), io.dtsoftware.facet.llm.ModelCaps(tools = true)).maxRounds)
+        val client = ScriptedClient(env.providers.config(p), { "mcp_acme_create_issue" }, """{"title":"Bug"}""")
+        env.providers.clientOverride = { client }
+        val convId = env.chat.send(null, "File a bug", emptyList(), io.dtsoftware.facet.domain.NewChatSpec(null, ModelRef(p.id, "m1"), GenParams()))
+
+        withTimeout(10_000) {
+            while (env.chat.live.value.values.none { t -> t.tools.any { it.status == ToolStatus.AWAITING_APPROVAL } }) delay(30)
+        }
+        env.settings.updateSynced { it.copy(yoloMode = true) }
+        env.awaitIdle()
+
+        val call = AppJson.decodeFromString<ToolTrace>(env.conversations.messages(convId).last { it.role == "assistant" }.stepsJson!!).steps[0].calls[0]
+        assertTrue(!call.result.startsWith("The user declined"))
     }
 }

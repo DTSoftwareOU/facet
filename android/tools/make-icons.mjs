@@ -33,7 +33,7 @@ const ICONS = {
   'square-check': 'checkbox', 'layers': 'layers', 'atom': 'atom', 'feather': 'feather', 'heart': 'heart',
   'house': 'home', 'quote': 'quote', 'arrow-right': 'arrow_right', 'list-filter': 'filter', 'calendar': 'calendar',
   'square-terminal': 'terminal', 'activity': 'activity', 'mic-off': 'mic_off', 'file-up': 'file_up',
-  'files': 'files', 'cpu': 'cpu', 'infinity': 'infinity', 'timer': 'timer', 'gem': 'gem', 'scale': 'scale',
+  'files': 'files', 'cpu': 'cpu', 'infinity': 'infinity', 'timer': 'timer', 'gem': 'gem', 'scale': 'scale', 'rocket': 'rocket',
 };
 
 const num = (s) => parseFloat(s);

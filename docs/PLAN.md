@@ -72,6 +72,10 @@ beautiful home that syncs across all your devices.
   be "always on". Import from a file, a .zip, or a URL; starter examples included.
 - Agent loop: up to 12 tool rounds per reply, parallel tool calls, tool activity shown live and
   stored with the reply; the exact tool exchange is replayed in later turns.
+- YOLO mode (Settings → Tools, or the chat settings sheet): every tool call runs without an
+  approval card and a reply may take up to 40 tool rounds. A rocket badge in the composer shows
+  it's on; tap it to turn it off. Turning it on also approves calls that are already waiting.
+  Synced, so it applies on every device.
 
 ### Organization
 - Drawer with chats grouped by Today / Yesterday / Previous 7 days / Previous 30 days / month.
@@ -136,6 +140,6 @@ docs/      This plan, API contract, security model, design system, deployment
 ## Roadmap after v1.0
 - Side-by-side model comparison (send one prompt to two models).
 - Image generation outputs (OpenAI image tool, Gemini image models).
-- MCP / custom tool calling.
+- Local (stdio) MCP servers through a companion bridge.
 - Home-screen widget and Quick Settings tile.
 - Web client sharing the same encrypted sync protocol.

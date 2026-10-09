@@ -13,7 +13,11 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /** The tools prepared for one reply, plus any extra system instructions they bring. */
-data class PreparedTools(val defs: List<ToolDef>, val systemAddendum: String?) {
+data class PreparedTools(
+    val defs: List<ToolDef>,
+    val systemAddendum: String?,
+    val maxRounds: Int = ToolRegistry.MAX_TOOL_ROUNDS,
+) {
     val byName: Map<String, ToolDef> = defs.associateBy { it.spec.name }
 }
 
@@ -40,11 +44,12 @@ class ToolRegistry(
     suspend fun prepare(params: GenParams, caps: ModelCaps): PreparedTools {
         val defs = ArrayList<ToolDef>()
         val addendum = ArrayList<String>()
+        val yolo = settings.synced.value.yoloMode
 
-        if (caps.tools && usesFacetSearch(params, caps)) {
-            defs += ToolDef(ToolSpec(WEB_SEARCH, WEB_SEARCH_DESC, WEB_SEARCH_SCHEMA), ToolKind.SEARCH)
-            defs += ToolDef(ToolSpec(FETCH_PAGE, FETCH_PAGE_DESC, FETCH_PAGE_SCHEMA), ToolKind.FETCH)
-        }
+        val facetSearch = caps.tools && usesFacetSearch(params, caps)
+        if (facetSearch) defs += ToolDef(ToolSpec(WEB_SEARCH, WEB_SEARCH_DESC, WEB_SEARCH_SCHEMA), ToolKind.SEARCH)
+        // Reading a link needs no search key: offer it with search, or whenever tools are on.
+        if (caps.tools && (facetSearch || params.tools)) defs += ToolDef(ToolSpec(FETCH_PAGE, FETCH_PAGE_DESC, FETCH_PAGE_SCHEMA), ToolKind.FETCH)
 
         if (params.tools) {
             val enabledSkills = skills.all().filter { it.enabled }
@@ -85,7 +90,7 @@ class ToolRegistry(
                         var name = (prefix + "_" + slug(t.name)).take(64)
                         var n = 2
                         while (!used.add(name)) name = (prefix + "_" + slug(t.name)).take(60) + "_" + n++
-                        val needsApproval = t.name !in auto && when (approval) {
+                        val needsApproval = !yolo && t.name !in auto && when (approval) {
                             ToolApproval.ALWAYS -> true
                             ToolApproval.WRITES -> t.readOnlyHint != true
                             ToolApproval.NEVER -> false
@@ -103,7 +108,11 @@ class ToolRegistry(
                 }
             }
         }
-        return PreparedTools(defs, addendum.takeIf { it.isNotEmpty() }?.joinToString("\n\n"))
+        return PreparedTools(
+            defs,
+            addendum.takeIf { it.isNotEmpty() }?.joinToString("\n\n"),
+            maxRounds = if (yolo) YOLO_TOOL_ROUNDS else MAX_TOOL_ROUNDS,
+        )
     }
 
     suspend fun execute(def: ToolDef, argumentsJson: String): ToolOutcome {
@@ -171,7 +180,10 @@ class ToolRegistry(
         const val FETCH_PAGE = "fetch_page"
         const val USE_SKILL = "use_skill"
         const val READ_SKILL_FILE = "read_skill_file"
-        const val EMPTY_SCHEMA = """{"type":"object","properties":{}}"""
+        /** Tool rounds per reply before Facet stops the model; YOLO mode allows longer runs. */
+        const val MAX_TOOL_ROUNDS = 12
+        const val YOLO_TOOL_ROUNDS = 40
+        const val EMPTY_SCHEMA ="""{"type":"object","properties":{}}"""
         /** Cap on tool output kept in history (sent to the model and stored identically). */
         const val MAX_RESULT_CHARS = 30_000
 

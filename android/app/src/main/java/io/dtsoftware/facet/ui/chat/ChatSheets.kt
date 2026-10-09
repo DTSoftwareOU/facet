@@ -242,6 +242,8 @@ fun ChatSettingsSheet(
     mcpServers: List<io.dtsoftware.facet.data.db.McpServerEntity>,
     skillCount: Int,
     mcpToolCount: (io.dtsoftware.facet.data.db.McpServerEntity) -> Int,
+    yolo: Boolean,
+    onYolo: (Boolean) -> Unit,
     model: ModelChoice?,
     params: GenParams,
     systemPrompt: String?,
@@ -355,6 +357,14 @@ fun ChatSettingsSheet(
                             )
                         }
                     }
+                }
+                if (caps.tools) {
+                    GroupDivider()
+                    SwitchRow(
+                        "YOLO mode", yolo, onYolo,
+                        subtitle = "Run tools without asking, in every chat.",
+                        icon = R.drawable.ic_rocket,
+                    )
                 }
                 if (caps.fastMode) {
                     GroupDivider()

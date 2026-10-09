@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -63,6 +64,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.onSizeChanged
@@ -129,6 +131,7 @@ fun ChatScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val drafts by vm.attachments.collectAsStateWithLifecycle()
     val prefs by container.settings.local.collectAsStateWithLifecycle()
+    val yolo = container.settings.synced.collectAsStateWithLifecycle().value.yoloMode
     val prompts by container.prompts.observeAll().collectAsStateWithLifecycle(emptyList())
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
@@ -295,7 +298,9 @@ fun ChatScreen(
                             onApproval = { id, decision -> container.chat.respondToApproval(id, decision) },
                         ),
                     )
-                    ScrollToBottom(listState, Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp)) {
+                    // A pending approval card is where attention belongs; keep the button off it.
+                    val awaitingApproval = state.thread.any { item -> item.live?.tools?.any { it.status == io.dtsoftware.facet.domain.ToolStatus.AWAITING_APPROVAL } == true }
+                    ScrollToBottom(listState, Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp), hidden = awaitingApproval) {
                         scope.launch { listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
                     }
                 }
@@ -329,6 +334,11 @@ fun ChatScreen(
                     prompts = prompts,
                     sendOnEnter = prefs.sendOnEnter,
                     searchAvailable = state.searchAvailable,
+                    yolo = yolo,
+                    onYoloOff = {
+                        container.settings.updateSynced { it.copy(yoloMode = false) }
+                        toast("YOLO mode is off. Facet will ask before tools that change things.")
+                    },
                     modifier = Modifier.widthIn(max = 800.dp).padding(horizontal = 10.dp).padding(bottom = 8.dp),
                 )
             }
@@ -358,6 +368,8 @@ fun ChatScreen(
             mcpServers = state.mcpServers,
             skillCount = state.skillCount,
             mcpToolCount = { container.mcp.tools(it).size - container.mcp.disabledTools(it).size },
+            yolo = yolo,
+            onYolo = { on -> container.settings.updateSynced { it.copy(yoloMode = on) } },
             model = state.model,
             params = state.params,
             systemPrompt = state.conversation?.systemPrompt,
@@ -463,9 +475,12 @@ private fun ChatTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (showMenuButton) FacetIconButton(R.drawable.ic_menu, "Open chats", onMenu) else Spacer(Modifier.width(8.dp))
+        // Fade the picker in once the chat has loaded, instead of flashing "Choose a model".
+        val pickerAlpha by animateFloatAsState(if (state.loaded) 1f else 0f, tween(180), label = "picker")
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
         Row(
             Modifier
+                .alpha(pickerAlpha)
                 .clip(RoundedCornerShape(14.dp))
                 .clickable(onClick = onModel)
                 .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -567,9 +582,9 @@ private fun MessageList(
 }
 
 @Composable
-private fun ScrollToBottom(listState: LazyListState, modifier: Modifier, onClick: () -> Unit) {
+private fun ScrollToBottom(listState: LazyListState, modifier: Modifier, hidden: Boolean = false, onClick: () -> Unit) {
     val show by remember { derivedStateOf { listState.canScrollForward && listState.layoutInfo.totalItemsCount > 0 && !nearBottom(listState) } }
-    AnimatedVisibility(show, modifier = modifier, enter = fadeIn() + scaleIn(initialScale = 0.8f), exit = fadeOut() + scaleOut(targetScale = 0.8f)) {
+    AnimatedVisibility(show && !hidden, modifier = modifier, enter = fadeIn() + scaleIn(initialScale = 0.8f), exit = fadeOut() + scaleOut(targetScale = 0.8f)) {
         Box(
             Modifier
                 .size(40.dp)
