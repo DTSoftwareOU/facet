@@ -1,0 +1,486 @@
+package io.dtsoftware.facet.sync
+
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.util.Log
+import androidx.room.withTransaction
+import io.dtsoftware.facet.core.crypto.DecryptionException
+import io.dtsoftware.facet.core.crypto.FacetCrypto
+import io.dtsoftware.facet.core.crypto.SecretBox
+import io.dtsoftware.facet.core.util.AppJson
+import io.dtsoftware.facet.core.util.Clock
+import io.dtsoftware.facet.data.db.FacetDatabase
+import io.dtsoftware.facet.data.db.MessageStatus
+import io.dtsoftware.facet.data.prefs.SettingsStore
+import io.dtsoftware.facet.data.repo.AttachmentStore
+import java.io.IOException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
+import okhttp3.OkHttpClient
+
+enum class SyncPhase { OFF, IDLE, SYNCING, OFFLINE, ERROR, PAUSED }
+
+data class SyncState(val phase: SyncPhase, val lastSyncAt: Long = 0, val message: String? = null)
+
+/**
+ * Offline-first, end-to-end encrypted sync (docs/API.md "Sync"). Local rows carry a dirty flag;
+ * pushes are last-writer-wins on `updatedAt`; pulls follow the server's change cursor.
+ * While the app is open, an SSE stream triggers a pull whenever another device pushes.
+ */
+class SyncEngine(
+    context: Context,
+    private val scope: CoroutineScope,
+    private val db: FacetDatabase,
+    private val auth: AuthManager,
+    private val api: SyncApi,
+    private val settings: SettingsStore,
+    private val attachments: AttachmentStore,
+    private val secrets: SecretBox,
+    http: OkHttpClient,
+) {
+    private val prefs = context.getSharedPreferences("facet_sync", Context.MODE_PRIVATE)
+    private val connectivity = context.getSystemService(ConnectivityManager::class.java)
+    private val streamHttp = http.newBuilder()
+        .readTimeout(70, java.util.concurrent.TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
+    private val mutex = Mutex()
+    private val _state = MutableStateFlow(SyncState(SyncPhase.OFF, prefs.getLong(K_LAST, 0)))
+    val state: StateFlow<SyncState> = _state.asStateFlow()
+
+    private var debounceJob: Job? = null
+    private var streamJob: Job? = null
+    @Volatile private var foreground = false
+    private var lastAccountRefresh = 0L
+
+    private var cursor: Long
+        get() = prefs.getLong(K_CURSOR, 0)
+        set(value) { prefs.edit().putLong(K_CURSOR, value).apply() }
+
+    fun start() {
+        scope.launch {
+            auth.state.collect { s ->
+                when (s) {
+                    is AccountState.SignedIn -> {
+                        if (_state.value.phase == SyncPhase.OFF || _state.value.phase == SyncPhase.PAUSED) {
+                            _state.value = SyncState(SyncPhase.IDLE, prefs.getLong(K_LAST, 0))
+                        }
+                        requestSync(0)
+                    }
+                    AccountState.Guest -> _state.value = SyncState(SyncPhase.OFF)
+                    is AccountState.Expired -> _state.value = SyncState(SyncPhase.PAUSED, prefs.getLong(K_LAST, 0), "Sign in again to resume sync.")
+                }
+                updateStream()
+            }
+        }
+        runCatching {
+            connectivity?.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    requestSync(500)
+                    updateStream()
+                }
+            })
+        }
+    }
+
+    fun setForeground(value: Boolean) {
+        foreground = value
+        updateStream()
+        if (value) requestSync(0)
+    }
+
+    /** Debounced sync request after local edits. */
+    fun requestSync(delayMs: Long = 1500) {
+        if (!auth.isSignedIn) return
+        debounceJob?.cancel()
+        debounceJob = scope.launch {
+            delay(delayMs)
+            syncNow()
+        }
+    }
+
+    suspend fun syncNow(): Boolean = mutex.withLock {
+        if (!auth.isSignedIn) return false
+        val key = auth.vaultKey() ?: return false
+        val codec = RecordCodec(key, secrets)
+        _state.value = _state.value.copy(phase = SyncPhase.SYNCING, message = null)
+        return try {
+            withContext(Dispatchers.IO) {
+                push(codec, key)
+                pull(codec)
+                purge()
+                downloadPending(key)
+                if (Clock.now() - lastAccountRefresh > 10 * 60_000) {
+                    runCatching { auth.refreshAccount() }
+                    lastAccountRefresh = Clock.now()
+                }
+            }
+            val now = Clock.now()
+            prefs.edit().putLong(K_LAST, now).apply()
+            _state.value = SyncState(SyncPhase.IDLE, now)
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: AuthException) {
+            _state.value = SyncState(if (auth.isSignedIn) SyncPhase.ERROR else SyncPhase.PAUSED, prefs.getLong(K_LAST, 0), e.message)
+            false
+        } catch (e: ApiException) {
+            _state.value = SyncState(SyncPhase.ERROR, prefs.getLong(K_LAST, 0), e.message)
+            false
+        } catch (e: IOException) {
+            _state.value = SyncState(SyncPhase.OFFLINE, prefs.getLong(K_LAST, 0), "Offline. Changes will sync when you're back online.")
+            false
+        } catch (e: Exception) {
+            Log.w(TAG, "sync failed", e)
+            _state.value = SyncState(SyncPhase.ERROR, prefs.getLong(K_LAST, 0), "Sync failed. It will retry automatically.")
+            false
+        }
+    }
+
+    // ---- push ----
+
+    private class Pending(val record: RecordDto, val onAccepted: suspend () -> Unit)
+
+    private suspend fun push(codec: RecordCodec, vaultKey: ByteArray) {
+        repeat(MAX_ROUNDS) {
+            val batch = collectDirty(codec, vaultKey)
+            if (batch.isEmpty()) return
+            for (chunk in chunked(batch)) {
+                val res = auth.authed { base, token -> api.push(base, token, chunk.map { it.record }) }
+                val byKey = chunk.associateBy { it.record.type + "/" + it.record.id }
+                db.withTransaction {
+                    res.accepted.forEach { a -> byKey[a.type + "/" + a.id]?.onAccepted?.invoke() }
+                    res.rejected.forEach { r -> r.current?.let { applyRemote(codec, it, force = true) } }
+                }
+            }
+        }
+    }
+
+    private fun chunked(batch: List<Pending>): List<List<Pending>> {
+        val out = ArrayList<List<Pending>>()
+        var cur = ArrayList<Pending>()
+        var bytes = 0
+        for (p in batch) {
+            val size = (p.record.ct?.length ?: 0) + 200
+            if (cur.isNotEmpty() && (cur.size >= 200 || bytes + size > 5_000_000)) {
+                out += cur
+                cur = ArrayList()
+                bytes = 0
+            }
+            cur += p
+            bytes += size
+        }
+        if (cur.isNotEmpty()) out += cur
+        return out
+    }
+
+    private suspend fun collectDirty(codec: RecordCodec, vaultKey: ByteArray): List<Pending> {
+        val out = ArrayList<Pending>()
+        if (settings.syncedDirty) {
+            val s = settings.synced.value
+            out += Pending(codec.encode(s)) { settings.markSyncedClean(s.updatedAt) }
+        }
+        val providers = db.providers()
+        providers.dirty(LIMIT).forEach { e -> out += Pending(codec.encode(e)) { providers.markClean(e.id, e.updatedAt) } }
+        val folders = db.folders()
+        folders.dirty(LIMIT).forEach { e -> out += Pending(codec.encode(e)) { folders.markClean(e.id, e.updatedAt) } }
+        val prompts = db.prompts()
+        prompts.dirty(LIMIT).forEach { e -> out += Pending(codec.encode(e)) { prompts.markClean(e.id, e.updatedAt) } }
+        val assistants = db.assistants()
+        assistants.dirty(LIMIT).forEach { e -> out += Pending(codec.encode(e)) { assistants.markClean(e.id, e.updatedAt) } }
+        val conversations = db.conversations()
+        conversations.dirty(LIMIT).forEach { e -> out += Pending(codec.encode(e)) { conversations.markClean(e.id, e.updatedAt) } }
+        val atts = db.attachments()
+        atts.dirty(LIMIT).forEach { e ->
+            if (e.conversationId == null && !e.deleted) return@forEach // unsent draft
+            var current = e
+            if (!e.deleted && !e.uploaded) {
+                val file = attachments.file(e) ?: return@forEach
+                val blob = FacetCrypto.encryptBlob(vaultKey, e.id, file.readBytes())
+                auth.authed { base, token -> api.putBlob(base, token, e.id, blob) }
+                atts.markUploaded(e.id)
+                current = e.copy(uploaded = true)
+            }
+            out += Pending(codec.encode(current)) { atts.markClean(e.id, e.updatedAt) }
+        }
+        val messages = db.messages()
+        messages.dirty(LIMIT * 2).forEach { e -> out += Pending(codec.encode(e)) { messages.markClean(e.id, e.updatedAt) } }
+        return out
+    }
+
+    // ---- pull ----
+
+    private suspend fun pull(codec: RecordCodec) {
+        var since = cursor
+        var seen: MutableMap<String, MutableSet<String>>? = null
+        var rounds = 0
+        while (rounds++ < 10_000) {
+            val res = auth.authed { base, token -> api.pull(base, token, since, PAGE) }
+            if (res.reset) {
+                since = 0
+                cursor = 0
+                seen = HashMap()
+                continue
+            }
+            db.withTransaction {
+                for (r in res.records) {
+                    applyRemote(codec, r, force = false)
+                    seen?.getOrPut(r.type) { HashSet() }?.add(r.id)
+                }
+            }
+            since = res.cursor
+            cursor = since
+            if (!res.hasMore) break
+        }
+        seen?.let { deleteUnseen(it) }
+    }
+
+    private suspend fun applyRemote(codec: RecordCodec, r: RecordDto, force: Boolean) {
+        try {
+            when (r.type) {
+                RecordType.CONVERSATION -> {
+                    val dao = db.conversations()
+                    val local = dao.get(r.id)
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (r.deleted) {
+                        dao.hardDelete(r.id)
+                        db.messages().hardDeleteConversation(r.id)
+                    } else {
+                        dao.upsert(codec.conversation(r))
+                    }
+                }
+                RecordType.MESSAGE -> {
+                    val dao = db.messages()
+                    val local = dao.get(r.id)
+                    if (local != null && local.status == MessageStatus.STREAMING.name) return
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (r.deleted) dao.hardDelete(r.id) else dao.upsert(codec.message(r))
+                }
+                RecordType.ATTACHMENT -> {
+                    val dao = db.attachments()
+                    val local = dao.get(r.id)
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (r.deleted) {
+                        local?.let { attachments.deleteFile(it) }
+                        dao.hardDelete(r.id)
+                    } else {
+                        dao.upsert(codec.attachment(r, local))
+                    }
+                }
+                RecordType.ASSISTANT -> {
+                    val dao = db.assistants()
+                    val local = dao.get(r.id)
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (r.deleted) dao.hardDelete(r.id) else dao.upsert(codec.assistant(r))
+                }
+                RecordType.FOLDER -> {
+                    val dao = db.folders()
+                    val local = dao.get(r.id)
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (r.deleted) dao.hardDelete(r.id) else dao.upsert(codec.folder(r))
+                }
+                RecordType.PROMPT -> {
+                    val dao = db.prompts()
+                    val local = dao.get(r.id)
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (r.deleted) dao.hardDelete(r.id) else dao.upsert(codec.prompt(r))
+                }
+                RecordType.PROVIDER -> {
+                    val dao = db.providers()
+                    val local = dao.get(r.id)
+                    if (!force && local != null && local.dirty && local.updatedAt > r.updatedAt) return
+                    if (r.deleted) dao.hardDelete(r.id) else dao.upsert(codec.provider(r, local))
+                }
+                RecordType.SETTINGS -> if (!r.deleted) {
+                    val remote = codec.settings(r)
+                    if (force || !settings.syncedDirty || remote.updatedAt >= settings.synced.value.updatedAt) {
+                        settings.applyRemoteSynced(remote)
+                    }
+                }
+                else -> Unit // Unknown type from a newer client: ignore.
+            }
+        } catch (e: DecryptionException) {
+            Log.w(TAG, "skipping undecryptable ${r.type} record")
+        } catch (e: kotlinx.serialization.SerializationException) {
+            Log.w(TAG, "skipping malformed ${r.type} record")
+        }
+    }
+
+    /** After a server reset, local clean rows the server no longer has are deleted. */
+    private suspend fun deleteUnseen(seen: Map<String, Set<String>>) = db.withTransaction {
+        fun gone(type: String, ids: List<String>) = ids.filter { it !in seen[type].orEmpty() }
+        gone(RecordType.CONVERSATION, db.conversations().cleanIds()).forEach {
+            db.conversations().hardDelete(it); db.messages().hardDeleteConversation(it)
+        }
+        gone(RecordType.MESSAGE, db.messages().cleanIds()).forEach { db.messages().hardDelete(it) }
+        gone(RecordType.ATTACHMENT, db.attachments().cleanIds()).forEach { id ->
+            db.attachments().get(id)?.takeIf { it.uploaded }?.let { attachments.deleteFile(it); db.attachments().hardDelete(id) }
+        }
+        gone(RecordType.ASSISTANT, db.assistants().cleanIds()).forEach { db.assistants().hardDelete(it) }
+        gone(RecordType.FOLDER, db.folders().cleanIds()).forEach { db.folders().hardDelete(it) }
+        gone(RecordType.PROMPT, db.prompts().cleanIds()).forEach { db.prompts().hardDelete(it) }
+        gone(RecordType.PROVIDER, db.providers().cleanIds()).forEach { db.providers().hardDelete(it) }
+    }
+
+    private suspend fun purge() {
+        db.conversations().purgeTombstones()
+        db.messages().purgeTombstones()
+        db.assistants().purgeTombstones()
+        db.folders().purgeTombstones()
+        db.prompts().purgeTombstones()
+        db.providers().purgeTombstones()
+        db.attachments().purgeable().forEach { a ->
+            if (a.uploaded) runCatching { auth.authed { base, token -> api.deleteBlob(base, token, a.id) } }
+            attachments.deleteFile(a)
+            db.attachments().hardDelete(a.id)
+        }
+    }
+
+    private suspend fun downloadPending(vaultKey: ByteArray) {
+        db.attachments().pendingDownload(EAGER_DOWNLOAD_MAX, 20).forEach { a ->
+            runCatching {
+                val blob = auth.authed { base, token -> api.getBlob(base, token, a.id) }
+                attachments.storeDownloaded(a, FacetCrypto.decryptBlob(vaultKey, a.id, blob))
+            }
+        }
+    }
+
+    /** Downloads an attachment's file on demand. Returns false if it isn't available. */
+    suspend fun ensureLocal(attachmentId: String): Boolean = withContext(Dispatchers.IO) {
+        val a = db.attachments().get(attachmentId) ?: return@withContext false
+        if (attachments.file(a) != null) return@withContext true
+        if (!a.uploaded || !auth.isSignedIn) return@withContext false
+        val key = auth.vaultKey() ?: return@withContext false
+        runCatching {
+            val blob = auth.authed { base, token -> api.getBlob(base, token, a.id) }
+            attachments.storeDownloaded(a, FacetCrypto.decryptBlob(key, a.id, blob))
+            true
+        }.getOrDefault(false)
+    }
+
+    // ---- account lifecycle ----
+
+    /** Queues every local entity for upload (new account, or after an email reset). */
+    suspend fun markEverythingDirty() = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            db.conversations().markAllDirty()
+            db.messages().markAllDirty()
+            db.attachments().markAllDirty()
+            db.assistants().markAllDirty()
+            db.folders().markAllDirty()
+            db.prompts().markAllDirty()
+            db.providers().markAllDirty()
+        }
+        settings.markSyncedDirty()
+        cursor = 0
+    }
+
+    /** Removes all synced content from this device (sign out with "remove data"). */
+    suspend fun wipeLocalData() = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            db.conversations().clear()
+            db.messages().clear()
+            db.attachments().clear()
+            db.assistants().clear()
+            db.folders().clear()
+            db.prompts().clear()
+            db.providers().clear()
+        }
+        attachments.clearAll()
+        settings.resetSynced()
+        cursor = 0
+        prefs.edit().remove(K_LAST).apply()
+    }
+
+    fun resetCursor() {
+        cursor = 0
+    }
+
+    // ---- live updates ----
+
+    private fun updateStream() {
+        val want = foreground && auth.isSignedIn
+        if (want && streamJob?.isActive != true) {
+            streamJob = scope.launch { runStream() }
+        } else if (!want) {
+            streamJob?.cancel()
+            streamJob = null
+        }
+    }
+
+    private suspend fun runStream() {
+        var backoff = 1_000L
+        while (currentCoroutineContext().isActive) {
+            try {
+                val token = auth.authed { _, t -> t }
+                val call = api.streamCall(streamHttp, auth.serverUrl, token)
+                coroutineScope {
+                    val watcher = launch {
+                        try { awaitCancellation() } finally { call.cancel() }
+                    }
+                    withContext(Dispatchers.IO) {
+                        call.execute().use { resp ->
+                            if (resp.code == 401) {
+                                runCatching { auth.authed { base, t -> api.account(base, t) } }
+                                return@withContext
+                            }
+                            if (!resp.isSuccessful) return@withContext
+                            backoff = 1_000L
+                            val source = resp.body.source()
+                            var event = ""
+                            while (true) {
+                                val line = source.readUtf8Line() ?: break
+                                when {
+                                    line.startsWith("event:") -> event = line.substring(6).trim()
+                                    line.startsWith("data:") -> {
+                                        val remote = runCatching {
+                                            AppJson.parseToJsonElement(line.substring(5).trim()).jsonObject["cursor"]!!.jsonPrimitive.long
+                                        }.getOrNull()
+                                        if ((event == "ready" || event == "changed") && remote != null && remote != cursor) requestSync(250)
+                                    }
+                                    line.isEmpty() -> event = ""
+                                }
+                            }
+                        }
+                    }
+                    watcher.cancel()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Network drop or auth issue: retry with backoff.
+            }
+            if (!auth.isSignedIn) return
+            delay(backoff)
+            backoff = (backoff * 2).coerceAtMost(60_000)
+        }
+    }
+
+    private companion object {
+        const val TAG = "FacetSync"
+        const val K_CURSOR = "cursor"
+        const val K_LAST = "last_sync"
+        const val LIMIT = 200
+        const val PAGE = 500
+        const val MAX_ROUNDS = 25
+        const val EAGER_DOWNLOAD_MAX = 6L * 1024 * 1024
+    }
+}

@@ -1,13 +1,93 @@
 package io.dtsoftware.facet
 
+import android.content.Intent
+import android.graphics.Color
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.compose.material3.Text
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.dtsoftware.facet.ui.FacetRoot
+import io.dtsoftware.facet.ui.LaunchRequest
+import io.dtsoftware.facet.ui.theme.FacetTheme
+import io.dtsoftware.facet.ui.theme.resolveDark
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
+    private val launchRequests = MutableStateFlow<LaunchRequest?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
-        setContent { Text("Facet") }
+        val container = (application as FacetApp).container
+        launchRequests.value = parseIntent(intent)
+
+        setContent {
+            val prefs by container.settings.local.collectAsStateWithLifecycle()
+            val dark = resolveDark(prefs.theme)
+            LaunchedEffect(dark) {
+                val style = if (dark) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+            }
+            LaunchedEffect(prefs.secureScreen) {
+                if (prefs.secureScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            }
+            FacetTheme(
+                mode = prefs.theme,
+                dynamicColor = prefs.dynamicColor,
+                chatScale = prefs.chatTextScale,
+                reducedMotion = prefs.reducedMotion,
+            ) {
+                FacetRoot(container, launchRequests)
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        parseIntent(intent)?.let { launchRequests.value = it }
+    }
+
+    private fun parseIntent(intent: Intent?): LaunchRequest? {
+        intent ?: return null
+        intent.getStringExtra(EXTRA_CONVERSATION)?.let { return LaunchRequest.OpenConversation(it) }
+        return when (intent.action) {
+            ACTION_NEW_CHAT -> LaunchRequest.NewChat(voice = false)
+            ACTION_VOICE -> LaunchRequest.NewChat(voice = true)
+            Intent.ACTION_SEND -> {
+                val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+                val uri = streamExtra(intent)
+                LaunchRequest.Share(text, listOfNotNull(uri))
+            }
+            Intent.ACTION_SEND_MULTIPLE -> {
+                val uris = if (Build.VERSION.SDK_INT >= 33) {
+                    intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    @Suppress("DEPRECATION") intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
+                }
+                LaunchRequest.Share(intent.getStringExtra(Intent.EXTRA_TEXT), uris.orEmpty())
+            }
+            else -> null
+        }
+    }
+
+    private fun streamExtra(intent: Intent): Uri? = if (Build.VERSION.SDK_INT >= 33) {
+        intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+    } else {
+        @Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_STREAM)
+    }
+
+    companion object {
+        const val EXTRA_CONVERSATION = "io.dtsoftware.facet.CONVERSATION"
+        const val ACTION_NEW_CHAT = "io.dtsoftware.facet.NEW_CHAT"
+        const val ACTION_VOICE = "io.dtsoftware.facet.VOICE_CHAT"
     }
 }

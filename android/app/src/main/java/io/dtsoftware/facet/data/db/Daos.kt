@@ -1,0 +1,320 @@
+package io.dtsoftware.facet.data.db
+
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.Upsert
+import kotlinx.coroutines.flow.Flow
+
+data class SearchHit(
+    val messageId: String,
+    val conversationId: String,
+    val title: String,
+    val snippet: String,
+    val role: String,
+    val createdAt: Long,
+)
+
+data class ConversationCost(val conversationId: String, val total: Double?)
+
+@Dao
+interface ConversationDao {
+    @Query("SELECT id FROM conversations WHERE dirty = 0")
+    suspend fun cleanIds(): List<String>
+
+    @Query("SELECT * FROM conversations WHERE deleted = 0 AND archived = :archived ORDER BY pinned DESC, lastActivityAt DESC")
+    fun observeList(archived: Boolean = false): Flow<List<ConversationEntity>>
+
+    @Query("SELECT * FROM conversations WHERE id = :id")
+    fun observe(id: String): Flow<ConversationEntity?>
+
+    @Query("SELECT * FROM conversations WHERE id = :id")
+    suspend fun get(id: String): ConversationEntity?
+
+    @Query("SELECT * FROM conversations WHERE deleted = 0 AND title LIKE '%' || :q || '%' ORDER BY lastActivityAt DESC LIMIT 40")
+    suspend fun searchTitles(q: String): List<ConversationEntity>
+
+    @Upsert suspend fun upsert(entity: ConversationEntity)
+    @Upsert suspend fun upsertAll(entities: List<ConversationEntity>)
+
+    @Query("SELECT * FROM conversations WHERE dirty = 1 LIMIT :limit")
+    suspend fun dirty(limit: Int): List<ConversationEntity>
+
+    @Query("UPDATE conversations SET dirty = 0 WHERE id = :id AND updatedAt = :updatedAt")
+    suspend fun markClean(id: String, updatedAt: Long)
+
+    @Query("DELETE FROM conversations WHERE deleted = 1 AND dirty = 0")
+    suspend fun purgeTombstones()
+
+    @Query("DELETE FROM conversations WHERE id = :id")
+    suspend fun hardDelete(id: String)
+
+    @Query("UPDATE conversations SET dirty = 1")
+    suspend fun markAllDirty()
+
+    @Query("SELECT COUNT(*) FROM conversations WHERE deleted = 0")
+    suspend fun count(): Int
+
+    @Query("SELECT * FROM conversations WHERE deleted = 0 ORDER BY lastActivityAt DESC")
+    suspend fun all(): List<ConversationEntity>
+
+    @Query("DELETE FROM conversations")
+    suspend fun clear()
+}
+
+@Dao
+interface MessageDao {
+    @Query("SELECT id FROM messages WHERE dirty = 0")
+    suspend fun cleanIds(): List<String>
+
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId AND deleted = 0 ORDER BY createdAt, id")
+    fun observeForConversation(conversationId: String): Flow<List<MessageEntity>>
+
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId AND deleted = 0 ORDER BY createdAt, id")
+    suspend fun forConversation(conversationId: String): List<MessageEntity>
+
+    @Query("SELECT * FROM messages WHERE id = :id")
+    suspend fun get(id: String): MessageEntity?
+
+    @Upsert suspend fun upsert(entity: MessageEntity)
+    @Upsert suspend fun upsertAll(entities: List<MessageEntity>)
+
+    @Query("UPDATE messages SET content = :content, thinking = :thinking, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateStreaming(id: String, content: String, thinking: String?, updatedAt: Long)
+
+    @Query("SELECT * FROM messages WHERE dirty = 1 AND status != 'STREAMING' LIMIT :limit")
+    suspend fun dirty(limit: Int): List<MessageEntity>
+
+    @Query("UPDATE messages SET dirty = 0 WHERE id = :id AND updatedAt = :updatedAt")
+    suspend fun markClean(id: String, updatedAt: Long)
+
+    @Query(
+        "UPDATE messages SET deleted = 1, dirty = 1, updatedAt = :now, content = '', thinking = NULL, blocksJson = NULL " +
+            "WHERE conversationId = :conversationId AND deleted = 0",
+    )
+    suspend fun tombstoneConversation(conversationId: String, now: Long)
+
+    @Query("DELETE FROM messages WHERE deleted = 1 AND dirty = 0")
+    suspend fun purgeTombstones()
+
+    @Query("DELETE FROM messages WHERE conversationId = :conversationId")
+    suspend fun hardDeleteConversation(conversationId: String)
+
+    @Query("DELETE FROM messages WHERE id = :id")
+    suspend fun hardDelete(id: String)
+
+    @Query("UPDATE messages SET status = 'STOPPED', dirty = 1 WHERE status = 'STREAMING'")
+    suspend fun recoverInterrupted()
+
+    @Query("UPDATE messages SET dirty = 1")
+    suspend fun markAllDirty()
+
+    @Query("SELECT conversationId, SUM(costUsd) AS total FROM messages WHERE conversationId = :conversationId AND deleted = 0")
+    fun observeCost(conversationId: String): Flow<ConversationCost?>
+
+    @Query(
+        """
+        SELECT m.id AS messageId, m.conversationId AS conversationId, c.title AS title,
+               snippet(messages_fts, '[[', ']]', '…', -1, 14) AS snippet, m.role AS role, m.createdAt AS createdAt
+        FROM messages_fts
+        JOIN messages m ON m.rowid = messages_fts.rowid
+        JOIN conversations c ON c.id = m.conversationId
+        WHERE messages_fts MATCH :query AND m.deleted = 0 AND c.deleted = 0
+        ORDER BY m.createdAt DESC
+        LIMIT 80
+        """,
+    )
+    suspend fun search(query: String): List<SearchHit>
+
+    @Query("DELETE FROM messages")
+    suspend fun clear()
+}
+
+@Dao
+interface AttachmentDao {
+    @Query("SELECT id FROM attachments WHERE dirty = 0")
+    suspend fun cleanIds(): List<String>
+
+    @Query("SELECT * FROM attachments WHERE id = :id")
+    suspend fun get(id: String): AttachmentEntity?
+
+    @Query("SELECT * FROM attachments WHERE id IN (:ids)")
+    suspend fun getAll(ids: List<String>): List<AttachmentEntity>
+
+    @Query("SELECT * FROM attachments WHERE id IN (:ids)")
+    fun observeAll(ids: List<String>): Flow<List<AttachmentEntity>>
+
+    @Upsert suspend fun upsert(entity: AttachmentEntity)
+
+    @Query("SELECT * FROM attachments WHERE dirty = 1 LIMIT :limit")
+    suspend fun dirty(limit: Int): List<AttachmentEntity>
+
+    @Query("SELECT * FROM attachments WHERE deleted = 0 AND uploaded = 0 AND localFile IS NOT NULL LIMIT :limit")
+    suspend fun pendingUpload(limit: Int): List<AttachmentEntity>
+
+    @Query("SELECT * FROM attachments WHERE deleted = 0 AND localFile IS NULL AND uploaded = 1 AND kind = 'image' AND sizeBytes < :maxBytes LIMIT :limit")
+    suspend fun pendingDownload(maxBytes: Long, limit: Int): List<AttachmentEntity>
+
+    @Query("UPDATE attachments SET dirty = 0 WHERE id = :id AND updatedAt = :updatedAt")
+    suspend fun markClean(id: String, updatedAt: Long)
+
+    @Query("UPDATE attachments SET uploaded = 1 WHERE id = :id")
+    suspend fun markUploaded(id: String)
+
+    @Query("UPDATE attachments SET localFile = :file WHERE id = :id")
+    suspend fun setLocalFile(id: String, file: String)
+
+    @Query("UPDATE attachments SET deleted = 1, dirty = 1, updatedAt = :now WHERE conversationId = :conversationId AND deleted = 0")
+    suspend fun tombstoneConversation(conversationId: String, now: Long)
+
+    @Query("SELECT * FROM attachments WHERE deleted = 1 AND dirty = 0")
+    suspend fun purgeable(): List<AttachmentEntity>
+
+    @Query("DELETE FROM attachments WHERE id = :id")
+    suspend fun hardDelete(id: String)
+
+    @Query("UPDATE attachments SET dirty = 1, uploaded = 0")
+    suspend fun markAllDirty()
+
+    @Query("SELECT * FROM attachments WHERE deleted = 0")
+    suspend fun all(): List<AttachmentEntity>
+
+    @Query("DELETE FROM attachments")
+    suspend fun clear()
+}
+
+@Dao
+interface AssistantDao {
+    @Query("SELECT id FROM assistants WHERE dirty = 0")
+    suspend fun cleanIds(): List<String>
+
+    @Query("SELECT * FROM assistants WHERE deleted = 0 ORDER BY sort, createdAt")
+    fun observeAll(): Flow<List<AssistantEntity>>
+
+    @Query("SELECT * FROM assistants WHERE id = :id")
+    suspend fun get(id: String): AssistantEntity?
+
+    @Upsert suspend fun upsert(entity: AssistantEntity)
+
+    @Query("SELECT * FROM assistants WHERE dirty = 1 LIMIT :limit")
+    suspend fun dirty(limit: Int): List<AssistantEntity>
+
+    @Query("UPDATE assistants SET dirty = 0 WHERE id = :id AND updatedAt = :updatedAt")
+    suspend fun markClean(id: String, updatedAt: Long)
+
+    @Query("DELETE FROM assistants WHERE deleted = 1 AND dirty = 0")
+    suspend fun purgeTombstones()
+
+    @Query("DELETE FROM assistants WHERE id = :id")
+    suspend fun hardDelete(id: String)
+
+    @Query("UPDATE assistants SET dirty = 1")
+    suspend fun markAllDirty()
+
+    @Query("DELETE FROM assistants")
+    suspend fun clear()
+}
+
+@Dao
+interface FolderDao {
+    @Query("SELECT id FROM folders WHERE dirty = 0")
+    suspend fun cleanIds(): List<String>
+
+    @Query("SELECT * FROM folders WHERE deleted = 0 ORDER BY sort, name")
+    fun observeAll(): Flow<List<FolderEntity>>
+
+    @Query("SELECT * FROM folders WHERE id = :id")
+    suspend fun get(id: String): FolderEntity?
+
+    @Upsert suspend fun upsert(entity: FolderEntity)
+
+    @Query("SELECT * FROM folders WHERE dirty = 1 LIMIT :limit")
+    suspend fun dirty(limit: Int): List<FolderEntity>
+
+    @Query("UPDATE folders SET dirty = 0 WHERE id = :id AND updatedAt = :updatedAt")
+    suspend fun markClean(id: String, updatedAt: Long)
+
+    @Query("DELETE FROM folders WHERE deleted = 1 AND dirty = 0")
+    suspend fun purgeTombstones()
+
+    @Query("DELETE FROM folders WHERE id = :id")
+    suspend fun hardDelete(id: String)
+
+    @Query("UPDATE folders SET dirty = 1")
+    suspend fun markAllDirty()
+
+    @Query("DELETE FROM folders")
+    suspend fun clear()
+}
+
+@Dao
+interface PromptDao {
+    @Query("SELECT id FROM prompts WHERE dirty = 0")
+    suspend fun cleanIds(): List<String>
+
+    @Query("SELECT * FROM prompts WHERE deleted = 0 ORDER BY title COLLATE NOCASE")
+    fun observeAll(): Flow<List<PromptEntity>>
+
+    @Query("SELECT * FROM prompts WHERE id = :id")
+    suspend fun get(id: String): PromptEntity?
+
+    @Upsert suspend fun upsert(entity: PromptEntity)
+
+    @Query("SELECT * FROM prompts WHERE dirty = 1 LIMIT :limit")
+    suspend fun dirty(limit: Int): List<PromptEntity>
+
+    @Query("UPDATE prompts SET dirty = 0 WHERE id = :id AND updatedAt = :updatedAt")
+    suspend fun markClean(id: String, updatedAt: Long)
+
+    @Query("DELETE FROM prompts WHERE deleted = 1 AND dirty = 0")
+    suspend fun purgeTombstones()
+
+    @Query("DELETE FROM prompts WHERE id = :id")
+    suspend fun hardDelete(id: String)
+
+    @Query("UPDATE prompts SET dirty = 1")
+    suspend fun markAllDirty()
+
+    @Query("DELETE FROM prompts")
+    suspend fun clear()
+}
+
+@Dao
+interface ProviderDao {
+    @Query("SELECT id FROM providers WHERE dirty = 0")
+    suspend fun cleanIds(): List<String>
+
+    @Query("SELECT * FROM providers WHERE deleted = 0 ORDER BY sort, createdAt")
+    fun observeAll(): Flow<List<ProviderEntity>>
+
+    @Query("SELECT * FROM providers WHERE deleted = 0 ORDER BY sort, createdAt")
+    suspend fun all(): List<ProviderEntity>
+
+    @Query("SELECT * FROM providers WHERE id = :id")
+    suspend fun get(id: String): ProviderEntity?
+
+    @Query("SELECT * FROM providers WHERE id = :id")
+    fun observe(id: String): Flow<ProviderEntity?>
+
+    @Upsert suspend fun upsert(entity: ProviderEntity)
+
+    @Query("UPDATE providers SET modelsJson = :modelsJson, modelsFetchedAt = :fetchedAt WHERE id = :id")
+    suspend fun setModels(id: String, modelsJson: String, fetchedAt: Long)
+
+    @Query("SELECT * FROM providers WHERE dirty = 1 LIMIT :limit")
+    suspend fun dirty(limit: Int): List<ProviderEntity>
+
+    @Query("UPDATE providers SET dirty = 0 WHERE id = :id AND updatedAt = :updatedAt")
+    suspend fun markClean(id: String, updatedAt: Long)
+
+    @Query("DELETE FROM providers WHERE deleted = 1 AND dirty = 0")
+    suspend fun purgeTombstones()
+
+    @Query("DELETE FROM providers WHERE id = :id")
+    suspend fun hardDelete(id: String)
+
+    @Query("UPDATE providers SET dirty = 1")
+    suspend fun markAllDirty()
+
+    @Query("DELETE FROM providers")
+    suspend fun clear()
+}
