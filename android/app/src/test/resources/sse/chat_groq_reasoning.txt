@@ -1,0 +1,6 @@
+data: {"id":"g1","object":"chat.completion.chunk","model":"openai/gpt-oss-120b","choices":[{"index":0,"delta":{"role":"assistant","reasoning":"Short plan."},"finish_reason":null}]}
+
+data: {"id":"g1","object":"chat.completion.chunk","model":"openai/gpt-oss-120b","choices":[{"index":0,"delta":{"content":"Result."},"finish_reason":"stop"}],"x_groq":{"usage":{"prompt_tokens":5,"completion_tokens":7}}}
+
+data: [DONE]
+
