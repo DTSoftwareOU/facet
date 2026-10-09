@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -46,6 +47,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -351,14 +353,27 @@ private fun ThinkingPanel(text: String, active: Boolean, startedAt: Long?, durat
         }
         AnimatedVisibility(expanded && text.isNotBlank(), enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
             val lineColor = c.outline
+            val scroll = rememberScrollState()
+            // While thinking, show a scrollable window that follows the newest text unless the
+            // reader has scrolled up. Once done, the full reasoning scrolls with the chat.
+            if (active) {
+                LaunchedEffect(Unit) {
+                    var lastMax = 0
+                    snapshotFlow { scroll.maxValue }.collect { max ->
+                        if (scroll.value >= lastMax - 48) scroll.scrollTo(max)
+                        lastMax = max
+                    }
+                }
+            }
             Text(
                 text.trim(),
                 style = FacetTheme.type.body.copy(fontStyle = FontStyle.Normal),
                 color = c.textSecondary,
                 modifier = Modifier
                     .padding(top = 6.dp, start = 7.dp)
-                    .heightIn(max = 420.dp)
+                    .then(if (active) Modifier.heightIn(max = 420.dp) else Modifier)
                     .drawBehind { drawLine(lineColor, Offset(0f, 0f), Offset(0f, size.height), strokeWidth = 2.dp.toPx()) }
+                    .then(if (active) Modifier.verticalScroll(scroll) else Modifier)
                     .padding(start = 14.dp, end = 4.dp),
             )
         }
