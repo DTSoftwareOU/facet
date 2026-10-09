@@ -293,6 +293,7 @@ class ChatEngine(
                         ev.blocks?.model?.takeIf { it.isNotBlank() }?.let { servedModel = it }
                     }
                     is StreamEvent.Failed -> error = ev.error
+                    is StreamEvent.ToolCallStarted, is StreamEvent.ToolCallReady -> Unit // Handled by the tool loop.
                 }
                 val now = Clock.now()
                 if (now - lastPersist > 1_000) {

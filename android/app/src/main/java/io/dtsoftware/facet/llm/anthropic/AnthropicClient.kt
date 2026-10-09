@@ -30,6 +30,7 @@ import io.dtsoftware.facet.llm.StopReason
 import io.dtsoftware.facet.llm.StreamEvent
 import io.dtsoftware.facet.llm.Usage
 import io.dtsoftware.facet.llm.internal.CitationCollector
+import io.dtsoftware.facet.llm.internal.ToolWire
 import io.dtsoftware.facet.llm.internal.arr
 import io.dtsoftware.facet.llm.internal.base64
 import io.dtsoftware.facet.llm.internal.bool
@@ -182,7 +183,8 @@ internal class AnthropicClient(
                     continue
                 }
                 if ((e.code == 400 || e.code == 422) && heals < MAX_HEALS) {
-                    val action = ParamHealer.diagnose(msg, built.sent, built.effort, request.caps.reasoning.efforts)
+                    val action = if (built.clientTools && ToolWire.toolsUnsupported(msg)) HealAction.Drop("tools")
+                    else ParamHealer.diagnose(msg, built.sent, built.effort, request.caps.reasoning.efforts)
                     if (action != null) {
                         heals++
                         quirks.record(config.id, request.model, action)
@@ -313,6 +315,12 @@ internal class AnthropicClient(
                     open[index] = b
                     when (b.type) {
                         "thinking", "redacted_thinking" -> emit(StreamEvent.ThinkingStarted)
+                        "tool_use" -> {
+                            val id = block.str("id").orEmpty()
+                            val name = block.str("name").orEmpty()
+                            turn.emittedAnything = true
+                            emit(StreamEvent.ToolCallStarted(id, name))
+                        }
                         "web_search_tool_result" -> {
                             val content = block["content"]
                             if (content is JsonArray) {
@@ -366,6 +374,13 @@ internal class AnthropicClient(
                     finished[index] = built
                     when (b.type) {
                         "thinking", "redacted_thinking" -> emit(StreamEvent.ThinkingEnded)
+                        "tool_use" -> {
+                            // Eager input streaming: arguments may be truncated or invalid; the engine validates.
+                            val raw = b.partialJson.toString()
+                            val args = if (raw.isBlank()) (b.start.obj("input") ?: JsonObject(emptyMap())).toString()
+                            else ToolWire.normalizeArgs(raw)
+                            emit(StreamEvent.ToolCallReady(b.start.str("id").orEmpty(), b.start.str("name").orEmpty(), args))
+                        }
                         "server_tool_use" -> if (built.str("name") == "web_search") {
                             turn.lastQuery = built.obj("input")?.str("query")
                             emit(StreamEvent.WebSearch(turn.lastQuery, done = false))
@@ -406,6 +421,7 @@ internal class AnthropicClient(
             "pause_turn" -> RoundOutcome.CONTINUE
             "max_tokens", "model_context_window_exceeded" -> { turn.stopReason = StopReason.MAX_TOKENS; RoundOutcome.DONE }
             "refusal" -> { turn.stopReason = StopReason.REFUSAL; RoundOutcome.DONE }
+            "tool_use" -> { turn.stopReason = StopReason.TOOL_USE; RoundOutcome.DONE }
             else -> { turn.stopReason = StopReason.END; RoundOutcome.DONE }
         }
     }
@@ -453,6 +469,7 @@ internal class AnthropicClient(
         val sent: List<ParamSpec>,
         val effort: Effort?,
         val replaysThinking: Boolean,
+        val clientTools: Boolean,
     )
 
     private fun buildBody(req: ChatRequest, dropped: Set<String>, stripThinking: Boolean, paused: JsonArray?): Built {
@@ -462,6 +479,7 @@ internal class AnthropicClient(
         val sent = ArrayList<ParamSpec>()
         val utility = req.utility
         val webSearch = req.params.webSearch && caps.webSearch && !utility && "web_search" !in dropped
+        val clientTools = if (!utility && caps.tools && "tools" !in dropped) req.tools else emptyList()
 
         // max_tokens
         val cap = maxTokensCap(dropped)
@@ -579,17 +597,28 @@ internal class AnthropicClient(
                     sent += ParamSpec("top_p", listOf("top_p"))
                 }
             }
-            if (webSearch) {
+            val eager = clientTools.isNotEmpty() && "eager_input_streaming" !in dropped
+            if (webSearch || clientTools.isNotEmpty()) {
                 val v2 = claude?.webSearchV2 == true && "web_search_v2" !in dropped
                 putJsonArray("tools") {
-                    addJsonObject {
+                    if (webSearch) addJsonObject {
                         put("type", if (v2) "web_search_20260209" else "web_search_20250305")
                         put("name", "web_search")
                         put("max_uses", 5)
                     }
+                    for (t in clientTools) addJsonObject {
+                        put("name", t.name)
+                        put("description", t.description)
+                        put("input_schema", ToolWire.schema(t.inputSchemaJson))
+                        if (eager) put("eager_input_streaming", true)
+                    }
                 }
-                if (v2) sent += ParamSpec("web_search_v2", listOf("web_search_20260209"))
-                sent += ParamSpec("web_search", listOf("web_search", "tools"))
+                if (webSearch) {
+                    if (v2) sent += ParamSpec("web_search_v2", listOf("web_search_20260209"))
+                    // With client tools present, a generic "tools" error isn't evidence against web search.
+                    sent += ParamSpec("web_search", if (clientTools.isEmpty()) listOf("web_search", "tools") else listOf("web_search"))
+                }
+                if (eager) sent += ParamSpec("eager_input_streaming", listOf("eager_input_streaming"))
             }
             if (!utility && "cache_control" !in dropped) {
                 putJsonObject("cache_control") { put("type", "ephemeral") }
@@ -609,7 +638,7 @@ internal class AnthropicClient(
         sent += ParamSpec("max_tokens", listOf("max_tokens"))
         // Specific params first so the healer blames the narrowest one.
         val ordered = sent.sortedBy { SPEC_ORDER.indexOf(it.key).let { i -> if (i < 0) SPEC_ORDER.size else i } }
-        return Built(body, betas, ordered, effort, replaysThinking)
+        return Built(body, betas, ordered, effort, replaysThinking, clientTools.isNotEmpty())
     }
 
     private fun budgetFor(e: Effort): Int = when (e) {
@@ -621,9 +650,17 @@ internal class AnthropicClient(
     }
 
     private fun userContent(parts: List<Part>): JsonArray {
-        val media = parts.filter { it !is Part.Text }
+        val results = parts.filterIsInstance<Part.ToolResult>()
+        val media = parts.filter { it is Part.Image || it is Part.Document }
         val texts = parts.filterIsInstance<Part.Text>().filter { it.text.isNotBlank() }
         val arr = buildJsonArray {
+            // tool_result blocks must come first in the user turn that follows tool_use.
+            for (r in results) addJsonObject {
+                put("type", "tool_result")
+                put("tool_use_id", ToolWire.safeId(r.callId))
+                put("content", r.content.ifBlank { "(no output)" })
+                if (r.isError) put("is_error", true)
+            }
             for (p in media) when (p) {
                 is Part.Image -> addJsonObject {
                     put("type", "image")
@@ -653,7 +690,7 @@ internal class AnthropicClient(
                         if (p.name.isNotBlank()) put("title", p.name)
                     }
                 }
-                is Part.Text -> Unit
+                else -> Unit
             }
             for (t in texts) addJsonObject { put("type", "text"); put("text", t.text) }
         }
@@ -678,8 +715,17 @@ internal class AnthropicClient(
                 if (kept.any { (it as? JsonObject)?.str("type") !in THINKING_TYPES }) return JsonArray(kept)
             }
         }
-        val text = m.parts.filterIsInstance<Part.Text>().joinToString("\n\n") { it.text }.ifBlank { "(no response)" }
-        return buildJsonArray { addJsonObject { put("type", "text"); put("text", text) } }
+        val text = m.parts.filterIsInstance<Part.Text>().joinToString("\n\n") { it.text }
+        val calls = m.parts.filterIsInstance<Part.ToolCall>()
+        return buildJsonArray {
+            if (text.isNotBlank() || calls.isEmpty()) addJsonObject { put("type", "text"); put("text", text.ifBlank { "(no response)" }) }
+            for (c in calls) addJsonObject {
+                put("type", "tool_use")
+                put("id", ToolWire.safeId(c.id))
+                put("name", c.name)
+                put("input", ToolWire.argsObject(c.argumentsJson))
+            }
+        }
     }
 
     private fun isEmptyText(el: JsonElement): Boolean {
@@ -721,7 +767,7 @@ internal class AnthropicClient(
         private val THINKING_TYPES = setOf("thinking", "redacted_thinking")
         private val SERVER_TOOL_TYPES = setOf("server_tool_use", "web_search_tool_result", "web_fetch_tool_result")
         private val SPEC_ORDER = listOf(
-            "block_binding", "display", "effort", "fallbacks", "speed", "web_search_v2", "cache_control",
+            "eager_input_streaming", "block_binding", "display", "effort", "fallbacks", "speed", "web_search_v2", "cache_control",
             "temperature", "top_p", "web_search", "thinking", "max_tokens",
         )
     }
