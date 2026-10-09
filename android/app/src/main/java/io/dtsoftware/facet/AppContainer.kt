@@ -14,6 +14,11 @@ import io.dtsoftware.facet.data.repo.ProviderRepository
 import io.dtsoftware.facet.domain.ChatEngine
 import io.dtsoftware.facet.domain.GenerationService
 import io.dtsoftware.facet.domain.Notifications
+import io.dtsoftware.facet.domain.tools.McpManager
+import io.dtsoftware.facet.domain.tools.SearchKind
+import io.dtsoftware.facet.domain.tools.SkillRepository
+import io.dtsoftware.facet.domain.tools.ToolRegistry
+import io.dtsoftware.facet.domain.tools.WebSearch
 import io.dtsoftware.facet.llm.PricingCatalog
 import io.dtsoftware.facet.sync.AuthManager
 import io.dtsoftware.facet.sync.SyncApi
@@ -60,7 +65,14 @@ class AppContainer(private val app: Application) {
     val syncApi = SyncApi(http)
     val auth = AuthManager(app, syncApi, secrets)
     val sync: SyncEngine = SyncEngine(app, scope, db, auth, syncApi, settings, attachments, secrets, http).also { syncRef = it }
-    val chat = ChatEngine(scope, conversations, providers, assistants, attachments, settings, pricing, sync)
+    val webSearch = WebSearch(http)
+    val skills = SkillRepository(db, http, onLocalChange)
+    val mcp = McpManager(app, db, secrets, http, scope, onLocalChange)
+    val tools = ToolRegistry(webSearch, providers, mcp, skills, settings)
+    val chat = ChatEngine(
+        scope, conversations, providers, assistants, attachments, settings, pricing, sync, tools,
+        mcpAutoApprove = { serverId, tool -> mcp.setAutoApprove(serverId, tool, true) },
+    )
 
     @Volatile var appInForeground = false
 
@@ -87,6 +99,21 @@ class AppContainer(private val app: Application) {
         scope.launch { runCatching { io.dtsoftware.facet.ui.markdown.MathRenderer.warmUpAsync(app) } }
         scope.launch {
             if (settings.local.value.pricingFeed) runCatching { pricing.refreshIfStale(24 * 60 * 60 * 1000L) }
+        }
+        // Providers and MCP servers that arrive by sync (or were just added) fetch their model/tool lists once.
+        scope.launch {
+            val attempted = HashSet<String>()
+            providers.observeAll().collect { list ->
+                list.filter { it.enabled && it.modelsFetchedAt == 0L && !SearchKind.isSearch(it.kind) && attempted.add(it.id) }
+                    .forEach { p -> launch { runCatching { providers.refreshModels(p.id) } } }
+            }
+        }
+        scope.launch {
+            val attempted = HashSet<String>()
+            mcp.observeAll().collect { list ->
+                list.filter { it.enabled && it.toolsFetchedAt == 0L && it.status == null && attempted.add(it.id) }
+                    .forEach { e -> launch { runCatching { mcp.refreshTools(e.id) } } }
+            }
         }
         sync.start()
         if (auth.isSignedIn) SyncWorker.schedule(app)

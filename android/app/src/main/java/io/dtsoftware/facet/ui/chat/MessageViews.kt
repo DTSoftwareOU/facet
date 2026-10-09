@@ -96,6 +96,7 @@ class MessageActions(
     val onUsage: (ThreadItem) -> Unit,
     val onOpenAttachment: (AttachmentRef) -> Unit,
     val thumbnail: suspend (String, Int) -> ImageBitmap?,
+    val onApproval: (String, io.dtsoftware.facet.domain.ApprovalDecision) -> Unit = { _, _ -> },
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -243,9 +244,15 @@ fun AssistantMessage(
             Spacer(Modifier.height(10.dp))
         }
 
+        val toolActivities = live?.tools?.takeIf { it.isNotEmpty() } ?: remember(m.stepsJson) { m.toolActivities() }
+        if (toolActivities.isNotEmpty()) {
+            ToolActivityList(toolActivities, actions.onApproval)
+            Spacer(Modifier.height(10.dp))
+        }
+
         if (text.isNotEmpty()) {
             Markdown(text = text, streaming = streaming, onLinkClick = { runCatching { uri.openUri(it) } }, onCopyCode = null)
-        } else if (streaming && !thinkingActive && live?.searching != true && !hasThinking) {
+        } else if (streaming && !thinkingActive && live?.searching != true && !hasThinking && toolActivities.isEmpty()) {
             WaitingDots()
         }
 

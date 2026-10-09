@@ -68,7 +68,8 @@ val ProviderOrder = listOf(
 
 @Composable
 fun ProvidersScreen(container: AppContainer, onBack: () -> Unit, onEdit: (String) -> Unit, onAdd: (String) -> Unit) {
-    val providers by container.providers.observeAll().collectAsStateWithLifecycle(emptyList())
+    val allProviders by container.providers.observeAll().collectAsStateWithLifecycle(emptyList())
+    val providers = allProviders.filterNot { io.dtsoftware.facet.domain.tools.SearchKind.isSearch(it.kind) }
     val c = FacetTheme.colors
     SettingsPage("Providers and keys", onBack) {
         if (providers.isEmpty()) {

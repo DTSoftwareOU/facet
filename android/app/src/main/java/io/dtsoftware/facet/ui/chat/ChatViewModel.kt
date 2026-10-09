@@ -61,6 +61,10 @@ data class ChatUiState(
     val catalog: List<ProviderModels> = emptyList(),
     val cost: Double = 0.0,
     val loaded: Boolean = false,
+    /** A BYOK search backend is configured (lets tool-capable models search). */
+    val searchAvailable: Boolean = false,
+    val mcpServers: List<io.dtsoftware.facet.data.db.McpServerEntity> = emptyList(),
+    val skillCount: Int = 0,
 )
 
 /** Draft state for a chat that hasn't been sent yet. */
@@ -82,7 +86,15 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
     private val messagesFlow = conversationId.flatMapLatest { id -> if (id == null) flowOf(emptyList()) else c.conversations.observeMessages(id) }
     private val costFlow = conversationId.flatMapLatest { id -> if (id == null) flowOf(0.0) else c.conversations.observeCost(id) }
 
-    val state: StateFlow<ChatUiState> = combine(
+    private val toolsFlow = combine(
+        c.providers.observeAll(),
+        c.mcp.observeAll(),
+        c.skills.observeAll(),
+    ) { providers, servers, skills ->
+        Triple(providers.any { it.enabled && io.dtsoftware.facet.domain.tools.SearchKind.isSearch(it.kind) }, servers.filter { it.enabled }, skills.count { it.enabled })
+    }
+
+    private val baseState: StateFlow<ChatUiState> = combine(
         combine(conversationFlow, messagesFlow, c.chat.live, c.chat.active, costFlow) { conv, msgs, live, active, cost ->
             Quint(conv, msgs, live, active, cost)
         },
@@ -122,6 +134,10 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
             cost = q.cost,
             loaded = true,
         )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
+
+    val state: StateFlow<ChatUiState> = combine(baseState, toolsFlow) { s, (search, servers, skills) ->
+        s.copy(searchAvailable = search, mcpServers = servers, skillCount = skills)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
 
     private data class Quint(

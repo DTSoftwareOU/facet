@@ -292,6 +292,7 @@ fun ChatScreen(
                             onUsage = { sheet = Sheet.Usage(it) },
                             onOpenAttachment = onOpenAttachment,
                             thumbnail = { id, px -> vm.thumbnail(id, px) },
+                            onApproval = { id, decision -> container.chat.respondToApproval(id, decision) },
                         ),
                     )
                     ScrollToBottom(listState, Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp)) {
@@ -327,6 +328,7 @@ fun ChatScreen(
                     onMic = ::onMic,
                     prompts = prompts,
                     sendOnEnter = prefs.sendOnEnter,
+                    searchAvailable = state.searchAvailable,
                     modifier = Modifier.widthIn(max = 800.dp).padding(horizontal = 10.dp).padding(bottom = 8.dp),
                 )
             }
@@ -352,6 +354,10 @@ fun ChatScreen(
             onDismiss = { sheet = null },
         )
         Sheet.Settings -> ChatSettingsSheet(
+            searchAvailable = state.searchAvailable,
+            mcpServers = state.mcpServers,
+            skillCount = state.skillCount,
+            mcpToolCount = { container.mcp.tools(it).size - container.mcp.disabledTools(it).size },
             model = state.model,
             params = state.params,
             systemPrompt = state.conversation?.systemPrompt,

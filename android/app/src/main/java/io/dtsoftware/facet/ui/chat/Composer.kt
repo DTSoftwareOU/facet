@@ -101,6 +101,7 @@ fun Composer(
     prompts: List<PromptEntity>,
     sendOnEnter: Boolean,
     modifier: Modifier = Modifier,
+    searchAvailable: Boolean = false,
 ) {
     val c = FacetTheme.colors
     val canSend = (value.text.isNotBlank() || attachments.isNotEmpty()) && caps != null
@@ -161,7 +162,7 @@ fun Composer(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 FacetIconButton(R.drawable.ic_plus, "Add attachment", onAttach, tint = c.textSecondary, size = 21.dp)
-                if (caps?.webSearch == true) {
+                if (caps?.webSearch == true || (caps?.tools == true && searchAvailable)) {
                     FacetChip(
                         "Search", params.webSearch, { onParams(params.copy(webSearch = !params.webSearch)) },
                         icon = R.drawable.ic_globe,

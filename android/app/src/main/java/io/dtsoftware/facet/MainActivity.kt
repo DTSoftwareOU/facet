@@ -70,6 +70,9 @@ class MainActivity : ComponentActivity() {
     private fun parseIntent(intent: Intent?): LaunchRequest? {
         intent ?: return null
         intent.getStringExtra(EXTRA_CONVERSATION)?.let { return LaunchRequest.OpenConversation(it) }
+        intent.data?.takeIf { it.scheme == packageName && it.path == "/oauth/mcp" }?.let { uri ->
+            return LaunchRequest.McpOAuth(uri.getQueryParameter("state"), uri.getQueryParameter("code"), uri.getQueryParameter("error"))
+        }
         return when (intent.action) {
             ACTION_NEW_CHAT -> LaunchRequest.NewChat(voice = false)
             ACTION_VOICE -> LaunchRequest.NewChat(voice = true)

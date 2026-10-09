@@ -71,11 +71,16 @@ class SyncEndToEndTest {
         val secrets = PlainBox()
         val settings = SettingsStore(ctx)
         val api = SyncApi(http)
-        val auth = AuthManager(ctx, api, secrets).apply { setServerUrl(server) }
+        val auth = AuthManager(ctx, api, secrets).apply {
+            setServerUrl(server)
+            onProfileName = { name -> settings.updateSynced { it.copy(profileName = name) } }
+        }
         val attachments = AttachmentStore(ctx, db) {}
         val sync = SyncEngine(ctx, CoroutineScope(SupervisorJob() + Dispatchers.IO), db, auth, api, settings, attachments, secrets, http)
         val conversations = ConversationRepository(db) {}
         val providers = ProviderRepository(db, secrets, http, InMemoryQuirkStore(), PricingCatalog(null, null)) {}
+        val mcp = io.dtsoftware.facet.domain.tools.McpManager(ctx, db, secrets, http, CoroutineScope(SupervisorJob() + Dispatchers.IO)) {}
+        val skills = io.dtsoftware.facet.domain.tools.SkillRepository(db, http) {}
 
         suspend fun syncOk() {
             val ok = sync.syncNow()
@@ -91,7 +96,7 @@ class SyncEndToEndTest {
 
         // Device A signs up and creates content.
         val a = Device("a")
-        val recoveryCode = a.auth.register(email, password, "Ada")
+        val recoveryCode = a.auth.register(email, password, "Ada Lovelace")
         assertTrue(a.auth.isSignedIn)
         val provider = a.providers.add(ProviderKind.ANTHROPIC, "Personal", "", "sk-ant-test-key-123", emptyMap())
         val conv = a.conversations.create(null, provider.id, "claude-opus-5-5", GenParams(webSearch = true))
@@ -110,7 +115,34 @@ class SyncEndToEndTest {
             AttachmentEntity(attId, conv.id, "image", "image/jpeg", "photo.jpg", bytes.size.toLong(), 10, 10, "$attId.jpg", createdAt = now, updatedAt = now),
         )
         a.settings.updateSynced { it.copy(aboutMe = "I like trains") }
+        val server = a.mcp.add("Acme Tracker", "https://mcp.acme.example/mcp", io.dtsoftware.facet.mcp.McpAuthMode.HEADERS, mapOf("Authorization" to "Bearer mcp-secret-token-xyz"))
+        a.skills.save(null, "lisbon-guide", "Use for trips to Lisbon.", "Always recommend pastel de nata at Manteigaria.")
         a.syncOk()
+
+        // The operator's view: nothing readable on the server, and no structure leaks in record types or ids.
+        val raw = a.auth.authed { base, token -> a.api.pull(base, token, 0, 1000) }
+        assertTrue(raw.records.isNotEmpty())
+        assertTrue("record types must be opaque", raw.records.all { it.type == "e" })
+        assertTrue("record ids must be opaque", raw.records.none { it.id == conv.id || it.id == user.id || it.id == provider.id || it.id == attId })
+        System.getenv("FACET_E2E_DATA")?.takeIf { it.isNotBlank() }?.let { dir ->
+            val files = File(dir).walkTopDown().filter { it.isFile }.toList()
+            assertTrue("server data dir has files", files.isNotEmpty())
+            val secretsToHide = listOf(
+                "Plan three days in Lisbon", "Trip to Lisbon", "pastéis de nata", "Thinking about trams", "sk-ant-test-key-123",
+                "I like trains", "Ada Lovelace", "photo.jpg", "mcp-secret-token-xyz", "Acme Tracker", "acme.example",
+                "pastel de nata at Manteigaria", "lisbon-guide", "claude-opus-5-5",
+            )
+            for (f in files) {
+                val bytes = f.readBytes()
+                val asText = String(bytes, Charsets.ISO_8859_1)
+                for (secret in secretsToHide) {
+                    val needle = String(secret.toByteArray(Charsets.UTF_8), Charsets.ISO_8859_1)
+                    assertFalse("\"$secret\" is readable in ${f.name}", asText.contains(needle))
+                }
+            }
+            println("Operator view OK: scanned ${files.size} server files, no plaintext found.")
+        }
+        assertNotNull(server)
 
         // Device B signs in and receives everything, decrypted.
         val b = Device("b")
@@ -126,6 +158,11 @@ class SyncEndToEndTest {
         val bProvider = b.providers.get(provider.id)!!
         assertEquals("sk-ant-test-key-123", b.providers.apiKey(bProvider))
         assertEquals("I like trains", b.settings.synced.value.aboutMe)
+        assertEquals("Ada Lovelace", b.settings.synced.value.profileName)
+        val bServer = b.mcp.all().single()
+        assertEquals("Acme Tracker", bServer.name)
+        assertEquals("Bearer mcp-secret-token-xyz", b.mcp.headers(bServer)["Authorization"])
+        assertEquals("Always recommend pastel de nata at Manteigaria.", b.skills.all().single().instructions)
         assertTrue(b.sync.ensureLocal(attId))
         assertTrue(bytes.contentEquals(b.attachments.bytes(attId)))
 

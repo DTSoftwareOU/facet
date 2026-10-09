@@ -115,9 +115,9 @@ fun HomeScreen(
             is LaunchRequest.OpenConversation -> vm.open(r.id)
             is LaunchRequest.NewChat -> { vm.newChat(); prefill = PrefillRequest(null, emptyList(), r.voice) }
             is LaunchRequest.Share -> { vm.newChat(); prefill = PrefillRequest(r.text, r.uris, false) }
-            null -> Unit
+            is LaunchRequest.McpOAuth, null -> Unit
         }
-        if (pending != null) {
+        if (pending != null && pending !is LaunchRequest.McpOAuth) {
             launchRequests.value = null
             drawer.close()
         }

@@ -262,3 +262,4 @@ Errors: `too_large`, `quota_exceeded`.
 | `SMTP_URL` | — | e.g. `smtps://user:pass@smtp.example.com:465`; enables email reset |
 | `SMTP_FROM` | `Facet <no-reply@dtsoftware.io>` | Sender |
 | `LOG_LEVEL` | `info` | pino level |
+| `AUTH_RATE_LIMIT_PER_IP` | `10` | Sign-in/sign-up/recovery attempts per IP per 15 min (raise for shared NATs or local testing) |

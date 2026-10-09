@@ -60,6 +60,13 @@
                 <action android:name="io.dtsoftware.facet.VOICE_CHAT" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- OAuth redirect for MCP server sign-in: <applicationId>:/oauth/mcp -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${applicationId}" />
+            </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />

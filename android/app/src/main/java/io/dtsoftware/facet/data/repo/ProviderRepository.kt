@@ -42,7 +42,7 @@ class ProviderRepository(
     fun observeAll(): Flow<List<ProviderEntity>> = dao.observeAll()
 
     fun observeCatalog(): Flow<List<ProviderModels>> = dao.observeAll().map { list ->
-        list.filter { it.enabled }.map { p ->
+        list.filter { it.enabled && !io.dtsoftware.facet.domain.tools.SearchKind.isSearch(it.kind) }.map { p ->
             ProviderModels(p, ProviderKind.fromId(p.kind), models(p), favorites(p))
         }
     }
@@ -61,6 +61,24 @@ class ProviderRepository(
             apiKeySealed = if (apiKey.isBlank()) "" else secrets.sealString(apiKey.trim()),
             headersJson = AppJson.encodeToString(headers),
             sort = dao.all().size,
+            createdAt = now,
+            updatedAt = now,
+        )
+        dao.upsert(p)
+        onLocalChange()
+        return p
+    }
+
+    /** Adds a non-LLM service row (web search backends) that shares key sealing and sync with providers. */
+    suspend fun addService(kindId: String, label: String, baseUrl: String, apiKey: String): ProviderEntity {
+        val now = Clock.now()
+        val p = ProviderEntity(
+            id = Ids.new(),
+            kind = kindId,
+            label = label,
+            baseUrl = normalizeBaseUrl(baseUrl),
+            apiKeySealed = if (apiKey.isBlank()) "" else secrets.sealString(apiKey.trim()),
+            sort = 1000,
             createdAt = now,
             updatedAt = now,
         )

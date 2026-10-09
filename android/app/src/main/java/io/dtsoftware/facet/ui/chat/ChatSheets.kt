@@ -238,6 +238,10 @@ fun SearchField(value: String, onChange: (String) -> Unit, placeholder: String, 
 
 @Composable
 fun ChatSettingsSheet(
+    searchAvailable: Boolean,
+    mcpServers: List<io.dtsoftware.facet.data.db.McpServerEntity>,
+    skillCount: Int,
+    mcpToolCount: (io.dtsoftware.facet.data.db.McpServerEntity) -> Int,
     model: ModelChoice?,
     params: GenParams,
     systemPrompt: String?,
@@ -311,12 +315,47 @@ fun ChatSettingsSheet(
                 Spacer(Modifier.height(16.dp))
             }
 
+            val canSearch = caps.webSearch || (caps.tools && searchAvailable)
             SettingsGroup(title = "Tools and speed") {
                 SwitchRow(
-                    "Web search", params.webSearch && caps.webSearch, { onParams(params.copy(webSearch = it)) },
-                    subtitle = if (caps.webSearch) "Let the model search the web and cite sources." else "This model can't search the web.",
-                    icon = R.drawable.ic_globe, enabled = caps.webSearch,
+                    "Web search", params.webSearch && canSearch, { onParams(params.copy(webSearch = it)) },
+                    subtitle = when {
+                        caps.webSearch -> "Let the model search the web and cite sources."
+                        canSearch -> "Uses your search key, then reads pages as needed."
+                        caps.tools -> "Add a search key in Settings → Web search to let this model search."
+                        else -> "This model can't use tools or search the web."
+                    },
+                    icon = R.drawable.ic_globe, enabled = canSearch,
                 )
+                if (caps.tools && (mcpServers.isNotEmpty() || skillCount > 0)) {
+                    GroupDivider()
+                    SwitchRow(
+                        "MCP tools and skills", params.tools, { onParams(params.copy(tools = it)) },
+                        subtitle = buildString {
+                            val parts = buildList {
+                                if (mcpServers.isNotEmpty()) add("${mcpServers.size} server" + if (mcpServers.size == 1) "" else "s")
+                                if (skillCount > 0) add("$skillCount skill" + if (skillCount == 1) "" else "s")
+                            }
+                            append(parts.joinToString(" and ")).append(" available in this chat.")
+                        },
+                        icon = R.drawable.ic_wand,
+                    )
+                    if (params.tools) {
+                        mcpServers.forEach { server ->
+                            GroupDivider()
+                            val on = server.id !in params.disabledMcpServers
+                            SwitchRow(
+                                server.name, on,
+                                { v ->
+                                    val set = params.disabledMcpServers.toMutableSet().apply { if (v) remove(server.id) else add(server.id) }
+                                    onParams(params.copy(disabledMcpServers = set.toList()))
+                                },
+                                subtitle = server.status ?: "${mcpToolCount(server)} tools",
+                                icon = R.drawable.ic_server,
+                            )
+                        }
+                    }
+                }
                 if (caps.fastMode) {
                     GroupDivider()
                     SwitchRow(

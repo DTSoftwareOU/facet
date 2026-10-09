@@ -49,6 +49,8 @@ sealed interface LaunchRequest {
     data class OpenConversation(val id: String) : LaunchRequest
     data class NewChat(val voice: Boolean) : LaunchRequest
     data class Share(val text: String?, val uris: List<Uri>) : LaunchRequest
+    /** Browser redirect after an MCP server sign-in. */
+    data class McpOAuth(val state: String?, val code: String?, val error: String?) : LaunchRequest
 }
 
 object Routes {
@@ -64,6 +66,11 @@ object Routes {
     @Serializable object Assistants
     @Serializable data class AssistantEdit(val assistantId: String? = null)
     @Serializable object Prompts
+    @Serializable object WebSearch
+    @Serializable object McpServers
+    @Serializable data class McpServerEdit(val serverId: String? = null)
+    @Serializable object Skills
+    @Serializable data class SkillEdit(val skillId: String? = null)
     @Serializable object Account
     @Serializable object Devices
     @Serializable object Privacy
@@ -85,6 +92,17 @@ fun FacetRoot(container: AppContainer, launchRequests: MutableStateFlow<LaunchRe
     val start: Any = if (prefs.onboardingDone) Routes.Home else Routes.Onboarding
     val reduced = FacetTheme.reducedMotion
     val dur = if (reduced) 150 else 320
+
+    // MCP sign-in redirects are handled here, before the chat screen sees launch requests.
+    val pendingRequest by launchRequests.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(pendingRequest) {
+        val r = pendingRequest as? LaunchRequest.McpOAuth ?: return@LaunchedEffect
+        launchRequests.value = null
+        if (r.code != null && r.state != null) {
+            val serverId = runCatching { container.mcp.completeSignIn(r.state, r.code) }.getOrNull()
+            if (serverId != null) nav.navigate(Routes.McpServerEdit(serverId)) { launchSingleTop = true }
+        }
+    }
 
     AppLockGate(enabled = prefs.appLock) {
         Box(Modifier.fillMaxSize().background(FacetTheme.colors.background)) {
@@ -168,6 +186,19 @@ fun FacetRoot(container: AppContainer, launchRequests: MutableStateFlow<LaunchRe
                     AssistantEditScreen(container, entry.toRoute<Routes.AssistantEdit>().assistantId) { nav.popBackStack() }
                 }
                 composable<Routes.Prompts> { PromptsScreen(container) { nav.popBackStack() } }
+                composable<Routes.WebSearch> { io.dtsoftware.facet.ui.settings.WebSearchScreen(container) { nav.popBackStack() } }
+                composable<Routes.McpServers> {
+                    io.dtsoftware.facet.ui.settings.McpServersScreen(container, onBack = { nav.popBackStack() }) { id -> nav.navigate(Routes.McpServerEdit(id)) }
+                }
+                composable<Routes.McpServerEdit> { entry ->
+                    io.dtsoftware.facet.ui.settings.McpServerEditScreen(container, entry.toRoute<Routes.McpServerEdit>().serverId) { nav.popBackStack() }
+                }
+                composable<Routes.Skills> {
+                    io.dtsoftware.facet.ui.settings.SkillsScreen(container, onBack = { nav.popBackStack() }) { id -> nav.navigate(Routes.SkillEdit(id)) }
+                }
+                composable<Routes.SkillEdit> { entry ->
+                    io.dtsoftware.facet.ui.settings.SkillEditScreen(container, entry.toRoute<Routes.SkillEdit>().skillId) { nav.popBackStack() }
+                }
                 composable<Routes.Account> {
                     AccountScreen(
                         container,

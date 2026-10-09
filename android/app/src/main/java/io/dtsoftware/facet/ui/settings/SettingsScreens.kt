@@ -155,6 +155,13 @@ fun SettingsScreen(container: AppContainer, onBack: () -> Unit, navigate: (Any) 
             GroupDivider()
             SettingsRow("Chat", subtitle = "Custom instructions, defaults, titles", icon = R.drawable.ic_message, onClick = { navigate(Routes.ChatPrefs) })
         }
+        SettingsGroup(title = "Tools") {
+            SettingsRow("Web search", subtitle = "Search for any model with your own key", icon = R.drawable.ic_globe, onClick = { navigate(Routes.WebSearch) })
+            GroupDivider()
+            SettingsRow("MCP servers", subtitle = "Connect apps and data sources", icon = R.drawable.ic_server, onClick = { navigate(Routes.McpServers) })
+            GroupDivider()
+            SettingsRow("Skills", subtitle = "Reusable instructions models load on demand", icon = R.drawable.ic_wand, onClick = { navigate(Routes.Skills) })
+        }
         SettingsGroup {
             SettingsRow("Appearance", icon = R.drawable.ic_palette, onClick = { navigate(Routes.Appearance) })
             GroupDivider()
