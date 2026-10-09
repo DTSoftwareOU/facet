@@ -206,7 +206,8 @@ private fun ApprovalCard(a: ToolActivity, onApproval: (String, ApprovalDecision)
             FacetIcon(R.drawable.ic_shield, null, tint = c.primary, size = 18.dp)
             Spacer(Modifier.width(10.dp))
             Text(
-                "Allow ${a.serverName ?: "this tool"} to run ${a.label.substringAfter(": ")}?",
+                if (a.kind == ToolKind.MEDIA) "Create this video? Clips can cost a few dollars each."
+                else "Allow ${a.serverName ?: "this tool"} to run ${a.label.substringAfter(": ")}?",
                 style = FacetTheme.type.labelL, color = c.text,
             )
         }
@@ -226,7 +227,7 @@ private fun ApprovalCard(a: ToolActivity, onApproval: (String, ApprovalDecision)
             FacetButton("Deny", { onApproval(a.id, ApprovalDecision.DENY) }, style = ButtonStyle.Tonal, modifier = Modifier.weight(1f))
             FacetButton("Allow", { onApproval(a.id, ApprovalDecision.ALLOW) }, modifier = Modifier.weight(1f))
         }
-        Text(
+        if (a.kind != ToolKind.MEDIA) Text(
             "Always allow this tool",
             style = FacetTheme.type.labelM, color = c.primary,
             modifier = Modifier.padding(top = 6.dp).clip(FacetShapes.small).clickable { onApproval(a.id, ApprovalDecision.ALWAYS) }.padding(6.dp),

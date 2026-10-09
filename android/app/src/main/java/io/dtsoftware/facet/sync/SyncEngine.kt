@@ -214,11 +214,22 @@ class SyncEngine(
             var current = e
             if (!e.deleted && !e.uploaded) {
                 val file = attachments.file(e) ?: return@forEach
-                val blobId = codec.blobId(e.id)
-                val blob = FacetCrypto.encryptBlob(vaultKey, blobId, file.readBytes())
-                auth.authed { base, token -> api.putBlob(base, token, blobId, blob) }
-                atts.markUploaded(e.id)
-                current = e.copy(uploaded = true)
+                // Files over the server's blob limit stay on this device; only their record syncs.
+                if (file.length() <= MAX_SYNC_BLOB_BYTES) {
+                    val blobId = codec.blobId(e.id)
+                    val uploaded = try {
+                        val blob = FacetCrypto.encryptBlob(vaultKey, blobId, file.readBytes())
+                        auth.authed { base, token -> api.putBlob(base, token, blobId, blob) }
+                        true
+                    } catch (err: kotlin.coroutines.cancellation.CancellationException) {
+                        throw err
+                    } catch (err: Exception) {
+                        false // e.g. storage quota full: retry next sync without holding up everything else
+                    }
+                    if (!uploaded) return@forEach
+                    atts.markUploaded(e.id)
+                    current = e.copy(uploaded = true)
+                }
             }
             out += Pending(codec.encode(current)) { atts.markClean(e.id, e.updatedAt) }
         }
@@ -517,3 +528,6 @@ class SyncEngine(
         const val EAGER_DOWNLOAD_MAX = 6L * 1024 * 1024
     }
 }
+
+/** The sync server rejects encrypted blobs over 32 MiB; leave headroom for encryption overhead. */
+private const val MAX_SYNC_BLOB_BYTES = 31L * 1024 * 1024

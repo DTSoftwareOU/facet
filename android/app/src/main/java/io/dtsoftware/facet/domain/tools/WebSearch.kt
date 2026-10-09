@@ -3,6 +3,9 @@ package io.dtsoftware.facet.domain.tools
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.llm.Citation
 import java.io.IOException
+import java.net.Inet4Address
+import java.net.Inet6Address
+import java.net.InetAddress
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -28,8 +31,18 @@ data class SearchConfig(val kind: SearchKind, val apiKey: String, val baseUrl: S
 class SearchException(message: String) : IOException(message)
 
 /** Web search over the user's chosen API, plus a local page reader. Nothing is proxied through Facet. */
-class WebSearch(http: OkHttpClient) {
+class WebSearch(http: OkHttpClient, allowPrivateAddresses: Boolean = false) {
     private val http = http.newBuilder().callTimeout(30, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build()
+
+    /**
+     * Page reads can be triggered by text a model read elsewhere, so they never reach this phone's own
+     * network (router, LAN devices, localhost). Checked on the connected address, so redirects are covered.
+     */
+    private val pageHttp = if (allowPrivateAddresses) this.http else this.http.newBuilder().addNetworkInterceptor { chain ->
+        val address = chain.connection()?.route()?.socketAddress?.address
+        if (address != null && isPrivateAddress(address)) throw IOException("Facet doesn't read pages on local or private networks.")
+        chain.proceed(chain.request())
+    }.build()
     private val jsonType = "application/json".toMediaType()
 
     suspend fun search(config: SearchConfig, query: String, count: Int = 6): List<SearchResult> = withContext(Dispatchers.IO) {
@@ -144,7 +157,7 @@ class WebSearch(http: OkHttpClient) {
             .header("User-Agent", "Mozilla/5.0 (Linux; Android 16) Facet/1.0 (+https://facet.dtsoftware.io)")
             .header("Accept", "text/html,application/xhtml+xml,text/plain,application/json;q=0.9,*/*;q=0.5")
             .build()
-        http.newCall(request).execute().use { resp ->
+        pageHttp.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) throw SearchException("That page returned HTTP ${resp.code}.")
             val type = resp.header("Content-Type").orEmpty().lowercase()
             if (type.contains("pdf") || type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/")) {
@@ -219,5 +232,16 @@ object HtmlText {
             e.startsWith("#") -> e.substring(1).toIntOrNull()?.let { cp -> runCatching { String(Character.toChars(cp)) }.getOrNull() } ?: m.value
             else -> named[e] ?: m.value
         }
+    }
+}
+
+/** Loopback, link-local, private (RFC 1918), carrier-grade NAT, unique-local IPv6, wildcard and multicast addresses. */
+internal fun isPrivateAddress(a: InetAddress): Boolean {
+    if (a.isLoopbackAddress || a.isLinkLocalAddress || a.isSiteLocalAddress || a.isAnyLocalAddress || a.isMulticastAddress) return true
+    val b = a.address
+    return when (a) {
+        is Inet4Address -> (b[0].toInt() and 0xFF) == 100 && (b[1].toInt() and 0xC0) == 64
+        is Inet6Address -> (b[0].toInt() and 0xFE) == 0xFC
+        else -> false
     }
 }

@@ -34,6 +34,21 @@ class MediaCatalogTest {
     }
 
     @Test
+    fun mistralAudioModels() {
+        assertEquals(ModelOutput.TRANSCRIPTION, out(ProviderKind.MISTRAL, "voxtral-mini-latest"))
+        assertEquals(ModelOutput.TRANSCRIPTION, out(ProviderKind.MISTRAL, "voxtral-mini-2602"))
+        assertEquals(ModelOutput.SPEECH, out(ProviderKind.MISTRAL, "voxtral-mini-tts-2603"))
+        assertNull("Voxtral Small is a chat model", out(ProviderKind.MISTRAL, "voxtral-small-latest"))
+        assertTrue(ModelCatalog.isCompatChatModel("voxtral-small-latest"))
+        // OCR, live transcription and guard models are neither chat nor media.
+        assertNull(out(ProviderKind.MISTRAL, "voxtral-mini-transcribe-realtime-2602"))
+        assertFalse(ModelCatalog.isCompatChatModel("voxtral-mini-transcribe-realtime-2602"))
+        assertFalse(ModelCatalog.isCompatChatModel("mistral-ocr-latest"))
+        assertTrue(ModelCatalog.canRun(ProviderKind.MISTRAL, ModelOutput.TRANSCRIPTION))
+        assertTrue(ModelCatalog.canRun(ProviderKind.MISTRAL, ModelOutput.SPEECH))
+    }
+
+    @Test
     fun onlyRunnableCombinations() {
         assertTrue(ModelCatalog.canRun(ProviderKind.GOOGLE, ModelOutput.VIDEO))
         assertFalse(ModelCatalog.canRun(ProviderKind.OPENAI, ModelOutput.VIDEO))

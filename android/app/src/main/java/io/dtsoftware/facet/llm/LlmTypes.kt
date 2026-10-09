@@ -92,13 +92,13 @@ data class ModelPricing(
 
 /** What a model produces. Chat pickers list TEXT models; the others are media models chosen in Settings. */
 @Serializable
-enum class ModelOutput(val label: String, val noun: String) {
-    TEXT("Chat", "chat"),
-    IMAGE("Images", "image"),
-    VIDEO("Video", "video"),
-    SPEECH("Speech", "speech"),
-    MUSIC("Music & sound", "music"),
-    TRANSCRIPTION("Transcription", "transcription"),
+enum class ModelOutput(val label: String, val noun: String, val what: String) {
+    TEXT("Chat", "chat", "chat"),
+    IMAGE("Images", "image", "images"),
+    VIDEO("Video", "video", "video"),
+    SPEECH("Speech", "speech", "speech"),
+    MUSIC("Music & sound", "music", "music"),
+    TRANSCRIPTION("Transcription", "transcription", "transcripts"),
 }
 
 @Serializable

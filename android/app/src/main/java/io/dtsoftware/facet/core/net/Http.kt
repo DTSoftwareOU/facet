@@ -2,7 +2,9 @@ package io.dtsoftware.facet.core.net
 
 import java.io.IOException
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
@@ -64,6 +66,9 @@ suspend fun Call.await(): Response = suspendCancellableCoroutine { cont ->
 /** Executes [request] and returns the body as a string. Throws [HttpStatusException] on non-2xx. */
 suspend fun OkHttpClient.fetchString(request: Request): String {
     val response = newCall(request).await()
-    if (!response.isSuccessful) throw HttpStatusException.from(response)
-    return response.use { it.body.string() }
+    // await() resumes on the caller's dispatcher (often Main); reading the body is network I/O.
+    return withContext(Dispatchers.IO) {
+        if (!response.isSuccessful) throw HttpStatusException.from(response)
+        response.use { it.body.string() }
+    }
 }

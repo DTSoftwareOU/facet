@@ -119,6 +119,6 @@ fun rememberSpeaker(): Speaker {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val speaker = remember { Speaker(context, scope) }
-    DisposableEffect(Unit) { onDispose { speaker.shutdown() } }
+    DisposableEffect(Unit) { onDispose { speaker.stop(); speaker.shutdown() } }
     return speaker
 }

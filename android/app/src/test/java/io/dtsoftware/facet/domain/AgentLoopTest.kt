@@ -255,8 +255,8 @@ class AgentLoopTest {
         env.addAcmeServer()
 
         val prepared = env.tools.prepare(GenParams(), io.dtsoftware.facet.llm.ModelCaps(tools = true))
-        assertTrue(prepared.defs.single { it.remoteName == "create_issue" }.needsApproval.not())
-        assertEquals(ToolRegistry.YOLO_TOOL_ROUNDS, prepared.maxRounds)
+        // Approval is decided when the tool runs (so YOLO can be switched mid-reply); the run below never waits.
+        assertTrue(prepared.defs.single { it.remoteName == "create_issue" }.needsApproval)
 
         val client = ScriptedClient(env.providers.config(p), { "mcp_acme_create_issue" }, """{"title":"Bug"}""")
         env.providers.clientOverride = { client }
@@ -277,7 +277,6 @@ class AgentLoopTest {
         val env = Env()
         val p = env.providers.add(ProviderKind.CUSTOM, "Test", "http://localhost", "", emptyMap())
         env.addAcmeServer()
-        assertEquals(ToolRegistry.MAX_TOOL_ROUNDS, env.tools.prepare(GenParams(), io.dtsoftware.facet.llm.ModelCaps(tools = true)).maxRounds)
         val client = ScriptedClient(env.providers.config(p), { "mcp_acme_create_issue" }, """{"title":"Bug"}""")
         env.providers.clientOverride = { client }
         val convId = env.chat.send(null, "File a bug", emptyList(), io.dtsoftware.facet.domain.NewChatSpec(null, ModelRef(p.id, "m1"), GenParams()))

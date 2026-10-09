@@ -61,12 +61,17 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -163,6 +168,27 @@ fun ChatScreen(
     fun share(text: String) {
         val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, text) }
         context.startActivity(Intent.createChooser(intent, null))
+    }
+
+    // Opening a sheet or dialog puts the keyboard away.
+    LaunchedEffect(sheet != null, renameOpen, deleteOpen) {
+        if (sheet != null || renameOpen || deleteOpen) {
+            keyboard?.hide()
+            focusManager.clearFocus()
+        }
+    }
+    // So does dragging the conversation, to read while the keyboard is up.
+    val imeUp by rememberUpdatedState(WindowInsets.ime.getBottom(LocalDensity.current) > 0)
+    val hideKeyboardOnDrag = remember(keyboard, focusManager) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (imeUp && source == NestedScrollSource.UserInput && kotlin.math.abs(available.y) > 2f) {
+                    keyboard?.hide()
+                    focusManager.clearFocus()
+                }
+                return Offset.Zero
+            }
+        }
     }
 
     // ---- launchers ----
@@ -293,7 +319,7 @@ fun ChatScreen(
                 onExport = { vm.exportMarkdown()?.let(::share) },
                 onDelete = { deleteOpen = true },
             )
-            Box(Modifier.weight(1f).fillMaxWidth()) {
+            Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(hideKeyboardOnDrag)) {
                 if (state.thread.isEmpty()) {
                     if (state.loaded) {
                         EmptyChat(

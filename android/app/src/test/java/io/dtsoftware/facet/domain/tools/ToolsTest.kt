@@ -82,6 +82,27 @@ class ToolsTest {
         server.close()
     }
 
+    @Test
+    fun pageReaderRefusesLocalNetworks() = runBlocking {
+        val server = MockWebServer()
+        server.start()
+        server.enqueue(MockResponse.Builder().body("<html><title>Router</title><body>admin</body></html>").build())
+        val e = runCatching { WebSearch(OkHttpClient()).fetchPage(server.url("/").toString()) }.exceptionOrNull()
+        assertTrue("localhost must be refused, got $e", e?.message?.contains("local or private networks") == true)
+        // The same page is readable when the guard is off (tests and self-hosted setups).
+        server.enqueue(MockResponse.Builder().body("<html><title>Router</title><body>admin</body></html>").build())
+        assertEquals("Router", WebSearch(OkHttpClient(), allowPrivateAddresses = true).fetchPage(server.url("/").toString()).first)
+        server.close()
+
+        fun ip(s: String) = java.net.InetAddress.getByName(s)
+        for (private in listOf("127.0.0.1", "10.1.2.3", "172.16.0.9", "192.168.1.1", "169.254.169.254", "100.64.0.1", "::1", "fd00::1", "0.0.0.0")) {
+            assertTrue(private, isPrivateAddress(ip(private)))
+        }
+        for (public in listOf("8.8.8.8", "1.1.1.1", "2606:4700::1111", "100.128.0.1")) {
+            assertTrue(public, !isPrivateAddress(ip(public)))
+        }
+    }
+
     private class PlainBox : SecretBox {
         override fun seal(plain: ByteArray) = "v1:" + FacetCrypto.b64(plain)
         override fun open(sealed: String) = FacetCrypto.unb64(sealed.removePrefix("v1:"))

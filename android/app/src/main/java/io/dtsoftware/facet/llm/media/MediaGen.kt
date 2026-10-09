@@ -2,6 +2,7 @@ package io.dtsoftware.facet.llm.media
 
 import io.dtsoftware.facet.core.net.HttpStatusException
 import io.dtsoftware.facet.core.net.await
+import io.dtsoftware.facet.core.net.fetchString
 import io.dtsoftware.facet.core.net.toJsonBody
 import io.dtsoftware.facet.llm.ErrorKind
 import io.dtsoftware.facet.llm.LlmError
@@ -13,6 +14,7 @@ import io.dtsoftware.facet.llm.ProviderConfig
 import io.dtsoftware.facet.llm.ProviderKind
 import io.dtsoftware.facet.llm.internal.arr
 import io.dtsoftware.facet.llm.internal.obj
+import io.dtsoftware.facet.llm.internal.parseJsonOrNull
 import io.dtsoftware.facet.llm.internal.parseObjectOrNull
 import io.dtsoftware.facet.llm.internal.str
 import io.dtsoftware.facet.llm.internal.trimBaseUrl
@@ -23,7 +25,9 @@ import java.nio.ByteOrder
 import java.util.Base64
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -138,6 +142,15 @@ object MediaGen {
                 v.str("voice_id")?.let { Voice(it, v.str("name") ?: it) }
             }
         }.getOrDefault(emptyList()).ifEmpty { listOf(Voice(ELEVEN_DEFAULT_VOICE, "George")) }
+        // Mistral voices are the ones saved (or cloned) in your Mistral account; "" lets Mistral pick.
+        ProviderKind.MISTRAL -> listOf(Voice("", "Default voice")) + runCatching {
+            val res = parseJsonOrNull(http.fetchString(authorize(config, Request.Builder().url("${config.baseUrl.trimBaseUrl()}/audio/voices")).get().build()))
+            val items = (res as? kotlinx.serialization.json.JsonArray)
+                ?: (res as? JsonObject)?.let { it.arr("data") ?: it.arr("voices") ?: it.arr("items") }
+            items.orEmpty().mapNotNull { it as? JsonObject }.mapNotNull { v ->
+                (v.str("id") ?: v.str("voice_id"))?.let { Voice(it, v.str("name") ?: it) }
+            }
+        }.getOrDefault(emptyList())
         else -> staticVoices(config.kind, modelId)
     }
 
@@ -156,6 +169,7 @@ object MediaGen {
         ProviderKind.GOOGLE -> "Kore"
         ProviderKind.ELEVENLABS -> ELEVEN_DEFAULT_VOICE
         ProviderKind.DEEPGRAM -> "thalia"
+        ProviderKind.MISTRAL -> ""
         else -> "alloy"
     }
 
@@ -341,6 +355,14 @@ object MediaGen {
                     bytes(http, authorize(config, Request.Builder().url(url)).post(body.toString().toJsonBody()).build())
                 }
             }
+            ProviderKind.MISTRAL -> concat(chunks(text, 4_000)) { part ->
+                val body = buildJsonObject {
+                    put("model", id); put("input", part); put("response_format", "mp3")
+                    if (voice.isNotBlank()) put("voice_id", voice)
+                }
+                val res = json(http, post(config, "$base/audio/speech", body.toString().toJsonBody()))
+                res.str("audio_data")?.let { fileFromBase64(it, "audio/mpeg") } ?: throw failure(config, "returned no audio")
+            }
             ProviderKind.DEEPGRAM -> {
                 val url = "$base/v1/speak".toHttpUrl().newBuilder()
                     .addQueryParameter("model", "$id-$voice-en").addQueryParameter("encoding", "mp3").build()
@@ -445,17 +467,21 @@ object MediaGen {
 
     private suspend fun json(http: OkHttpClient, request: Request): JsonObject {
         val response = http.newCall(request).await()
-        if (!response.isSuccessful) throw HttpStatusException.from(response)
-        val text = response.use { it.body.string() }
+        val text = withContext(Dispatchers.IO) {
+            if (!response.isSuccessful) throw HttpStatusException.from(response)
+            response.use { it.body.string() }
+        }
         return parseObjectOrNull(text) ?: throw IOException("The response wasn't JSON.")
     }
 
     private suspend fun bytes(http: OkHttpClient, request: Request): MediaFile {
         val response = http.newCall(request).await()
-        if (!response.isSuccessful) throw HttpStatusException.from(response)
-        return response.use { r ->
-            val data = r.body.bytes()
-            MediaFile(data, sniff(data) ?: r.header("Content-Type")?.substringBefore(';')?.trim() ?: "application/octet-stream")
+        return withContext(Dispatchers.IO) {
+            if (!response.isSuccessful) throw HttpStatusException.from(response)
+            response.use { r ->
+                val data = r.body.bytes()
+                MediaFile(data, sniff(data) ?: r.header("Content-Type")?.substringBefore(';')?.trim() ?: "application/octet-stream")
+            }
         }
     }
 
@@ -556,7 +582,7 @@ object MediaGen {
     private fun failure(config: ProviderConfig, what: String) = LlmException(LlmError(ErrorKind.UNKNOWN, "${config.label} $what."))
 
     private fun unsupported(config: ProviderConfig, output: ModelOutput): Nothing =
-        throw LlmException(LlmError(ErrorKind.BAD_REQUEST, "Facet can't make ${output.noun} with ${config.label} yet."))
+        throw LlmException(LlmError(ErrorKind.BAD_REQUEST, "Facet can't make ${output.what} with ${config.label} yet."))
 
     private const val ELEVEN_DEFAULT_VOICE = "JBFqnCBsd6RMkjVDRZzb"
 

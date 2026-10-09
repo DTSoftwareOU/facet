@@ -90,7 +90,7 @@ fun MediaModelsScreen(container: AppContainer, onBack: () -> Unit, onProviders: 
                 SettingsRow(
                     o.label,
                     subtitle = when {
-                        r == null -> "None of your providers makes ${o.noun}"
+                        r == null -> "None of your providers makes ${o.what}"
                         r.explicit -> r.label
                         else -> "Automatic · ${r.label}"
                     },
@@ -178,7 +178,7 @@ private fun Option(title: String, content: @Composable () -> Unit) {
 
 /** Voice ids are opaque for some providers (ElevenLabs); show a friendly name when we know one. */
 private fun voiceName(choice: MediaChoice, voice: String): String =
-    if (ProviderKind.fromId(choice.provider.kind) == ProviderKind.ELEVENLABS && voice == io.dtsoftware.facet.llm.media.MediaGen.defaultVoice(ProviderKind.ELEVENLABS, choice.model.id)) "George"
+    if (voice.isBlank()) "Default voice" else if (ProviderKind.fromId(choice.provider.kind) == ProviderKind.ELEVENLABS && voice == io.dtsoftware.facet.llm.media.MediaGen.defaultVoice(ProviderKind.ELEVENLABS, choice.model.id)) "George"
     else voice.replaceFirstChar(Char::titlecase)
 
 @Composable
@@ -198,12 +198,12 @@ private fun MediaModelPicker(
             if (choices.isEmpty()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "None of your providers makes ${output.noun} yet. " + when (output) {
+                        "None of your providers makes ${output.what} yet. " + when (output) {
                             ModelOutput.IMAGE -> "OpenAI, Google, OpenRouter, xAI, Together, Stability AI and Black Forest Labs do."
                             ModelOutput.VIDEO -> "Google (Gemini API) does."
-                            ModelOutput.SPEECH -> "OpenAI, Google, ElevenLabs and Deepgram do."
+                            ModelOutput.SPEECH -> "OpenAI, Google, Mistral, ElevenLabs and Deepgram do."
                             ModelOutput.MUSIC -> "Google, ElevenLabs and Stability AI do."
-                            ModelOutput.TRANSCRIPTION -> "OpenAI, Groq, Together, ElevenLabs and Deepgram do."
+                            ModelOutput.TRANSCRIPTION -> "OpenAI, Mistral, Groq, Together, ElevenLabs and Deepgram do."
                             ModelOutput.TEXT -> ""
                         },
                         style = FacetTheme.type.body, color = c.textSecondary,

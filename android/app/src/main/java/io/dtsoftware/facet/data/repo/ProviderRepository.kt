@@ -1,5 +1,6 @@
 package io.dtsoftware.facet.data.repo
 
+import androidx.room.withTransaction
 import io.dtsoftware.facet.core.crypto.SecretBox
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.core.util.Clock
@@ -279,9 +280,13 @@ class ProviderRepository(
     }
 
     private suspend fun mutate(id: String, transform: (ProviderEntity) -> ProviderEntity) {
-        val p = dao.get(id) ?: return
-        dao.upsert(transform(p).copy(updatedAt = Clock.now(), dirty = true))
-        onLocalChange()
+        // In a transaction, so a model-list refresh can't land between the read and the write.
+        val changed = db.withTransaction {
+            val p = dao.get(id) ?: return@withTransaction false
+            dao.upsert(transform(p).copy(updatedAt = Clock.now(), dirty = true))
+            true
+        }
+        if (changed) onLocalChange()
     }
 
     companion object {

@@ -90,7 +90,7 @@ class MediaService(
         onProgress: (String) -> Unit = {},
     ): Pair<AttachmentEntity, MediaChoice> {
         val choice = resolve(output) ?: throw LlmException(
-            LlmError(ErrorKind.BAD_REQUEST, "No ${output.noun} model is set up. Add a provider that makes ${output.noun} in Settings → Media models."),
+            LlmError(ErrorKind.BAD_REQUEST, "No ${output.noun} model is set up. Add a provider that makes ${output.what} in Settings → Media models."),
         )
         val prefs = settings.synced.value.media
         val job = MediaJob(
@@ -116,9 +116,9 @@ class MediaService(
         if (!settings.synced.value.media.aiReadAloud) return null
         val choice = resolve(ModelOutput.SPEECH, explicitOnly = true) ?: return null
         val voice = voiceFor(choice)
-        val dir = File(cacheDir, "speech").apply { mkdirs() }
+        val dir = File(cacheDir, "speech")
         val key = sha("${choice.provider.id}/${choice.model.id}/$voice/$text")
-        dir.listFiles()?.firstOrNull { it.name.startsWith(key) }?.let { return it }
+        withContext(Dispatchers.IO) { dir.mkdirs(); dir.listFiles()?.firstOrNull { it.name.startsWith(key) } }?.let { return it }
         val file = runner.run(providers.config(choice.provider), choice.model, MediaJob(ModelOutput.SPEECH, text, voice = voice)) {}
         return withContext(Dispatchers.IO) {
             pruneCache(dir)

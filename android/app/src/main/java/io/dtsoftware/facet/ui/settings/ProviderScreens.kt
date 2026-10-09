@@ -279,7 +279,7 @@ fun ProviderEditScreen(container: AppContainer, providerId: String?, kindId: Str
                         status = if (r.isSuccess) {
                             true to if (key.isBlank()) "Connected." else "Connected. This key works."
                         } else {
-                            false to (r.exceptionOrNull()?.message ?: "That didn't work.")
+                            false to (r.exceptionOrNull()?.message?.removeSuffix(" Check it in Providers.") ?: "That didn't work.")
                         }
                     }
                 },

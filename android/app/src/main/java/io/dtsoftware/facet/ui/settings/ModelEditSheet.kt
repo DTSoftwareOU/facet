@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -58,14 +59,29 @@ import kotlinx.coroutines.launch
 @Composable
 fun ModelEditSheet(container: AppContainer, providerId: String, modelId: String, onDismiss: () -> Unit) {
     val provider by produceState<ProviderEntity?>(null, providerId) { value = container.providers.get(providerId) }
-    FacetSheet(onDismiss) {
-        val p = provider ?: return@FacetSheet
-        ModelEditForm(container, p, modelId, onDismiss)
+    // Open only once the provider is loaded: an empty bottom sheet can dismiss itself.
+    val p = provider ?: return
+    // Changes save when the sheet closes (Done, Back or swipe), like every other setting.
+    var pending by remember { mutableStateOf<ModelPrefs?>(null) }
+    fun close() {
+        pending?.let { prefs -> container.scope.launch { container.providers.setModelPrefs(p.id, modelId, prefs) } }
+        pending = null
+        onDismiss()
+    }
+    FacetSheet(::close) {
+        ModelEditForm(container, p, modelId, onDraft = { pending = it }, onDone = ::close, onRemoved = { pending = null; onDismiss() })
     }
 }
 
 @Composable
-internal fun ModelEditForm(container: AppContainer, p: ProviderEntity, modelId: String, onDismiss: () -> Unit) {
+internal fun ModelEditForm(
+    container: AppContainer,
+    p: ProviderEntity,
+    modelId: String,
+    onDraft: (ModelPrefs?) -> Unit = {},
+    onDone: () -> Unit = {},
+    onRemoved: () -> Unit = onDone,
+) {
     val c = FacetTheme.colors
     val scope = rememberCoroutineScope()
     val kind = ProviderKind.fromId(p.kind)
@@ -88,23 +104,31 @@ internal fun ModelEditForm(container: AppContainer, p: ProviderEntity, modelId: 
     val maxOutputValue = parseTokens(maxOutput)
     val priceInValue = parsePrice(priceIn)
     val priceOutValue = parsePrice(priceOut)
-    val valid = (context.isBlank() || contextValue != null) && (maxOutput.isBlank() || maxOutputValue != null) &&
-        (priceIn.isBlank() || priceInValue != null) && (priceOut.isBlank() || priceOutValue != null)
+    // A field with an unreadable number keeps its saved value instead of dropping the whole edit.
+    val contextFinal = if (context.isNotBlank() && contextValue == null) saved.contextWindow else contextValue?.takeIf { it != base.contextWindow }
+    val maxOutputFinal = if (maxOutput.isNotBlank() && maxOutputValue == null) saved.maxOutput else maxOutputValue?.takeIf { it != base.maxOutput }
+    val pricesUnreadable = (priceIn.isNotBlank() && priceInValue == null) || (priceOut.isNotBlank() && priceOutValue == null)
 
     fun draft() = ModelPrefs(
         name = name.trim().takeIf { it.isNotEmpty() && it != base.displayName },
         hidden = hidden,
         output = output.takeIf { it != base.output },
         caps = caps.takeIf { it != base.caps },
-        contextWindow = contextValue?.takeIf { it != base.contextWindow },
-        maxOutput = maxOutputValue?.takeIf { it != base.maxOutput },
-        pricing = if (priceInValue == null && priceOutValue == null) null else ModelPricing(
-            input = priceInValue ?: base.pricing?.input ?: 0.0,
-            output = priceOutValue ?: base.pricing?.output ?: 0.0,
-            cacheRead = base.pricing?.cacheRead,
-            cacheWrite = base.pricing?.cacheWrite,
-        ).takeIf { it != base.pricing },
+        contextWindow = contextFinal,
+        maxOutput = maxOutputFinal,
+        pricing = when {
+            pricesUnreadable -> saved.pricing
+            priceInValue == null && priceOutValue == null -> null
+            else -> ModelPricing(
+                input = priceInValue ?: base.pricing?.input ?: 0.0,
+                output = priceOutValue ?: base.pricing?.output ?: 0.0,
+                cacheRead = base.pricing?.cacheRead,
+                cacheWrite = base.pricing?.cacheWrite,
+            ).takeIf { it != base.pricing }
+        },
     )
+    val draft = draft()
+    SideEffect { onDraft(draft.takeIf { it != saved }) }
 
     fun resetDraft() {
         name = ""; hidden = false; caps = base.caps; output = base.output
@@ -140,7 +164,10 @@ internal fun ModelEditForm(container: AppContainer, p: ProviderEntity, modelId: 
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionLabel("Makes", Modifier.padding(start = 12.dp))
-            Segmented(ModelOutput.entries.toList(), output, { it.label }, { output = it })
+            Segmented(
+                ModelOutput.entries.filter { it == output || io.dtsoftware.facet.llm.ModelCatalog.canRun(kind, it) },
+                output, { it.label }, { output = it },
+            )
             if (output != base.output) {
                 Text(
                     "Sorted as ${base.output.label.lowercase()} automatically. Your choice moves it to the ${output.label.lowercase()} list.",
@@ -259,14 +286,13 @@ internal fun ModelEditForm(container: AppContainer, p: ProviderEntity, modelId: 
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             FacetButton("Reset", ::resetDraft, style = ButtonStyle.Tonal, modifier = Modifier.weight(1f))
-            FacetButton(
-                "Save", {
-                    val prefs = draft()
-                    scope.launch { container.providers.setModelPrefs(p.id, modelId, prefs); onDismiss() }
-                },
-                enabled = valid, modifier = Modifier.weight(1f),
-            )
+            FacetButton("Done", onDone, modifier = Modifier.weight(1f))
         }
+        Text(
+            "Changes save when you close this.",
+            style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
         if (isCustom) {
             SettingsGroup {
                 SettingsRow(
@@ -281,7 +307,7 @@ internal fun ModelEditForm(container: AppContainer, p: ProviderEntity, modelId: 
     if (confirmRemove) {
         ConfirmDialog(
             "Remove ${current.displayName}?", "It disappears from the model list on all your devices. Chats that used it stay.",
-            "Remove", onConfirm = { scope.launch { container.providers.removeCustomModel(p.id, modelId); onDismiss() } },
+            "Remove", onConfirm = { scope.launch { container.providers.removeCustomModel(p.id, modelId); onRemoved() } },
             onDismiss = { confirmRemove = false }, danger = true,
         )
     }

@@ -67,11 +67,13 @@ object AudioPlayback {
     }
 
     fun stop() {
+        val done = onComplete
         player?.runCatching { stop(); release() }
         player = null
         playing = false
         currentId = null
         onComplete = null
+        done?.invoke()
     }
 
     private fun finish() {

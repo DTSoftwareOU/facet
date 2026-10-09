@@ -16,7 +16,6 @@ import kotlinx.serialization.json.jsonPrimitive
 data class PreparedTools(
     val defs: List<ToolDef>,
     val systemAddendum: String?,
-    val maxRounds: Int = ToolRegistry.MAX_TOOL_ROUNDS,
 ) {
     val byName: Map<String, ToolDef> = defs.associateBy { it.spec.name }
 }
@@ -45,7 +44,6 @@ class ToolRegistry(
     suspend fun prepare(params: GenParams, caps: ModelCaps): PreparedTools {
         val defs = ArrayList<ToolDef>()
         val addendum = ArrayList<String>()
-        val yolo = settings.synced.value.yoloMode
 
         val facetSearch = caps.tools && usesFacetSearch(params, caps)
         if (facetSearch) defs += ToolDef(ToolSpec(WEB_SEARCH, WEB_SEARCH_DESC, WEB_SEARCH_SCHEMA), ToolKind.SEARCH)
@@ -91,7 +89,8 @@ class ToolRegistry(
                         var name = (prefix + "_" + slug(t.name)).take(64)
                         var n = 2
                         while (!used.add(name)) name = (prefix + "_" + slug(t.name)).take(60) + "_" + n++
-                        val needsApproval = !yolo && t.name !in auto && when (approval) {
+                        // YOLO is checked when the tool runs, so turning it off mid-reply takes effect.
+                        val needsApproval = t.name !in auto && when (approval) {
                             ToolApproval.ALWAYS -> true
                             ToolApproval.WRITES -> t.readOnlyHint != true
                             ToolApproval.NEVER -> false
@@ -117,11 +116,7 @@ class ToolRegistry(
             }
         }
 
-        return PreparedTools(
-            defs,
-            addendum.takeIf { it.isNotEmpty() }?.joinToString("\n\n"),
-            maxRounds = if (yolo) YOLO_TOOL_ROUNDS else MAX_TOOL_ROUNDS,
-        )
+        return PreparedTools(defs, addendum.takeIf { it.isNotEmpty() }?.joinToString("\n\n"))
     }
 
     suspend fun execute(def: ToolDef, argumentsJson: String, ctx: ToolContext = ToolContext()): ToolOutcome {
@@ -209,7 +204,11 @@ class ToolRegistry(
 
     private fun mediaTool(output: io.dtsoftware.facet.llm.ModelOutput, modelName: String): ToolDef {
         val t = MEDIA_TOOLS.getValue(output)
-        return ToolDef(ToolSpec(t.name, t.description.replace("{model}", modelName), t.schema), ToolKind.MEDIA, output = output)
+        // Video clips can cost a few dollars each, so they ask first (unless YOLO is on).
+        return ToolDef(
+            ToolSpec(t.name, t.description.replace("{model}", modelName), t.schema), ToolKind.MEDIA,
+            needsApproval = output == io.dtsoftware.facet.llm.ModelOutput.VIDEO, output = output,
+        )
     }
 
     private class MediaToolSpec(val name: String, val noun: String, val description: String, val schema: String)

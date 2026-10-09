@@ -299,7 +299,10 @@ fun ChatSettingsSheet(
                     title = model?.model?.displayName ?: "No model selected",
                     subtitle = model?.providerLabel,
                     leading = { model?.let { ProviderBadge(it.kind, size = 30.dp) } },
-                    onClick = onChangeModel,
+                    onClick = {
+                        if (canEditInstructions && instructions != systemPrompt.orEmpty()) onSystemPrompt(instructions)
+                        onChangeModel()
+                    },
                 )
             }
             Spacer(Modifier.height(16.dp))

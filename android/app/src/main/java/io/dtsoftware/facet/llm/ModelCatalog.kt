@@ -307,7 +307,7 @@ object ModelCatalog {
     private val compatExclude = listOf(
         "embed", "tts", "whisper", "transcribe", "dall-e", "imagen", "flux", "stable-diffusion", "sdxl",
         "moderation", "rerank", "guard", "audio", "speech", "-image", "image-", "veo", "lyria", "aqa",
-        "bge-", "e5-", "nomic", "playai", "orpheus", "distil-whisper",
+        "bge-", "e5-", "nomic", "playai", "orpheus", "distil-whisper", "ocr", "realtime", "shield",
     )
 
     fun isCompatChatModel(id: String): Boolean {
@@ -408,6 +408,8 @@ object ModelCatalog {
         val s = id.lowercase(Locale.ROOT).removePrefix("models/")
         if (notMedia.any { it in s }) return null
         return when {
+            // Mistral: Voxtral Mini is the transcription model; Voxtral Small is chat with audio input.
+            kind == ProviderKind.MISTRAL && s.startsWith("voxtral-mini") && "tts" !in s -> ModelOutput.TRANSCRIPTION
             "transcribe" in s || "whisper" in s || s.startsWith("scribe") || s.startsWith("nova-") -> ModelOutput.TRANSCRIPTION
             "tts" in s || s.startsWith("aura") || s.startsWith("eleven_") -> ModelOutput.SPEECH
             "lyria" in s || s.startsWith("music_") || "stable-audio" in s || s == "sound_effects" -> ModelOutput.MUSIC
@@ -426,10 +428,10 @@ object ModelCatalog {
             ProviderKind.DEEPINFRA, ProviderKind.NEBIUS, ProviderKind.STABILITY, ProviderKind.BFL, ProviderKind.CUSTOM,
         )
         ModelOutput.VIDEO -> kind == ProviderKind.GOOGLE
-        ModelOutput.SPEECH -> kind in setOf(ProviderKind.OPENAI, ProviderKind.GOOGLE, ProviderKind.ELEVENLABS, ProviderKind.DEEPGRAM, ProviderKind.CUSTOM)
+        ModelOutput.SPEECH -> kind in setOf(ProviderKind.OPENAI, ProviderKind.GOOGLE, ProviderKind.MISTRAL, ProviderKind.ELEVENLABS, ProviderKind.DEEPGRAM, ProviderKind.CUSTOM)
         ModelOutput.MUSIC -> kind in setOf(ProviderKind.GOOGLE, ProviderKind.ELEVENLABS, ProviderKind.STABILITY)
         ModelOutput.TRANSCRIPTION -> kind in setOf(
-            ProviderKind.OPENAI, ProviderKind.GROQ, ProviderKind.TOGETHER, ProviderKind.DEEPINFRA,
+            ProviderKind.OPENAI, ProviderKind.MISTRAL, ProviderKind.GROQ, ProviderKind.TOGETHER, ProviderKind.DEEPINFRA,
             ProviderKind.ELEVENLABS, ProviderKind.DEEPGRAM, ProviderKind.CUSTOM,
         )
     }
@@ -493,7 +495,7 @@ object ModelCatalog {
             ModelOutput.VIDEO -> listOf("omni", "veo-3.1-generate", "veo")
             ModelOutput.SPEECH -> listOf("gpt-4o-mini-tts", "eleven_multilingual", "eleven", "flash-tts", "tts", "aura")
             ModelOutput.MUSIC -> listOf("music_v2", "music", "lyria", "stable-audio", "sound")
-            ModelOutput.TRANSCRIPTION -> listOf("gpt-4o-transcribe", "scribe", "nova-3", "whisper-large-v3-turbo", "transcribe", "whisper")
+            ModelOutput.TRANSCRIPTION -> listOf("gpt-4o-transcribe", "scribe", "nova-3", "voxtral", "whisper-large-v3-turbo", "transcribe", "whisper")
             ModelOutput.TEXT -> emptyList()
         }
         val ofKind = models.filter { it.output == output }

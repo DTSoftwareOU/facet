@@ -410,8 +410,9 @@ class ChatEngine(
                 st.allText.append(joinText(textPrefix, st.stepText.toString()))
 
                 if (st.error != null || st.stop != StopReason.TOOL_USE || calls.isEmpty()) break
-                if (round >= prepared.maxRounds) {
-                    publish { it.copy(notice = "Stopped after ${prepared.maxRounds} rounds of tool use.") }
+                val roundLimit = if (settings.synced.value.yoloMode) ToolRegistry.YOLO_TOOL_ROUNDS else ToolRegistry.MAX_TOOL_ROUNDS
+                if (round >= roundLimit) {
+                    publish { it.copy(notice = "Stopped after $roundLimit rounds of tool use.") }
                     st.stop = StopReason.END
                     break
                 }
@@ -487,7 +488,7 @@ class ChatEngine(
             approvals[call.id] = pending
             if (settings.synced.value.yoloMode) respondToApproval(call.id, ApprovalDecision.ALLOW)
             val decision = pending.await()
-            if (decision == ApprovalDecision.ALWAYS) runCatching { mcpAutoApprove(def.serverId!!, def.remoteName!!) }
+            if (decision == ApprovalDecision.ALWAYS && def.kind == ToolKind.MCP) runCatching { mcpAutoApprove(def.serverId!!, def.remoteName!!) }
             if (decision == ApprovalDecision.DENY) {
                 val msg = "The user declined this tool call. Don't retry it; continue without it or ask the user how to proceed."
                 update { it.copy(status = ToolStatus.DENIED, result = msg) }
@@ -496,11 +497,14 @@ class ChatEngine(
         }
         update { it.copy(status = ToolStatus.RUNNING) }
         val start = Clock.now()
+        val timeoutMs = if (def.kind == ToolKind.MEDIA) MEDIA_TOOL_TIMEOUT_MS else TOOL_TIMEOUT_MS
         val outcome = try {
             val ctx = ToolContext(reply.conversationId) { progress -> update { it.copy(label = progress) } }
-            withTimeout(if (def.kind == ToolKind.MEDIA) MEDIA_TOOL_TIMEOUT_MS else TOOL_TIMEOUT_MS) { tools.execute(def, call.argumentsJson, ctx) }
+            withTimeout(timeoutMs) { tools.execute(def, call.argumentsJson, ctx) }
         } catch (e: CancellationException) {
-            if (e is kotlinx.coroutines.TimeoutCancellationException) ToolOutcome("The tool timed out after ${TOOL_TIMEOUT_MS / 1000} s.", true) else throw e
+            if (e is kotlinx.coroutines.TimeoutCancellationException) {
+                ToolOutcome("The tool timed out after " + (if (timeoutMs >= 60_000) "${timeoutMs / 60_000} min." else "${timeoutMs / 1000} s."), true)
+            } else throw e
         } catch (e: Exception) {
             ToolOutcome(e.message ?: "The tool failed.", true)
         }

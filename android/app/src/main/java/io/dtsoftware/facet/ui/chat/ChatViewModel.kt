@@ -149,7 +149,13 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
     )
 
     private fun defaultModel(catalog: List<ProviderModels>, assistant: Assistant, synced: ModelRef?): ModelRef? {
-        fun valid(r: ModelRef?) = r?.takeIf { ref -> catalog.any { it.provider.id == ref.providerId } }
+        // A saved choice counts only if its provider is on and the model isn't hidden.
+        fun valid(r: ModelRef?) = r?.takeIf { ref ->
+            catalog.any { pm ->
+                pm.provider.id == ref.providerId && ref.modelId !in pm.hidden &&
+                    (pm.models.isEmpty() || pm.models.any { it.id == ref.modelId })
+            }
+        }
         val local = c.settings.local.value
         return valid(assistant.model)
             ?: valid(synced)

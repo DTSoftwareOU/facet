@@ -151,6 +151,26 @@ class MediaGenTest {
     }
 
     @Test
+    fun mistralSpeechAndTranscription() = runTest {
+        server.enqueue(json("""{"audio_data":"${b64(mp3)}"}"""))
+        val f = MediaGen.generate(config(ProviderKind.MISTRAL), http, model("voxtral-mini-tts-2603", ModelOutput.SPEECH), MediaJob(ModelOutput.SPEECH, "Bonjour", voice = "v-123"))
+        assertEquals("audio/mpeg", f.mimeType)
+        val tts = server.takeRequest()
+        assertEquals("/v1/audio/speech", tts.url.encodedPath)
+        assertEquals("v-123", tts.json().s("voice_id"))
+        assertEquals("mp3", tts.json().s("response_format"))
+
+        // No saved voice: let Mistral choose.
+        server.enqueue(json("""{"audio_data":"${b64(mp3)}"}"""))
+        MediaGen.generate(config(ProviderKind.MISTRAL), http, model("voxtral-mini-tts-2603", ModelOutput.SPEECH), MediaJob(ModelOutput.SPEECH, "Hola", voice = ""))
+        assertNull(server.takeRequest().json()["voice_id"])
+
+        server.enqueue(json("""{"text":"salut"}"""))
+        assertEquals("salut", MediaGen.transcribe(config(ProviderKind.MISTRAL), http, model("voxtral-mini-latest", ModelOutput.TRANSCRIPTION), ByteArray(2000), "audio/mp4", "d.m4a"))
+        assertEquals("/v1/audio/transcriptions", server.takeRequest().url.encodedPath)
+    }
+
+    @Test
     fun openRouterImageFromDataUrl() = runTest {
         server.enqueue(json("""{"choices":[{"message":{"content":"","images":[{"type":"image_url","image_url":{"url":"data:image/png;base64,${b64(png)}"}}]}}]}"""))
         val f = MediaGen.generate(config(ProviderKind.OPENROUTER), http, model("google/gemini-2.5-flash-image", ModelOutput.IMAGE), MediaJob(ModelOutput.IMAGE, "x"))
