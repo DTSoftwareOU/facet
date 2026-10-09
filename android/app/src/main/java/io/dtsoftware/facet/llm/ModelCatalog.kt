@@ -231,6 +231,8 @@ object ModelCatalog {
             val miniOld = s.startsWith("o1-mini") || s.startsWith("o3-mini")
             val pro = "-pro" in s
             return ModelCaps(
+                // The first o1 previews shipped without function calling.
+                tools = !(s.startsWith("o1-mini") || s.startsWith("o1-preview")),
                 vision = !miniOld,
                 pdf = !miniOld,
                 reasoning = ReasoningSupport(
@@ -296,7 +298,8 @@ object ModelCatalog {
         val vision = "gpt-4o" in s || "gpt-4.1" in s || "4-turbo" in s || "chatgpt" in s ||
             "vision" in s || (v != null && v.major >= 5)
         val webSearch = ("gpt-4o" in s || "gpt-4.1" in s || (v != null && v.major >= 5)) && "nano" !in s
-        return ModelCaps(vision = vision, pdf = vision, webSearch = webSearch, sampling = true)
+        // ChatGPT snapshot aliases don't support function calling.
+        return ModelCaps(vision = vision, pdf = vision, webSearch = webSearch, sampling = true, tools = !s.startsWith("chatgpt-"))
     }
 
     // ---------------------------------------------------------------- OpenAI-compatible
@@ -345,6 +348,7 @@ object ModelCatalog {
                 ModelCaps(
                     vision = "gemma" !in s || looksVision(s),
                     pdf = false,
+                    tools = "gemma" !in s,
                     reasoning = if (thinks) ReasoningSupport(ReasoningKind.EFFORT, efforts, null, summaries = true) else ReasoningSupport(),
                     sampling = true,
                 )
@@ -370,6 +374,7 @@ object ModelCatalog {
             ProviderKind.PERPLEXITY -> ModelCaps(
                 reasoning = ReasoningSupport(summaries = "reasoning" in s || "deep-research" in s),
                 sampling = true,
+                tools = false,
             )
             else -> {
                 val gptOss = "gpt-oss" in s

@@ -4,6 +4,8 @@ import io.dtsoftware.facet.core.net.HttpStatusException
 import io.dtsoftware.facet.core.net.fetchString
 import io.dtsoftware.facet.core.net.sseFlow
 import io.dtsoftware.facet.core.net.toJsonBody
+import io.dtsoftware.facet.llm.ApiStyle
+import io.dtsoftware.facet.llm.ChatMessage
 import io.dtsoftware.facet.llm.ChatRequest
 import io.dtsoftware.facet.llm.Effort
 import io.dtsoftware.facet.llm.ErrorKind
@@ -19,6 +21,7 @@ import io.dtsoftware.facet.llm.ParamHealer
 import io.dtsoftware.facet.llm.ParamSpec
 import io.dtsoftware.facet.llm.Part
 import io.dtsoftware.facet.llm.PricingCatalog
+import io.dtsoftware.facet.llm.ProviderBlocks
 import io.dtsoftware.facet.llm.ProviderConfig
 import io.dtsoftware.facet.llm.ProviderKind
 import io.dtsoftware.facet.llm.QuirkStore
@@ -29,11 +32,13 @@ import io.dtsoftware.facet.llm.StopReason
 import io.dtsoftware.facet.llm.StreamEvent
 import io.dtsoftware.facet.llm.Usage
 import io.dtsoftware.facet.llm.internal.CitationCollector
+import io.dtsoftware.facet.llm.internal.ToolWire
 import io.dtsoftware.facet.llm.internal.ThinkTagSplitter
 import io.dtsoftware.facet.llm.internal.arr
 import io.dtsoftware.facet.llm.internal.dataUrl
 import io.dtsoftware.facet.llm.internal.long
 import io.dtsoftware.facet.llm.internal.obj
+import io.dtsoftware.facet.llm.internal.parseJsonOrNull
 import io.dtsoftware.facet.llm.internal.parseObjectOrNull
 import io.dtsoftware.facet.llm.internal.str
 import io.dtsoftware.facet.llm.internal.stringOrNull
@@ -138,6 +143,7 @@ internal class OpenAiChatClient(
             } else ReasoningSupport(),
             webSearch = true,
             sampling = params?.contains("temperature") ?: true,
+            tools = params?.contains("tools") ?: true,
         )
         return ModelInfo(
             id = id,
@@ -179,8 +185,9 @@ internal class OpenAiChatClient(
     override fun stream(request: ChatRequest): Flow<StreamEvent> = flow {
         val dropped = quirks.dropped(config.id, request.model).toMutableSet()
         var heals = 0
+        var includeReasoning = false
         while (true) {
-            val built = buildBody(request, dropped)
+            val built = buildBody(request, dropped, includeReasoning)
             val httpRequest = requestBuilder("chat/completions")
                 .header("Accept", "text/event-stream")
                 .post(built.body.toString().toJsonBody())
@@ -195,8 +202,14 @@ internal class OpenAiChatClient(
                     return@flow
                 }
                 val msg = LlmErrors.extractMessage(e.body)
+                // DeepSeek-style thinking + tools: the tool loop must echo reasoning_content back.
+                if (e.code == 400 && !includeReasoning && built.hasToolHistory && "reasoning_content" in msg.lowercase()) {
+                    includeReasoning = true
+                    continue
+                }
                 if ((e.code == 400 || e.code == 422) && heals < MAX_HEALS) {
-                    val action = ParamHealer.diagnose(msg, built.sent, built.effort, request.caps.reasoning.efforts)
+                    val action = if (built.clientTools && ToolWire.toolsUnsupported(msg)) HealAction.Drop("tools")
+                    else ParamHealer.diagnose(msg, built.sent, built.effort, request.caps.reasoning.efforts)
                     if (action != null) {
                         heals++
                         quirks.record(config.id, request.model, action)
@@ -234,7 +247,12 @@ internal class OpenAiChatClient(
         val splitter = ThinkTagSplitter()
         val citations = CitationCollector()
         var perplexityCitationsSeen = 0
+        val text = StringBuilder()
+        val reasoning = StringBuilder()
+        val tools = java.util.TreeMap<Int, ToolAcc>()
     }
+
+    private class ToolAcc(var id: String = "", var name: String = "", val args: StringBuilder = StringBuilder(), var started: Boolean = false)
 
     private suspend fun FlowCollector<StreamEvent>.consume(httpRequest: Request, s: StreamState) {
         streamHttp.sseFlow(httpRequest).collect { ev ->
@@ -312,6 +330,32 @@ internal class OpenAiChatClient(
             }
             if (changed) emit(StreamEvent.Citations(s.citations.snapshot()))
         }
+        delta.arr("tool_calls")?.forEach { el -> handleToolFragment(el as? JsonObject ?: return@forEach, s) }
+    }
+
+    /**
+     * Accumulates a streamed tool-call fragment. Ids and names may arrive only on the first fragment;
+     * some providers (Gemini compat) omit `index` and ids, so a fragment with a name starts a new call.
+     */
+    private suspend fun FlowCollector<StreamEvent>.handleToolFragment(o: JsonObject, s: StreamState) {
+        val fn = o.obj("function")
+        val name = fn?.str("name")?.takeIf { it.isNotEmpty() }
+        val index = o.long("index")?.toInt()
+            ?: if (name != null || s.tools.isEmpty()) s.tools.size else s.tools.lastKey()
+        val acc = s.tools.getOrPut(index) { ToolAcc() }
+        o.str("id")?.takeIf { it.isNotBlank() && acc.id.isEmpty() }?.let { acc.id = it }
+        if (name != null && acc.name.isEmpty()) acc.name = name
+        when (val args = fn?.get("arguments")) {
+            is JsonPrimitive -> args.stringOrNull()?.let { acc.args.append(it) }
+            is JsonObject -> acc.args.append(args.toString())
+            else -> Unit
+        }
+        if (!acc.started && acc.name.isNotEmpty()) {
+            if (acc.id.isEmpty()) acc.id = ToolWire.newId(index)
+            acc.started = true
+            closeThinking(s)
+            emit(StreamEvent.ToolCallStarted(acc.id, acc.name))
+        }
     }
 
     private suspend fun FlowCollector<StreamEvent>.emitThinking(text: String, s: StreamState) {
@@ -319,6 +363,7 @@ internal class OpenAiChatClient(
             s.thinkingOpen = true
             emit(StreamEvent.ThinkingStarted)
         }
+        s.reasoning.append(text)
         emit(StreamEvent.ThinkingDelta(text))
     }
 
@@ -332,6 +377,7 @@ internal class OpenAiChatClient(
             emitThinking(seg.text, s)
         } else {
             closeThinking(s)
+            s.text.append(seg.text)
             emit(StreamEvent.TextDelta(seg.text))
         }
     }
@@ -368,13 +414,40 @@ internal class OpenAiChatClient(
         s.finished = true
         for (seg in s.splitter.flush()) emitSegment(seg, s)
         closeThinking(s)
-        val stop = when (s.finishReason) {
-            "length" -> StopReason.MAX_TOKENS
-            "content_filter" -> StopReason.REFUSAL
+        val calls = s.tools.values.filter { it.name.isNotEmpty() }
+        for (c in calls) {
+            if (!c.started) {
+                c.started = true
+                emit(StreamEvent.ToolCallStarted(c.id, c.name))
+            }
+            emit(StreamEvent.ToolCallReady(c.id, c.name, ToolWire.normalizeArgs(c.args.toString())))
+        }
+        val stop = when {
+            s.finishReason == "length" -> StopReason.MAX_TOKENS
+            s.finishReason == "content_filter" -> StopReason.REFUSAL
+            calls.isNotEmpty() -> StopReason.TOOL_USE
             else -> StopReason.END
         }
         if (stop == StopReason.REFUSAL) emit(StreamEvent.Notice("${s.model} stopped because of a content filter."))
-        emit(StreamEvent.Completed(stop, null))
+        val blocks = if (calls.isEmpty()) null else {
+            val message = buildJsonObject {
+                put("role", "assistant")
+                put("content", s.text.toString())
+                putJsonArray("tool_calls") {
+                    for (c in calls) addJsonObject {
+                        put("id", c.id)
+                        put("type", "function")
+                        putJsonObject("function") {
+                            put("name", c.name)
+                            put("arguments", ToolWire.normalizeArgs(c.args.toString()))
+                        }
+                    }
+                }
+                if (s.reasoning.isNotEmpty()) put("reasoning_content", s.reasoning.toString())
+            }
+            ProviderBlocks(ApiStyle.OPENAI_CHAT, s.model, JsonArray(listOf(message)).toString())
+        }
+        emit(StreamEvent.Completed(stop, blocks))
     }
 
     private fun parseUsage(u: JsonObject) = Usage(
@@ -386,32 +459,27 @@ internal class OpenAiChatClient(
 
     // ------------------------------------------------------------------ request body
 
-    private class Built(val body: JsonObject, val sent: List<ParamSpec>, val effort: Effort?)
+    private class Built(
+        val body: JsonObject,
+        val sent: List<ParamSpec>,
+        val effort: Effort?,
+        val clientTools: Boolean,
+        val hasToolHistory: Boolean,
+    )
 
-    private fun buildBody(req: ChatRequest, dropped: Set<String>): Built {
+    private fun buildBody(req: ChatRequest, dropped: Set<String>, includeReasoning: Boolean = false): Built {
         val caps = req.caps
         val sent = ArrayList<ParamSpec>()
         val utility = req.utility
-
-        val messages = mergeSameRole(buildList {
-            req.system?.takeIf { it.isNotBlank() }?.let { add("system" to JsonPrimitive(it)) }
-            for (m in req.messages) {
-                when (m.role) {
-                    Role.USER -> add("user" to userContent(m.parts, caps))
-                    Role.ASSISTANT -> add(
-                        "assistant" to JsonPrimitive(
-                            m.parts.filterIsInstance<Part.Text>().joinToString("\n\n") { it.text }.ifBlank { "(no response)" },
-                        ),
-                    )
-                }
-            }
-        })
+        val clientTools = if (!utility && caps.tools && "tools" !in dropped && kind != ProviderKind.PERPLEXITY) req.tools else emptyList()
+        val hasToolHistory = req.messages.any { m -> m.parts.any { it is Part.ToolCall || it is Part.ToolResult } }
+        val messages = buildMessages(req, caps, includeReasoning)
 
         var effort: Effort? = null
         val body = buildJsonObject {
             put("model", req.model)
             put("stream", true)
-            put("messages", JsonArray(messages.map { (role, content) -> buildJsonObject { put("role", role); put("content", content) } }))
+            put("messages", messages)
             if ("stream_options" !in dropped && kind != ProviderKind.PERPLEXITY) {
                 putJsonObject("stream_options") { put("include_usage", true) }
                 sent += ParamSpec("stream_options", listOf("stream_options", "include_usage"))
@@ -480,9 +548,93 @@ internal class OpenAiChatClient(
                     sent += ParamSpec("top_p", listOf("top_p"))
                 }
             }
+
+            // Client tools (function calling); tool_choice stays at the default "auto".
+            if (clientTools.isNotEmpty()) {
+                putJsonArray("tools") {
+                    for (t in clientTools) addJsonObject {
+                        put("type", "function")
+                        putJsonObject("function") {
+                            put("name", t.name)
+                            put("description", t.description)
+                            put("parameters", ToolWire.schema(t.inputSchemaJson))
+                        }
+                    }
+                }
+            }
         }
         val order = listOf("extra_body", "effort", "reasoning", "stream_options", "web_search", "temperature", "top_p", "max_tokens")
-        return Built(body, sent.sortedBy { order.indexOf(it.key) }, effort)
+        return Built(body, sent.sortedBy { order.indexOf(it.key) }, effort, clientTools.isNotEmpty(), hasToolHistory)
+    }
+
+    /** Tool call ids as this provider accepts them (Mistral: 9 alphanumeric characters). */
+    private fun wireId(id: String): String {
+        val raw = id.ifBlank { "call_0" }
+        return if (kind == ProviderKind.MISTRAL) ToolWire.mistralId(raw) else raw
+    }
+
+    private fun buildMessages(req: ChatRequest, caps: ModelCaps, includeReasoning: Boolean): JsonArray {
+        val out = ArrayList<JsonObject>()
+
+        /** Appends a plain message, merging into the previous one of the same role (strict-alternation providers). */
+        fun addPlain(role: String, content: JsonElement) {
+            val last = out.lastOrNull()
+            val lastContent = last?.get("content")
+            if (last != null && last.str("role") == role && role != "system" && role != "tool" &&
+                "tool_calls" !in last && lastContent != null && lastContent !is kotlinx.serialization.json.JsonNull
+            ) {
+                out[out.lastIndex] = buildJsonObject { put("role", role); put("content", mergeContent(lastContent, content)) }
+            } else {
+                out += buildJsonObject { put("role", role); put("content", content) }
+            }
+        }
+
+        req.system?.takeIf { it.isNotBlank() }?.let { out += buildJsonObject { put("role", "system"); put("content", it) } }
+        for (m in req.messages) {
+            when (m.role) {
+                Role.USER -> {
+                    val results = m.parts.filterIsInstance<Part.ToolResult>()
+                    for (r in results) out += buildJsonObject {
+                        put("role", "tool")
+                        put("tool_call_id", wireId(r.callId))
+                        put("content", (if (r.isError) "Error: " else "") + r.content.ifBlank { "(no output)" })
+                    }
+                    val rest = m.parts.filter { it !is Part.ToolResult && it !is Part.ToolCall }
+                    if (rest.isNotEmpty() || results.isEmpty()) addPlain("user", userContent(rest, caps))
+                }
+                Role.ASSISTANT -> {
+                    val text = m.parts.filterIsInstance<Part.Text>().joinToString("\n\n") { it.text }
+                    val calls = m.parts.filterIsInstance<Part.ToolCall>()
+                    if (calls.isEmpty()) {
+                        addPlain("assistant", JsonPrimitive(text.ifBlank { "(no response)" }))
+                    } else {
+                        out += buildJsonObject {
+                            put("role", "assistant")
+                            put("content", text)
+                            putJsonArray("tool_calls") {
+                                for (c in calls) addJsonObject {
+                                    put("id", wireId(c.id))
+                                    put("type", "function")
+                                    putJsonObject("function") {
+                                        put("name", c.name)
+                                        put("arguments", ToolWire.replayArgs(c.argumentsJson))
+                                    }
+                                }
+                            }
+                            if (includeReasoning) storedReasoning(m)?.let { put("reasoning_content", it) }
+                        }
+                    }
+                }
+            }
+        }
+        return JsonArray(out)
+    }
+
+    /** reasoning_content saved with an OPENAI_CHAT tool step (echoed only when the provider asks for it). */
+    private fun storedReasoning(m: ChatMessage): String? {
+        val b = m.blocks?.takeIf { it.style == ApiStyle.OPENAI_CHAT } ?: return null
+        val arr = parseJsonOrNull(b.json) as? JsonArray ?: return null
+        return arr.firstNotNullOfOrNull { (it as? JsonObject)?.str("reasoning_content") } ?: ""
     }
 
     private fun userContent(parts: List<Part>, caps: ModelCaps): JsonElement {
@@ -492,6 +644,7 @@ internal class OpenAiChatClient(
         }
         return buildJsonArray {
             for (p in parts) when (p) {
+                is Part.ToolCall, is Part.ToolResult -> Unit
                 is Part.Text -> if (p.text.isNotBlank()) addJsonObject { put("type", "text"); put("text", p.text) }
                 is Part.Image -> addJsonObject {
                     put("type", "image_url")
@@ -516,20 +669,6 @@ internal class OpenAiChatClient(
                 }
             }
         }
-    }
-
-    /** Merges consecutive same-role messages (several providers require strict alternation). */
-    private fun mergeSameRole(list: List<Pair<String, JsonElement>>): List<Pair<String, JsonElement>> {
-        val out = ArrayList<Pair<String, JsonElement>>(list.size)
-        for (item in list) {
-            val last = out.lastOrNull()
-            if (last != null && last.first == item.first && item.first != "system") {
-                out[out.lastIndex] = last.first to mergeContent(last.second, item.second)
-            } else {
-                out += item
-            }
-        }
-        return out
     }
 
     private fun mergeContent(a: JsonElement, b: JsonElement): JsonElement {

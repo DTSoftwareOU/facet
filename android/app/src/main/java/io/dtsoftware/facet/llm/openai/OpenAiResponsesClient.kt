@@ -29,6 +29,7 @@ import io.dtsoftware.facet.llm.StopReason
 import io.dtsoftware.facet.llm.StreamEvent
 import io.dtsoftware.facet.llm.Usage
 import io.dtsoftware.facet.llm.internal.CitationCollector
+import io.dtsoftware.facet.llm.internal.ToolWire
 import io.dtsoftware.facet.llm.internal.arr
 import io.dtsoftware.facet.llm.internal.dataUrl
 import io.dtsoftware.facet.llm.internal.long
@@ -152,6 +153,8 @@ internal class OpenAiResponsesClient(
                 if ((e.code == 400 || e.code == 403 || e.code == 422) && heals < MAX_HEALS) {
                     val action = if ("verif" in lower && "summar" in lower && built.sent.any { it.key == "summary" }) {
                         HealAction.Drop("summary")
+                    } else if (built.clientTools && ToolWire.toolsUnsupported(msg)) {
+                        HealAction.Drop("tools")
                     } else if (e.code != 403) {
                         ParamHealer.diagnose(msg, built.sent, built.effort, request.caps.reasoning.efforts)
                     } else null
@@ -192,6 +195,7 @@ internal class OpenAiResponsesClient(
         val citations = CitationCollector()
         val outputItems = ArrayList<JsonObject>()
         val searchQueries = HashMap<String, String?>()
+        var toolCalls = 0
     }
 
     private suspend fun FlowCollector<StreamEvent>.consume(httpRequest: Request, s: StreamState) {
@@ -215,6 +219,7 @@ internal class OpenAiResponsesClient(
                             emit(StreamEvent.ThinkingStarted)
                         }
                         "web_search_call" -> emit(StreamEvent.WebSearch(item.obj("action")?.str("query"), done = false))
+                        "function_call" -> emit(StreamEvent.ToolCallStarted(item.str("call_id") ?: item.str("id").orEmpty(), item.str("name").orEmpty()))
                     }
                 }
                 "response.reasoning_summary_part.added" -> {
@@ -236,6 +241,16 @@ internal class OpenAiResponsesClient(
                         "reasoning" -> if (s.thinkingOpen) {
                             s.thinkingOpen = false
                             emit(StreamEvent.ThinkingEnded)
+                        }
+                        "function_call" -> {
+                            s.toolCalls++
+                            emit(
+                                StreamEvent.ToolCallReady(
+                                    item.str("call_id") ?: item.str("id").orEmpty(),
+                                    item.str("name").orEmpty(),
+                                    ToolWire.normalizeArgs(item.str("arguments").orEmpty()),
+                                ),
+                            )
                         }
                         "web_search_call" -> {
                             val action = item.obj("action")
@@ -287,6 +302,7 @@ internal class OpenAiResponsesClient(
                         type == "response.incomplete" && reason == "content_filter" -> StopReason.REFUSAL
                         type == "response.incomplete" -> StopReason.MAX_TOKENS
                         s.refusal -> StopReason.REFUSAL
+                        s.toolCalls > 0 || response?.arr("output")?.any { (it as? JsonObject)?.str("type") == "function_call" } == true -> StopReason.TOOL_USE
                         else -> StopReason.END
                     }
                     if (stop == StopReason.REFUSAL) emit(StreamEvent.Notice("${s.model} declined to answer this request."))
@@ -319,7 +335,7 @@ internal class OpenAiResponsesClient(
 
     // ------------------------------------------------------------------ request body
 
-    private class Built(val body: JsonObject, val sent: List<ParamSpec>, val effort: Effort?, val replayed: Boolean)
+    private class Built(val body: JsonObject, val sent: List<ParamSpec>, val effort: Effort?, val replayed: Boolean, val clientTools: Boolean)
 
     private fun buildBody(req: ChatRequest, dropped: Set<String>, noReplay: Boolean): Built {
         val caps = req.caps
@@ -327,13 +343,23 @@ internal class OpenAiResponsesClient(
         val reasoningModel = caps.reasoning.kind == ReasoningKind.EFFORT
         val utility = req.utility
         var replayed = false
+        val clientTools = if (!utility && caps.tools && "tools" !in dropped) req.tools else emptyList()
 
         val input = buildJsonArray {
             for (m in req.messages) {
                 when (m.role) {
-                    Role.USER -> addJsonObject {
-                        put("role", "user")
-                        put("content", userContent(m.parts))
+                    Role.USER -> {
+                        val results = m.parts.filterIsInstance<Part.ToolResult>()
+                        for (r in results) addJsonObject {
+                            put("type", "function_call_output")
+                            put("call_id", r.callId)
+                            put("output", if (r.isError) "Error: " + r.content else r.content)
+                        }
+                        val rest = m.parts.filter { it !is Part.ToolResult && it !is Part.ToolCall }
+                        if (rest.isNotEmpty() || results.isEmpty()) addJsonObject {
+                            put("role", "user")
+                            put("content", userContent(rest))
+                        }
                     }
                     Role.ASSISTANT -> {
                         val items = if (!noReplay) replayItems(m, req.model) else null
@@ -342,11 +368,18 @@ internal class OpenAiResponsesClient(
                             items.forEach { add(it) }
                         } else {
                             val text = m.parts.filterIsInstance<Part.Text>().joinToString("\n\n") { it.text }
-                            addJsonObject {
+                            val calls = m.parts.filterIsInstance<Part.ToolCall>()
+                            if (text.isNotBlank() || calls.isEmpty()) addJsonObject {
                                 put("role", "assistant")
                                 putJsonArray("content") {
                                     addJsonObject { put("type", "output_text"); put("text", text.ifBlank { "(no response)" }) }
                                 }
+                            }
+                            for (c in calls) addJsonObject {
+                                put("type", "function_call")
+                                put("call_id", c.id)
+                                put("name", c.name)
+                                put("arguments", ToolWire.replayArgs(c.argumentsJson))
                             }
                         }
                     }
@@ -397,9 +430,20 @@ internal class OpenAiResponsesClient(
                     sent += ParamSpec("verbosity", listOf("text.verbosity", "verbosity"))
                 }
             }
-            if (req.params.webSearch && caps.webSearch && !utility && "web_search" !in dropped) {
-                putJsonArray("tools") { addJsonObject { put("type", "web_search") } }
-                sent += ParamSpec("web_search", listOf("web_search", "tools"))
+            val webSearch = req.params.webSearch && caps.webSearch && !utility && "web_search" !in dropped
+            if (webSearch || clientTools.isNotEmpty()) {
+                putJsonArray("tools") {
+                    if (webSearch) addJsonObject { put("type", "web_search") }
+                    for (t in clientTools) addJsonObject {
+                        put("type", "function")
+                        put("name", t.name)
+                        put("description", t.description)
+                        put("parameters", ToolWire.schema(t.inputSchemaJson))
+                        put("strict", false)
+                    }
+                }
+                // With client tools present, a generic "tools" error isn't evidence against web search.
+                if (webSearch) sent += ParamSpec("web_search", if (clientTools.isEmpty()) listOf("web_search", "tools") else listOf("web_search"))
             }
             val cap = maxTokensCap(dropped)
             val max = req.params.maxOutputTokens ?: if (utility) (if (reasoningModel) 2_048 else 256) else null
@@ -423,7 +467,7 @@ internal class OpenAiResponsesClient(
             }
         }
         val order = listOf("summary", "mode", "effort", "verbosity", "include", "web_search", "temperature", "top_p", "max_output_tokens", "reasoning")
-        return Built(body, sent.sortedBy { order.indexOf(it.key) }, effort, replayed)
+        return Built(body, sent.sortedBy { order.indexOf(it.key) }, effort, replayed, clientTools.isNotEmpty())
     }
 
     private fun replayItems(m: ChatMessage, model: String): List<JsonObject>? {
@@ -431,11 +475,12 @@ internal class OpenAiResponsesClient(
         if (b.style != ApiStyle.OPENAI_RESPONSES || b.model != model) return null
         val arr = parseJsonOrNull(b.json) as? JsonArray ?: return null
         val items = arr.mapNotNull { it as? JsonObject }
-        return items.takeIf { list -> list.any { it.str("type") == "message" } }
+        return items.takeIf { list -> list.any { it.str("type") == "message" || it.str("type") == "function_call" } }
     }
 
     private fun userContent(parts: List<Part>): JsonArray = buildJsonArray {
         for (p in parts) when (p) {
+            is Part.ToolCall, is Part.ToolResult -> Unit
             is Part.Text -> if (p.text.isNotBlank()) addJsonObject { put("type", "input_text"); put("text", p.text) }
             is Part.Image -> addJsonObject {
                 put("type", "input_image")
