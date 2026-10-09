@@ -189,16 +189,21 @@ fun ChatScreen(
         vm.events.collect { e ->
             when (e) {
                 is ChatEvent.Message -> toast(e.text)
-                ChatEvent.Sent -> {
-                    if (Build.VERSION.SDK_INT >= 33 && !prefs.notificationsAsked && prefs.notifyOnComplete &&
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        container.settings.updateLocal { it.copy(notificationsAsked = true) }
-                        notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                }
+                ChatEvent.Sent -> Unit
             }
         }
+    }
+
+    // Ask for notification permission once, after the first reply finishes, not mid-conversation start.
+    var wasGenerating by remember { mutableStateOf(false) }
+    LaunchedEffect(state.generating) {
+        if (wasGenerating && !state.generating && Build.VERSION.SDK_INT >= 33 && !prefs.notificationsAsked && prefs.notifyOnComplete &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            container.settings.updateLocal { it.copy(notificationsAsked = true) }
+            notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        wasGenerating = state.generating
     }
 
     LaunchedEffect(prefill) {

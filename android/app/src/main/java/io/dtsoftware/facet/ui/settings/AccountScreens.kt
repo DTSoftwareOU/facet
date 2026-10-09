@@ -117,7 +117,7 @@ private fun GuestAccount(container: AppContainer, state: AccountState, onBack: (
 }
 
 @Composable
-private fun ServerSheet(container: AppContainer, current: String, onSaved: (String) -> Unit, onDismiss: () -> Unit) {
+fun ServerSheet(container: AppContainer, current: String, onSaved: (String) -> Unit, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     var url by remember { mutableStateOf(current) }
     var checking by remember { mutableStateOf(false) }

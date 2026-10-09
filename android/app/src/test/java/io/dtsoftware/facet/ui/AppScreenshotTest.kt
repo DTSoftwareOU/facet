@@ -185,6 +185,38 @@ class AppScreenshotTest {
         shoot(name, mode) { HomeScreen(c, requests, {}, {}, {}, {}, {}) }
     }
 
+    @Test fun thinkingDark() = live("thinking_dark", text = "", thinking = "Comparing the user's budget against typical rents in each neighborhood, then checking transport times…")
+    @Test fun streamingDark() = live(
+        "streaming_dark",
+        text = "Here's how the two neighborhoods compare for a remote worker:\n\n| | Arroios | Campo de Ourique |\n|---|---|---|\n| Rent (1-bed) | €1,150 | €1,300 |\n| Cafés with Wi-Fi | Many | Some |\n\nArroios is livelier and closer to the metro, while",
+        thinking = "",
+        searching = true,
+    )
+
+    private fun live(name: String, text: String, thinking: String, searching: Boolean = false) {
+        val (c, conv) = container()
+        val now = Clock.now()
+        val user = MessageEntity(Ids.new(), conv!!, null, "user", "Which neighborhood should I live in as a remote worker in Lisbon?", createdAt = now + 100_000, updatedAt = now + 100_000)
+        val reply = MessageEntity(
+            Ids.new(), conv, user.id, "assistant", "", providerId = "p-anthropic", modelId = "claude-opus-5-5", modelName = "Claude Opus 5.5",
+            status = io.dtsoftware.facet.data.db.MessageStatus.STREAMING.name, createdAt = now + 100_001, updatedAt = now + 100_001,
+        )
+        runBlocking {
+            c.db.messages().upsert(user)
+            c.db.messages().upsert(reply)
+            c.db.conversations().upsert(c.db.conversations().get(conv)!!.copy(currentLeafId = reply.id))
+        }
+        c.chat.showLiveForTest(
+            io.dtsoftware.facet.domain.LiveTurn(
+                reply.id, conv, text = text, thinking = thinking, thinkingActive = text.isEmpty(),
+                thinkingStartedAt = now - 4_000, thinkingMs = if (text.isEmpty()) 0 else 9_000,
+                searching = searching, searchQuery = if (searching) "Arroios rent prices 2026" else null, searchCount = if (searching) 1 else 0,
+            ),
+        )
+        val requests = MutableStateFlow<LaunchRequest?>(LaunchRequest.OpenConversation(conv))
+        shoot(name, ThemeMode.DARK) { HomeScreen(c, requests, {}, {}, {}, {}, {}) }
+    }
+
     @Test
     fun newChatDark() {
         val (c, _) = container()

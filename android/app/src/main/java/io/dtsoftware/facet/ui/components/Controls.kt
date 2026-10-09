@@ -215,7 +215,7 @@ fun SendButton(
         contentAlignment = Alignment.Center,
     ) {
         if (generating) {
-            Box(Modifier.size(13.dp).clip(FacetShapes.small).background(c.background))
+            Box(Modifier.size(13.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(3.dp)).background(c.background))
         } else {
             FacetIcon(
                 io.dtsoftware.facet.R.drawable.ic_arrow_up, "Send",

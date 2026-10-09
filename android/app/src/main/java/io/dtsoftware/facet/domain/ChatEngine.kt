@@ -103,6 +103,13 @@ class ChatEngine(
 
     fun isGenerating(conversationId: String) = conversationId in _active.value
 
+    /** Test hook: shows [turn] as if it were streaming. */
+    @androidx.annotation.VisibleForTesting
+    internal fun showLiveForTest(turn: LiveTurn) {
+        _live.update { it + (turn.messageId to turn) }
+        _active.update { it + turn.conversationId }
+    }
+
     fun stop(conversationId: String) {
         jobs[conversationId]?.cancel()
     }

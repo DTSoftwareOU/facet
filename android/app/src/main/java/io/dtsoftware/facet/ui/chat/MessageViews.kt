@@ -211,11 +211,12 @@ fun AssistantMessage(
     val thinkingActive = live?.thinkingActive == true
     val citations = live?.citations?.takeIf { it.isNotEmpty() } ?: remember(m.citationsJson) { m.citations() }
     val uri = LocalUriHandler.current
+    val hasThinking = thinkingActive || !thinkingText.isNullOrBlank() || (m.thinkingMs ?: 0) > 0 || (live?.thinkingStartedAt != null)
 
     Column(modifier.fillMaxWidth()) {
-        // Header: gem + model name
+        // Header: gem + model name. The gem turns only while nothing else shows progress.
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
-            Gem(size = 18.dp, thinking = streaming && text.isEmpty())
+            Gem(size = 18.dp, thinking = streaming && text.isEmpty() && !hasThinking && live?.searching != true)
             Spacer(Modifier.width(8.dp))
             Text(
                 m.modelName ?: m.modelId ?: "Assistant",
@@ -226,7 +227,6 @@ fun AssistantMessage(
             )
         }
 
-        val hasThinking = thinkingActive || !thinkingText.isNullOrBlank() || (m.thinkingMs ?: 0) > 0 || (live?.thinkingStartedAt != null)
         if (hasThinking) {
             ThinkingPanel(
                 text = thinkingText.orEmpty(),

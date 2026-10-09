@@ -4,8 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -36,19 +38,22 @@ internal fun TableView(block: MdBlock.Table, env: MdEnv) {
     val minCol = with(env.density) { 64.dp.roundToPx() }
     val maxCol = with(env.density) { 300.dp.roundToPx() }
 
-    Box(
+    BoxWithConstraints(
         Modifier
             .fillMaxWidth()
             .clip(FacetShapes.code)
             .border(1.dp, colors.outline, FacetShapes.code),
     ) {
+        // Inside the horizontal scroller the grid gets no minimum width, so pass the viewport
+        // width explicitly: narrow tables then stretch to fill it.
+        val viewport = maxWidth
         Box(
             Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
         ) {
             Layout(
-                modifier = Modifier.drawBehind {
+                modifier = Modifier.widthIn(min = viewport).drawBehind {
                     val stroke = 1.dp.toPx()
                     val b = lines.bottoms
                     for (r in 0 until b.size - 1) {

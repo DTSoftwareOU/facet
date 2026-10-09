@@ -241,7 +241,8 @@ fun FacetTextField(
                         imeAction = imeAction,
                         autoCorrectEnabled = !password && keyboardType == KeyboardType.Text,
                     ),
-                    keyboardActions = KeyboardActions(onAny = { onIme?.invoke() }),
+                    // Only override IME actions when asked to; otherwise Next/Done keep moving focus and closing the keyboard.
+                    keyboardActions = if (onIme != null) KeyboardActions(onAny = { onIme() }) else KeyboardActions.Default,
                     modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
                 )
             }

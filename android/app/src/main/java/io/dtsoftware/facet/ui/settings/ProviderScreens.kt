@@ -253,7 +253,11 @@ fun ProviderEditScreen(container: AppContainer, providerId: String?, kindId: Str
                     scope.launch {
                         val r = container.providers.verify(kind, baseUrl, key, parsedHeaders())
                         testing = false
-                        status = if (r.isSuccess) true to "Connected. This key works." else false to (r.exceptionOrNull()?.message ?: "That didn't work.")
+                        status = if (r.isSuccess) {
+                            true to if (key.isBlank()) "Connected." else "Connected. This key works."
+                        } else {
+                            false to (r.exceptionOrNull()?.message ?: "That didn't work.")
+                        }
                     }
                 },
                 style = ButtonStyle.Tonal, loading = testing, enabled = canSave, modifier = Modifier.weight(1f),

@@ -104,7 +104,9 @@ fun AuthScreen(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var registrationOpen by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) { runCatching { container.auth.meta() }.onSuccess { registrationOpen = it.registrationOpen } }
+    var server by remember { mutableStateOf(container.auth.serverUrl) }
+    var editServer by remember { mutableStateOf(false) }
+    LaunchedEffect(server) { runCatching { container.auth.meta() }.onSuccess { registrationOpen = it.registrationOpen } }
 
     val emailOk = email.contains('@') && email.substringAfter('@').contains('.')
     val canSubmit = emailOk && !busy && if (signUp) passwordOk(password) && password == confirm else password.isNotEmpty()
@@ -191,10 +193,14 @@ fun AuthScreen(
             }
         }
         Text(
-            "Sync server: " + container.auth.serverUrl.removePrefix("https://"),
+            "Sync server: " + server.removePrefix("https://") + " · Change",
             style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
-            textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().clip(FacetShapes.small).clickable { editServer = true }.padding(8.dp),
         )
+    }
+    if (editServer) {
+        io.dtsoftware.facet.ui.settings.ServerSheet(container, server, onSaved = { server = it }, onDismiss = { editServer = false })
     }
 }
 
