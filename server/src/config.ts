@@ -136,5 +136,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     smtpUrl: env.SMTP_URL || null,
     smtpFrom: env.SMTP_FROM || base.smtpFrom,
     logLevel: env.LOG_LEVEL || base.logLevel,
+    rateLimits: {
+      ...base.rateLimits,
+      authIp: { ...base.rateLimits.authIp, max: int('AUTH_RATE_LIMIT_PER_IP', env.AUTH_RATE_LIMIT_PER_IP, base.rateLimits.authIp.max) },
+    },
   };
 }
