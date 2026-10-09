@@ -76,6 +76,8 @@ data class ModelCaps(
     val fastMode: Boolean = false,
     /** Anthropic server-side refusal fallbacks ("fallbacks": "default"). */
     val refusalFallback: Boolean = false,
+    /** Supports function/tool calling (client tools: Facet search, MCP, skills). */
+    val tools: Boolean = true,
 )
 
 /** USD per 1M tokens. */
@@ -119,7 +121,18 @@ sealed interface Part {
     data class Image(val mimeType: String, val bytes: ByteArray) : Part
     /** PDF or other document the provider can read natively. */
     data class Document(val mimeType: String, val name: String, val bytes: ByteArray) : Part
+    /** Assistant side: the model asked to call a client tool. [argumentsJson] is a JSON object string. */
+    data class ToolCall(val id: String, val name: String, val argumentsJson: String) : Part
+    /** User side: the result of a client tool call, paired with [ToolCall.id]. */
+    data class ToolResult(val callId: String, val name: String, val content: String, val isError: Boolean = false) : Part
 }
+
+/**
+ * A client-side tool the model may call. [inputSchemaJson] is a JSON Schema object (as a JSON string)
+ * describing the arguments. Names match ^[a-zA-Z0-9_-]{1,64}$.
+ */
+@Serializable
+data class ToolSpec(val name: String, val description: String, val inputSchemaJson: String)
 
 /**
  * Raw provider content kept so a turn can be replayed losslessly to the same provider
@@ -149,6 +162,8 @@ data class ChatRequest(
     val utility: Boolean = false,
     /** The model's output-token ceiling from [ModelInfo.maxOutput], used to size `max_tokens` when unset. */
     val modelMaxOutput: Int? = null,
+    /** Client tools offered to the model. Empty = no function calling. */
+    val tools: List<ToolSpec> = emptyList(),
 )
 
 @Serializable
@@ -168,7 +183,8 @@ data class Usage(
     val reasoningTokens: Long = 0,
 )
 
-enum class StopReason { END, MAX_TOKENS, REFUSAL, CANCELLED, ERROR }
+/** [TOOL_USE]: the model stopped to call client tools; run them and continue the turn. */
+enum class StopReason { END, MAX_TOKENS, REFUSAL, CANCELLED, ERROR, TOOL_USE }
 
 enum class ErrorKind { AUTH, PERMISSION, RATE_LIMIT, QUOTA, CONTEXT_LENGTH, BAD_REQUEST, NOT_FOUND, OVERLOADED, SERVER, NETWORK, TIMEOUT, REFUSAL, UNKNOWN }
 
@@ -199,6 +215,10 @@ sealed interface StreamEvent {
     data class UsageUpdate(val usage: Usage) : StreamEvent
     /** Informational, e.g. "Answered by claude-opus-4-8 after a refusal fallback." */
     data class Notice(val text: String) : StreamEvent
+    /** The model began writing a call to client tool [name] (arguments still streaming). */
+    data class ToolCallStarted(val id: String, val name: String) : StreamEvent
+    /** A complete client tool call. All calls of a step arrive before [Completed] with [StopReason.TOOL_USE]. */
+    data class ToolCallReady(val id: String, val name: String, val argumentsJson: String) : StreamEvent
     data class Completed(val stopReason: StopReason, val blocks: ProviderBlocks?) : StreamEvent
     data class Failed(val error: LlmError) : StreamEvent
 }
