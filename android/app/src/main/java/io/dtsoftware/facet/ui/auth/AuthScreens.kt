@@ -68,7 +68,8 @@ import kotlinx.coroutines.launch
 /** Full-screen form layout shared by auth screens. */
 @Composable
 private fun AuthLayout(onBack: (() -> Unit)?, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxSize().background(FacetTheme.colors.background).statusBarsPadding().imePadding()) {
+    // The form ends above the gesture bar, so its footer link never sits under the handle.
+    Column(Modifier.fillMaxSize().background(FacetTheme.colors.background).statusBarsPadding().navigationBarsPadding().imePadding()) {
         // Fixed top bar so scrolled content never slides under the back button.
         Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 6.dp), contentAlignment = Alignment.CenterStart) {
             if (onBack != null) FacetIconButton(R.drawable.ic_arrow_left, "Back", onBack)
@@ -80,8 +81,7 @@ private fun AuthLayout(onBack: (() -> Unit)?, content: @Composable ColumnScope.(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp)
-                    .padding(top = 4.dp, bottom = 32.dp)
-                    .navigationBarsPadding(),
+                    .padding(top = 4.dp, bottom = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 content = content,
             )
