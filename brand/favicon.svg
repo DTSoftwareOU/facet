@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <g stroke-width="1" stroke-linejoin="round">
+    <polygon points="4,50 50,4 50,32 32,50" fill="#F2C66D" stroke="#F2C66D"/>
+    <polygon points="50,4 96,50 68,50 50,32" fill="#6E9BFF" stroke="#6E9BFF"/>
+    <polygon points="96,50 50,96 50,68 68,50" fill="#3A5BD9" stroke="#3A5BD9"/>
+    <polygon points="50,96 4,50 32,50 50,68" fill="#49D3C1" stroke="#49D3C1"/>
+    <polygon points="50,32 68,50 50,68 32,50" fill="#F4F7FB" stroke="#F4F7FB"/>
+  </g>
+</svg>

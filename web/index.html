@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Facet — every AI model, one private home</title>
+  <meta name="description" content="Facet is an open-source, end-to-end encrypted AI chat app for Android. Bring your own OpenAI, Anthropic, Google or OpenRouter key, use any model, and sync across your devices.">
+  <meta name="theme-color" content="#11151b" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <link rel="preload" href="/fonts/instrument-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/instrument-serif-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Facet">
+  <meta property="og:title" content="Facet — every AI model, one private home">
+  <meta property="og:description" content="Open-source, end-to-end encrypted AI chat for Android. Bring your own keys.">
+  <meta property="og:url" content="https://facet.dtsoftware.io/">
+  <meta property="og:image" content="https://facet.dtsoftware.io/assets/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="The Facet gem beside the words: Every model. One private home.">
+  <meta name="twitter:card" content="summary_large_image">
+  <script src="/site.js" defer></script>
+</head>
+<body>
+<svg class="sprite" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h16"/></symbol>
+    <symbol id="i-new" viewBox="0 0 24 24"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M17.5 3.5a2.1 2.1 0 0 1 3 3L13 14l-4 1 1-4z"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66L20 8.5"/><path d="M20 4v4.5h-4.5"/></symbol>
+    <symbol id="i-speak" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 18a8 8 0 1 1 16 0"/><path d="m12 18 4-6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand-link" href="/" aria-label="Facet home">
+      <img class="on-dark" src="/assets/facet-wordmark-dark.svg" alt="Facet" width="104" height="26">
+      <img class="on-light" src="/assets/facet-wordmark-light.svg" alt="Facet" width="104" height="26">
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a class="nav-optional" href="#models">Models</a>
+      <a class="nav-optional" href="#security">Security</a>
+      <a class="nav-optional" href="/self-host.html">Self-host</a>
+      <a class="btn btn-primary btn-small" href="/download/facet-latest.apk">Download</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <div>
+        <div class="hero-gem" aria-hidden="true">
+          <svg viewBox="0 0 100 100">
+            <g stroke-width="0.6" stroke-linejoin="round">
+              <g class="gem-facet gem-nw"><polygon class="tone" points="4,50 50,4 50,32 32,50" fill="#F2C66D"/></g>
+              <g class="gem-facet gem-ne"><polygon class="tone" points="50,4 96,50 68,50 50,32" fill="#6E9BFF"/></g>
+              <g class="gem-facet gem-se"><polygon class="tone" points="96,50 50,96 50,68 68,50" fill="#3A5BD9"/></g>
+              <g class="gem-facet gem-sw"><polygon class="tone" points="50,96 4,50 32,50 50,68" fill="#49D3C1"/></g>
+              <polygon class="gem-facet gem-table" points="50,32 68,50 50,68 32,50" fill="#F4F7FB"/>
+            </g>
+          </svg>
+        </div>
+        <h1 id="hero-title">Every model.<br> One private home.</h1>
+        <p class="lede">Facet is an open-source AI chat app for Android. Bring your own OpenAI, Anthropic, Google or OpenRouter key, pick any model, and keep every conversation end-to-end encrypted across your devices.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="/download/facet-latest.apk">
+            <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>
+            Download for Android
+          </a>
+          <a class="btn btn-quiet" href="/self-host.html" data-repo-path="">
+            <svg class="ico" aria-hidden="true"><use href="#i-code"/></svg>
+            View source
+          </a>
+        </div>
+        <p class="hero-note">Free and open source under Apache-2.0. Requires Android 8.0 or later.</p>
+      </div>
+
+      <!-- PRODUCT MOCKUP: HTML/CSS stand-in for a real screenshot of the Facet chat screen.
+           Replace this whole <figure> with an <img> once real screenshots exist. -->
+      <figure class="phone" aria-label="The Facet chat screen: Claude Opus 5.5 answering a Kotlin question with a code sample">
+        <div class="phone-screen">
+          <div class="phone-status" aria-hidden="true"><span>9:41</span><span class="icons"><span></span><span></span><span></span></span></div>
+          <div class="phone-topbar">
+            <span class="icon-btn"><svg class="ico" aria-hidden="true"><use href="#i-menu"/></svg></span>
+            <span class="model-chip">Claude Opus 5.5 <svg class="ico" aria-hidden="true"><use href="#i-down"/></svg></span>
+            <span class="icon-btn"><svg class="ico" aria-hidden="true"><use href="#i-new"/></svg></span>
+          </div>
+          <div class="phone-thread">
+            <p class="bubble-user">Debounce helper in Kotlin?</p>
+            <div class="thought">
+              <svg class="gem-mini" viewBox="0 0 100 100" aria-hidden="true">
+                <polygon points="4,50 50,4 50,32 32,50" fill="#F2C66D"/>
+                <polygon points="50,4 96,50 68,50 50,32" fill="#6E9BFF"/>
+                <polygon points="96,50 50,96 50,68 68,50" fill="#3A5BD9"/>
+                <polygon points="50,96 4,50 32,50 50,68" fill="#49D3C1"/>
+                <polygon points="50,32 68,50 50,68 32,50" fill="#F4F7FB"/>
+              </svg>
+              Thought for 8s
+              <svg class="ico chev" aria-hidden="true"><use href="#i-right"/></svg>
+            </div>
+            <div class="reply">
+              <p>Here’s a small helper that cancels the pending call whenever a new one arrives:</p>
+              <div class="code">
+                <div class="code-head"><span>kotlin</span><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg></div>
+<pre><span class="tk-k">fun</span> &lt;<span class="tk-t">T</span>&gt; debounce(
+  waitMs: <span class="tk-t">Long</span>,
+  scope: <span class="tk-t">CoroutineScope</span>,
+  action: (<span class="tk-t">T</span>) -&gt; <span class="tk-t">Unit</span>,
+): (<span class="tk-t">T</span>) -&gt; <span class="tk-t">Unit</span> {
+  <span class="tk-k">var</span> job: <span class="tk-t">Job</span>? = <span class="tk-k">null</span>
+  <span class="tk-k">return</span> { value -&gt;
+    job?.cancel()
+    job = scope.launch {
+      delay(waitMs)
+      action(value)
+    }
+  }
+}</pre>
+              </div>
+              <p>Each call restarts the timer, so only the last one runs.</p>
+              <div class="reply-meta" aria-hidden="true">
+                <svg class="ico"><use href="#i-copy"/></svg>
+                <svg class="ico"><use href="#i-redo"/></svg>
+                <svg class="ico"><use href="#i-speak"/></svg>
+                <span class="cost">$0.012</span>
+              </div>
+            </div>
+          </div>
+          <div class="phone-composer">
+            <div class="composer-chips">
+              <span class="chip is-on"><svg class="ico" aria-hidden="true"><use href="#i-globe"/></svg>Web search</span>
+              <span class="chip"><svg class="ico" aria-hidden="true"><use href="#i-gauge"/></svg>Effort: High</span>
+            </div>
+            <div class="composer">
+              <span class="icon-btn"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg></span>
+              <span class="placeholder">Message Claude</span>
+              <span class="icon-btn"><svg class="ico" aria-hidden="true"><use href="#i-mic"/></svg></span>
+              <span class="send"><svg class="ico" aria-hidden="true"><use href="#i-up"/></svg></span>
+            </div>
+          </div>
+        </div>
+      </figure>
+      <!-- /PRODUCT MOCKUP -->
+    </div>
+  </section>
+
+  <section class="section" id="models" aria-labelledby="models-title">
+    <div class="wrap split">
+      <div>
+        <h2 id="models-title">Bring your own keys. Use any model.</h2>
+        <p class="intro">Add a key and Facet loads that provider’s current model list. Switch models in the middle of a conversation; Facet only shows the controls each model actually supports.</p>
+        <ul class="provider-list" aria-label="Supported providers">
+          <li>OpenAI</li>
+          <li>Anthropic</li>
+          <li>Google Gemini</li>
+          <li>OpenRouter</li>
+          <li>Groq</li>
+          <li>Mistral</li>
+          <li>DeepSeek</li>
+          <li>xAI</li>
+          <li>Together</li>
+          <li>Perplexity</li>
+          <li>Fireworks</li>
+          <li>Cerebras</li>
+          <li>Ollama</li>
+          <li>LM Studio</li>
+          <li class="is-any">Any OpenAI-compatible endpoint</li>
+        </ul>
+        <p class="fine">You pay each provider directly at its API prices. Facet shows the tokens and estimated cost of every reply, including cached and reasoning tokens.</p>
+      </div>
+
+      <div class="sheet" role="img" aria-label="Facet's model settings sheet for Claude Opus 5.5, with effort set to High, thinking summaries and web search on, and fast mode off">
+        <div class="sheet-grip"></div>
+        <h3>Claude Opus 5.5</h3>
+        <p class="sub">Anthropic, 1M token context</p>
+        <div class="field">
+          <div class="field-label"><span>Effort</span><span>High</span></div>
+          <div class="segmented">
+            <span>Low</span><span>Medium</span><span class="is-on">High</span><span>XHigh</span><span>Max</span>
+          </div>
+        </div>
+        <div class="toggle-row">
+          <p>Show thinking<small>Stream reasoning summaries as the model works</small></p>
+          <span class="switch is-on"></span>
+        </div>
+        <div class="toggle-row">
+          <p>Web search<small>Let the model search the web and cite sources</small></p>
+          <span class="switch is-on"></span>
+        </div>
+        <div class="toggle-row">
+          <p>Fast mode<small>Faster output at premium pricing</small></p>
+          <span class="switch"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="security" aria-labelledby="security-title">
+    <div class="wrap">
+      <h2 id="security-title">Encrypted before it leaves your phone.</h2>
+      <p class="intro">Chats, files, assistants and API keys are encrypted on your device with a key only you hold. The sync server stores ciphertext it can’t read, and it never receives your password.</p>
+      <div class="ledger">
+        <div class="can">
+          <h3><svg class="ico" aria-hidden="true"><use href="#i-eye"/></svg>What the sync server can see</h3>
+          <ul>
+            <li>Your email address and optional display name</li>
+            <li>How many items you’ve synced, their types, sizes and timestamps</li>
+            <li>Names of your signed-in devices and their IP addresses</li>
+          </ul>
+        </div>
+        <div class="cannot">
+          <h3><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg>What it can’t read</h3>
+          <ul>
+            <li>Conversations, messages and attachments</li>
+            <li>Your API keys</li>
+            <li>Assistants, saved prompts and settings</li>
+            <li>Your password — only a derived key ever leaves the device</li>
+          </ul>
+        </div>
+      </div>
+      <p class="fine">Prompts go straight from your phone to the AI provider you choose, under that provider’s terms; Facet’s server never relays them. If you forget your password, your recovery code restores access. Without it, encrypted data can’t be recovered by anyone, including us. <a href="/privacy.html">Read the privacy policy</a>.</p>
+    </div>
+  </section>
+
+  <section class="section" id="open-source" aria-labelledby="oss-title">
+    <div class="wrap split">
+      <div>
+        <h2 id="oss-title">Open source, and yours to host.</h2>
+        <p class="intro">Facet is licensed under Apache-2.0, and the app and sync server live in one repository. Use the hosted server at facet.dtsoftware.io, or run your own and point the app at it from Settings.</p>
+        <div class="cta-row">
+          <a class="btn btn-quiet" href="/self-host.html">Self-hosting guide</a>
+          <a class="btn btn-quiet" href="/self-host.html" data-repo-path="">View source</a>
+        </div>
+      </div>
+      <div class="terminal" role="group" aria-label="Commands to run your own sync server">
+        <div class="terminal-head">Your own server, with automatic HTTPS</div>
+<pre><code><span class="prompt">$ </span>git clone <span data-repo-text=".git">&lt;repository URL&gt;</span>
+<span class="prompt">$ </span>cd facet/deploy
+<span class="prompt">$ </span>cp .env.example .env
+<span class="note"># set your domain and two random secrets</span>
+<span class="prompt">$ </span>docker compose up -d</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="native" aria-labelledby="native-title">
+    <div class="wrap">
+      <h2 id="native-title">Native, light and quick.</h2>
+      <ul class="facts">
+        <li><strong>Kotlin and Jetpack Compose</strong><span>No web views, no ad or analytics SDKs. Just the app.</span></li>
+        <li><strong>Steady streaming</strong><span>Replies arrive at an even pace and render block by block, so long answers full of code and tables don’t stutter.</span></li>
+        <li><strong>Works without an account</strong><span>Everything is stored on your phone. Create an account later and your chats sync, encrypted.</span></li>
+        <li><strong>Keeps going in the background</strong><span>Leave mid-reply and the response still finishes. You get a notification when it’s ready.</span></li>
+        <li><strong>Locks when you want</strong><span>Optional biometric lock, and previews hidden from the app switcher.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="start" aria-labelledby="start-title">
+    <div class="wrap">
+      <h2 id="start-title">Get started in three steps.</h2>
+      <ol class="steps">
+        <li>
+          <h3>Install Facet</h3>
+          <p>Download the APK and open it on any phone running Android 8.0 or later.</p>
+        </li>
+        <li>
+          <h3>Add an API key</h3>
+          <p>Paste a key from OpenAI, Anthropic, Google, OpenRouter or another provider. Facet checks it and loads the models.</p>
+        </li>
+        <li>
+          <h3>Create an account, if you like</h3>
+          <p>Sign up to sync encrypted chats across your devices, and keep the recovery code Facet gives you somewhere safe.</p>
+        </li>
+      </ol>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/download/facet-latest.apk">
+          <svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>
+          Download for Android
+        </a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span class="footer-brand"><img src="/assets/favicon.svg" alt="" width="18" height="18">© 2026 DT Software</span>
+    <nav aria-label="Footer">
+      <a href="/privacy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/self-host.html">Self-host</a>
+      <a href="/self-host.html" data-repo-path="">Source</a>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

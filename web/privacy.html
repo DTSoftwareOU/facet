@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy policy — Facet</title>
+  <meta name="description" content="How Facet and the facet.dtsoftware.io sync service handle your data: end-to-end encrypted sync, no ads, no analytics, no tracking.">
+  <meta name="theme-color" content="#11151b" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Facet">
+  <meta property="og:title" content="Facet privacy policy">
+  <meta property="og:url" content="https://facet.dtsoftware.io/privacy.html">
+  <meta property="og:image" content="https://facet.dtsoftware.io/assets/og.png">
+  <script src="/site.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand-link" href="/" aria-label="Facet home">
+      <img class="on-dark" src="/assets/facet-wordmark-dark.svg" alt="Facet" width="104" height="26">
+      <img class="on-light" src="/assets/facet-wordmark-light.svg" alt="Facet" width="104" height="26">
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a class="nav-optional" href="/#models">Models</a>
+      <a class="nav-optional" href="/#security">Security</a>
+      <a class="nav-optional" href="/self-host.html">Self-host</a>
+      <a class="btn btn-primary btn-small" href="/download/facet-latest.apk">Download</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="doc">
+  <div class="wrap">
+    <h1>Privacy policy</h1>
+    <p class="updated">Updated October 9, 2026</p>
+
+    <div class="summary">
+      <p><strong>Facet is built so that we can’t read your conversations.</strong> Your chats, attachments, assistants, prompts, settings and API keys are encrypted on your device before they’re synced, and the key that decrypts them never leaves your devices.</p>
+      <p>Your prompts go directly from your phone to the AI provider you choose. We don’t run ads, analytics or trackers, and we don’t sell data.</p>
+    </div>
+
+    <h2>Who this covers</h2>
+    <p>Facet is made by DT Software (“we”, “us”). This policy covers the Facet Android app, the hosted sync service at <code>facet.dtsoftware.io</code>, and this website. If you connect the app to a sync server run by someone else, that server’s operator is responsible for it and their policy applies to the data it holds.</p>
+
+    <h2>Using Facet without an account</h2>
+    <p>You can use Facet without signing up. In that case your conversations, settings and API keys are stored only on your phone and we receive none of it.</p>
+    <p>To estimate what each reply costs, the app downloads a public price list of AI models from OpenRouter about once a day. That request contains no account information or content. You can turn it off in Settings.</p>
+
+    <h2>AI providers</h2>
+    <p>When you send a message, the app sends it — together with the conversation so far, any attachments, and your API key — directly to the provider you selected, such as OpenAI, Anthropic, Google, OpenRouter or an endpoint you configured yourself. Facet’s servers don’t relay or see these requests.</p>
+    <p>Each provider handles that data under its own privacy policy and terms, including how long it keeps requests and whether it uses them to improve its services. Review the policies of the providers you use.</p>
+
+    <h2>What the sync service stores</h2>
+    <p>If you create an account, the sync service stores:</p>
+    <ul>
+      <li><strong>Account details:</strong> your email address, an optional display name, and when the account was created.</li>
+      <li><strong>Sign-in data:</strong> the parameters used to derive keys from your password (a random salt and an iteration count), a hash of a key derived from your password, and your vault key in encrypted form (plus a second encrypted copy that only your recovery code can unlock). We never receive your password or your recovery code.</li>
+      <li><strong>Encrypted content:</strong> your conversations, messages, attachments, assistants, saved prompts, settings and API keys, stored as ciphertext. Alongside each item we store its type (for example “message”), its size, timestamps and a sequence number used for syncing.</li>
+      <li><strong>Sessions:</strong> for each signed-in device, its name and platform (for example “Pixel 9, Android”), its IP address, and when it signed in and was last active.</li>
+      <li><strong>Server logs:</strong> IP address, time, requested path and response status for each request, used to keep the service secure and to fix problems.</li>
+    </ul>
+    <p>We can’t read your encrypted content or API keys. They’re encrypted with AES-256-GCM using a key that is created on your device and is itself protected by your password; the server only ever holds it in encrypted form.</p>
+
+    <h2>How we use information</h2>
+    <ul>
+      <li>To provide sync: storing your encrypted data and delivering it to your signed-in devices.</li>
+      <li>To sign you in, keep your account secure, and limit abuse (for example, rate-limiting repeated sign-in attempts).</li>
+      <li>To send emails you ask for, such as a password-reset code, when email is enabled on the server.</li>
+      <li>To answer you when you contact us.</li>
+    </ul>
+    <p>We don’t use your data for advertising, we don’t build profiles, and we don’t use your data to train AI models. We don’t send marketing email.</p>
+    <p>Where the GDPR applies, we process account and sync data to provide the service you signed up for, and we keep security logs on the basis of our legitimate interest in protecting the service and its users.</p>
+
+    <h2>Sharing</h2>
+    <p>We don’t sell or rent personal data. We share it only with:</p>
+    <ul>
+      <li>the infrastructure provider that hosts the sync service, and an email delivery provider if email is enabled, each acting on our instructions;</li>
+      <li>authorities, when the law requires it. We can only hand over what we hold — encrypted content stays encrypted, because we don’t have the key.</li>
+    </ul>
+
+    <h2>Retention and deletion</h2>
+    <ul>
+      <li>Account and sync data is kept while your account exists.</li>
+      <li>When you delete an item, a small encrypted placeholder is kept for up to 180 days so your other devices learn about the deletion, then it’s purged.</li>
+      <li>Sessions that haven’t been used for 90 days expire and are removed.</li>
+      <li>Server logs are kept for up to 14 days.</li>
+      <li><strong>Deleting your account</strong> (in the app: Settings → Account → Delete account) removes your account, sessions, encrypted items and attachments from the live service immediately. Copies in backups are overwritten within 14 days.</li>
+    </ul>
+
+    <h2>Security</h2>
+    <p>Traffic to the sync service is encrypted with TLS. Your password never leaves your device: the app derives keys from it with 600,000 rounds of PBKDF2-SHA256 and sends the server only a derived authentication key, which the server hashes again before storing.</p>
+    <p>Because we can’t decrypt your data, we also can’t recover it for you. If you forget your password, your recovery code restores access. If you lose both, the only option is an email reset, which keeps your account but permanently deletes your encrypted data. On the phone, API keys and your vault key are additionally protected by the Android Keystore, and you can turn on a biometric app lock.</p>
+
+    <h2>App permissions</h2>
+    <ul>
+      <li><strong>Microphone</strong> — only when you use voice input. Speech is converted to text by your phone’s speech recognition service, which may process audio under its own provider’s terms.</li>
+      <li><strong>Camera and photos</strong> — only when you attach an image.</li>
+      <li><strong>Notifications</strong> — to tell you when a reply finished while the app was in the background.</li>
+      <li><strong>Biometrics</strong> — handled entirely by Android for the optional app lock. We never receive biometric data.</li>
+    </ul>
+
+    <h2>Your rights</h2>
+    <p>Depending on where you live, you may have the right to access, correct, export or delete your personal data, and to object to or restrict how we process it. You can export everything and delete your account from the app. For anything else, email us and we’ll respond within 30 days. You can also complain to your local data protection authority.</p>
+
+    <h2>Children</h2>
+    <p>Facet isn’t intended for children under 13, or under the age of digital consent where you live, and we don’t knowingly collect their data.</p>
+
+    <h2>International transfers</h2>
+    <p>The sync service may be hosted outside your country. Wherever it runs, your content reaches it already encrypted.</p>
+
+    <h2>Changes to this policy</h2>
+    <p>We’ll post any changes on this page and update the date at the top. If a change materially affects how we handle your data, we’ll also tell you in the app before it takes effect.</p>
+
+    <h2>Contact</h2>
+    <p>Questions or requests: <a href="mailto:privacy@dtsoftware.io">privacy@dtsoftware.io</a>.</p>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span class="footer-brand"><img src="/assets/favicon.svg" alt="" width="18" height="18">© 2026 DT Software</span>
+    <nav aria-label="Footer">
+      <a href="/privacy.html" aria-current="page">Privacy</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/self-host.html">Self-host</a>
+      <a href="/self-host.html" data-repo-path="">Source</a>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>

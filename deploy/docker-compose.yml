@@ -1,0 +1,53 @@
+# Facet production stack: sync server + Caddy (automatic HTTPS, static site, APK downloads).
+# Usage (from this folder): cp .env.example .env && edit .env && docker compose up -d --build
+name: facet
+
+services:
+  facet:
+    build: ../server
+    image: facet-sync:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8787"
+      DATA_DIR: /data
+      TRUST_PROXY: "true"
+      PUBLIC_URL: https://${FACET_DOMAIN:-facet.dtsoftware.io}
+    volumes:
+      - facet-data:/data
+    expose:
+      - "8787"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - facet
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      FACET_DOMAIN: ${FACET_DOMAIN:-facet.dtsoftware.io}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../web:/srv/web:ro
+      - ./downloads:/srv/downloads:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  facet-data:
+  caddy-data:
+  caddy-config:

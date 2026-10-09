@@ -1,0 +1,33 @@
+{$FACET_DOMAIN:facet.dtsoftware.io} {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# Sync API. No compression and no buffering, so Server-Sent Events stream immediately.
+	handle /v1/* {
+		reverse_proxy facet:8787 {
+			flush_interval -1
+		}
+	}
+
+	# APK and other release downloads: put files in deploy/downloads/.
+	handle_path /download/* {
+		root * /srv/downloads
+		@apk path *.apk
+		header @apk Content-Type application/vnd.android.package-archive
+		header Content-Disposition attachment
+		header Cache-Control "public, max-age=300"
+		file_server
+	}
+
+	# Static website (web/).
+	handle {
+		root * /srv/web
+		encode zstd gzip
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
+}

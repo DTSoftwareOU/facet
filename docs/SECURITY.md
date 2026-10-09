@@ -138,8 +138,9 @@ blob for that account, then sets the new credentials.
 - Access token: HS256 JWT signed with `JWT_SECRET`, 15 minutes, claims `sub` (user id),
   `sid` (session id), `iat`, `exp`.
 - Refresh token: 32 random bytes (base64url), stored as SHA-256. Rotated on every refresh.
-  Presenting a previously rotated refresh token revokes the whole session (theft detection).
-  Sessions expire after 90 days of inactivity.
+  Presenting a previously rotated refresh token revokes the whole session (theft detection),
+  except within 30 s of the rotation, where it is treated as a retry after a lost response and
+  a fresh token is issued instead. Sessions expire after 90 days of inactivity.
 
 ## Rate limits
 

@@ -29,6 +29,10 @@ Every non-2xx response has this body:
 | 501 | `email_disabled` | SMTP isn't configured on this server |
 | 500 | `internal` | Server error |
 
+Leniency: a JSON request with an empty body is treated as `{}`; `device` may be omitted
+(defaults to `{ "name": "Unknown device", "platform": "other" }`, and unknown platforms become
+`other`); base64 input may omit padding.
+
 ## Common shapes
 
 ```ts
@@ -39,7 +43,7 @@ type User = {
   email: string;
   displayName: string | null;
   createdAt: number;
-  storage: { usedBytes: number; quotaBytes: number };
+  storage: { usedBytes: number; quotaBytes: number };   // encrypted blob bytes vs. blob quota
 };
 
 type Tokens = {
@@ -95,6 +99,12 @@ Errors: `invalid_credentials`.
 ### `POST /v1/auth/refresh`
 `{ "refreshToken" }` → `200 { "tokens": Tokens }`. The old refresh token stops working.
 Re-use of a rotated token → `401 invalid_refresh_token` and the session is revoked.
+
+Grace window: if the token presented is the *immediately previous* one and it was rotated less
+than 30 s ago, the server assumes the client never received the response and issues a fresh
+token instead of revoking (the token from the lost response becomes invalid). Clients must
+serialize refresh calls (one in flight at a time) and persist the new refresh token before
+using the new access token.
 
 ### `POST /v1/auth/logout` (auth)
 Revokes the current session. `204`.
@@ -195,6 +205,17 @@ Rules per record, keyed by `(type, id)`:
 days may be purged; if `since` is older than the purge horizon the server responds with
 `"reset": true` and the client should perform a full pull from 0.
 
+`reset` details: the response is `{ "records": [], "cursor": 0, "hasMore": false, "reset": true }`
+(the `reset` key is absent otherwise). It is also returned when `since` is greater than the
+user's current cursor (e.g. after an email reset wiped the account). After a reset the client
+pulls from 0 and treats any local, non-dirty synced entity that the full pull didn't return
+as deleted. `since=0` never triggers a reset.
+
+Push notes: an identical retry (same `updatedAt`, `deleted` and `ct` bytes) is accepted with
+the record's existing `seq` and doesn't advance the cursor. `ct` must be a version-1 envelope
+(first byte `0x01`, ≥ 30 bytes); `ct` may be `null` only when `deleted` is true. A `deleted`
+write at the same `updatedAt` as a live record wins the tie.
+
 ### `GET /v1/sync/stream` (Server-Sent Events)
 Auth via header. Events:
 
@@ -208,6 +229,12 @@ data: {"cursor": 58}
 
 plus `: ping` comments every 25 s. Fired after any push for that user (from any session).
 
+Only `event:` and `data:` fields and `:` comments are sent (no `id:`/`retry:`). An invalid
+token gets a normal `401` JSON error before any stream starts. The server ends the stream
+when the session is revoked (logout, password change, revoke) or the server shuts down;
+clients reconnect with backoff, refreshing the access token first on `401`, and pull from
+their cursor after each `ready`.
+
 ## Blobs (auth)
 
 ### `PUT /v1/blobs/:id`
@@ -217,7 +244,7 @@ Errors: `too_large`, `quota_exceeded`.
 
 ### `GET /v1/blobs/:id` → raw bytes, `200`, `Content-Type: application/octet-stream`.
 
-### `DELETE /v1/blobs/:id` → `204`.
+### `DELETE /v1/blobs/:id` → `204` (also when the blob doesn't exist).
 
 ## Server configuration (environment)
 
@@ -231,7 +258,7 @@ Errors: `too_large`, `quota_exceeded`.
 | `PUBLIC_URL` | `http://localhost:8787` | Used in emails |
 | `REGISTRATION_OPEN` | `true` | Allow sign-ups |
 | `BLOB_QUOTA_BYTES` | `2147483648` | Per-user blob quota |
-| `TRUST_PROXY` | `true` | Read client IP from `X-Forwarded-For` |
+| `TRUST_PROXY` | `true` | Read client IP from `X-Forwarded-For` (`true` = trust one proxy hop, `false` = ignore, or a hop count) |
 | `SMTP_URL` | — | e.g. `smtps://user:pass@smtp.example.com:465`; enables email reset |
 | `SMTP_FROM` | `Facet <no-reply@dtsoftware.io>` | Sender |
 | `LOG_LEVEL` | `info` | pino level |

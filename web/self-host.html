@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Run your own sync server — Facet</title>
+  <meta name="description" content="Host the Facet sync server yourself with Docker and point the app at it. It stores only end-to-end encrypted data.">
+  <meta name="theme-color" content="#11151b" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Facet">
+  <meta property="og:title" content="Run your own Facet sync server">
+  <meta property="og:url" content="https://facet.dtsoftware.io/self-host.html">
+  <meta property="og:image" content="https://facet.dtsoftware.io/assets/og.png">
+  <script src="/site.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand-link" href="/" aria-label="Facet home">
+      <img class="on-dark" src="/assets/facet-wordmark-dark.svg" alt="Facet" width="104" height="26">
+      <img class="on-light" src="/assets/facet-wordmark-light.svg" alt="Facet" width="104" height="26">
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a class="nav-optional" href="/#models">Models</a>
+      <a class="nav-optional" href="/#security">Security</a>
+      <a class="nav-optional" href="/self-host.html" aria-current="page">Self-host</a>
+      <a class="btn btn-primary btn-small" href="/download/facet-latest.apk">Download</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="doc">
+  <div class="wrap">
+    <h1>Run your own sync server</h1>
+    <p class="updated">A short guide. The full one lives in the repository: <a href="/self-host.html" data-repo-path="/blob/main/docs/DEPLOY.md">docs/DEPLOY.md</a>.</p>
+
+    <div class="summary">
+      <p>The Facet sync server is a small Node.js service backed by a single SQLite database. It only ever stores encrypted data and account metadata, so it needs very little: a modest Linux server is plenty for a household or a small team.</p>
+    </div>
+
+    <h2>What you need</h2>
+    <ul>
+      <li>A Linux server with Docker and Docker Compose.</li>
+      <li>A domain or subdomain with a DNS record pointing at the server.</li>
+      <li>Ports 80 and 443 open. The bundled Caddy web server uses them to get and renew HTTPS certificates automatically.</li>
+    </ul>
+
+    <h2>Set it up</h2>
+    <ol>
+      <li>
+        <p><strong>Get the code.</strong></p>
+<pre><code>git clone <span data-repo-text=".git">&lt;repository URL&gt;</span>
+cd facet/deploy</code></pre>
+      </li>
+      <li>
+        <p><strong>Configure it.</strong> Copy the example file, then set your domain and the two secrets. The comments in the file explain each value.</p>
+<pre><code>cp .env.example .env
+openssl rand -base64 48   # run twice: one value for JWT_SECRET, one for SERVER_SECRET</code></pre>
+      </li>
+      <li>
+        <p><strong>Start it.</strong></p>
+<pre><code>docker compose up -d
+curl https://your.domain/v1/health   # → {"ok":true}</code></pre>
+      </li>
+      <li>
+        <p><strong>Point the app at it.</strong> In Facet, open Settings → Account → Sync server and enter your address, for example <code>https://your.domain</code>. Do this before you sign in: accounts belong to one server and don’t move between servers automatically.</p>
+      </li>
+    </ol>
+
+    <h2>Settings</h2>
+    <p>The server is configured with environment variables. The ones you’re most likely to change:</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th scope="col">Variable</th><th scope="col">Default</th><th scope="col">What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>JWT_SECRET</code></td><td>required</td><td>Signs sign-in tokens. At least 32 characters.</td></tr>
+          <tr><td><code>SERVER_SECRET</code></td><td>required</td><td>Used for internal hashing. At least 32 characters.</td></tr>
+          <tr><td><code>PUBLIC_URL</code></td><td><code>http://localhost:8787</code></td><td>Your server’s public address, used in emails.</td></tr>
+          <tr><td><code>REGISTRATION_OPEN</code></td><td><code>true</code></td><td>Set to <code>false</code> once everyone has an account.</td></tr>
+          <tr><td><code>BLOB_QUOTA_BYTES</code></td><td>2 GiB</td><td>Attachment storage per account.</td></tr>
+          <tr><td><code>DATA_DIR</code></td><td><code>./data</code></td><td>Where the database and attachments are stored.</td></tr>
+          <tr><td><code>SMTP_URL</code></td><td>unset</td><td>Enables password reset by email (see below).</td></tr>
+          <tr><td><code>SMTP_FROM</code></td><td><code>Facet &lt;no-reply@…&gt;</code></td><td>Sender for those emails.</td></tr>
+          <tr><td><code>TRUST_PROXY</code></td><td><code>true</code></td><td>Read client IPs from the reverse proxy.</td></tr>
+          <tr><td><code>LOG_LEVEL</code></td><td><code>info</code></td><td>How much the server logs.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Password resets</h2>
+    <p>Without email configured, people who forget their password reset it with the recovery code Facet showed them at sign-up, and their data is kept. If you set <code>SMTP_URL</code>, people without a recovery code can also reset by email. Because the server can’t decrypt anything, an email reset keeps the account but permanently deletes its encrypted data.</p>
+
+    <h2>Backups</h2>
+    <p>Everything the server stores lives in <code>DATA_DIR</code>: the SQLite database and the folder of encrypted attachments. Back up that directory regularly. For a consistent copy of the database, use SQLite’s online backup or stop the container for a moment while you copy. Backups contain only ciphertext and account metadata.</p>
+
+    <h2>Updating</h2>
+<pre><code>git pull
+docker compose up -d --build</code></pre>
+
+    <h2>More detail</h2>
+    <p>See the <a href="/self-host.html" data-repo-path="/blob/main/docs/DEPLOY.md">deployment guide</a> for running without Docker, using your own reverse proxy and monitoring, and the <a href="/self-host.html" data-repo-path="/blob/main/docs/API.md">API reference</a> and <a href="/self-host.html" data-repo-path="/blob/main/docs/SECURITY.md">security model</a> for how sync and encryption work.</p>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span class="footer-brand"><img src="/assets/favicon.svg" alt="" width="18" height="18">© 2026 DT Software</span>
+    <nav aria-label="Footer">
+      <a href="/privacy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+      <a href="/self-host.html" aria-current="page">Self-host</a>
+      <a href="/self-host.html" data-repo-path="">Source</a>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>
