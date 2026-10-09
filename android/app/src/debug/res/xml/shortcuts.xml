@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_chat"
+        android:enabled="true"
+        android:icon="@drawable/shortcut_new_chat"
+        android:shortcutShortLabel="@string/shortcut_new_chat">
+        <intent
+            android:action="io.dtsoftware.facet.NEW_CHAT"
+            android:targetClass="io.dtsoftware.facet.MainActivity"
+            android:targetPackage="io.dtsoftware.facet.debug" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="voice"
+        android:enabled="true"
+        android:icon="@drawable/shortcut_voice"
+        android:shortcutShortLabel="@string/shortcut_voice">
+        <intent
+            android:action="io.dtsoftware.facet.VOICE_CHAT"
+            android:targetClass="io.dtsoftware.facet.MainActivity"
+            android:targetPackage="io.dtsoftware.facet.debug" />
+    </shortcut>
+</shortcuts>

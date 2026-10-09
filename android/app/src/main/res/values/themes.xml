@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Facet" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/facet_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="Theme.Facet.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/facet_splash</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_animated</item>
+        <item name="windowSplashScreenAnimationDuration">840</item>
+        <item name="postSplashScreenTheme">@style/Theme.Facet</item>
+    </style>
+</resources>

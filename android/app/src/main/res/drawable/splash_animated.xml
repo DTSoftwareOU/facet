@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/splash_gem">
+    <target android:name="nw" android:animation="@animator/splash_nw" />
+    <target android:name="ne" android:animation="@animator/splash_ne" />
+    <target android:name="se" android:animation="@animator/splash_se" />
+    <target android:name="sw" android:animation="@animator/splash_sw" />
+</animated-vector>

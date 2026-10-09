@@ -31,6 +31,7 @@ import okhttp3.OkHttpClient
 
 /** Manual dependency graph: small, explicit, and fast to start. */
 class AppContainer(private val app: Application) {
+    val appContext: android.content.Context get() = app
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val secrets = KeystoreSecretBox()
     val settings = SettingsStore(app)
@@ -82,6 +83,7 @@ class AppContainer(private val app: Application) {
             }
         }
         scope.launch { conversations.recoverInterrupted() }
+        scope.launch { runCatching { io.dtsoftware.facet.ui.markdown.MathRenderer.warmUpAsync(app) } }
         scope.launch {
             if (settings.local.value.pricingFeed) runCatching { pricing.refreshIfStale(24 * 60 * 60 * 1000L) }
         }

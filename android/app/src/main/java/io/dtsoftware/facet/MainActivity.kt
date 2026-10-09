@@ -16,6 +16,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dtsoftware.facet.ui.FacetRoot
 import io.dtsoftware.facet.ui.LaunchRequest
+import io.dtsoftware.facet.ui.lock.DeviceAuth
 import io.dtsoftware.facet.ui.theme.FacetTheme
 import io.dtsoftware.facet.ui.theme.resolveDark
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +50,16 @@ class MainActivity : ComponentActivity() {
                 FacetRoot(container, launchRequests)
             }
         }
+    }
+
+    @Deprecated("Only used for the Android 8 device-credential fallback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == DeviceAuth.LEGACY_REQUEST) {
+            DeviceAuth.pendingLegacyCallback?.invoke(resultCode == RESULT_OK)
+            DeviceAuth.pendingLegacyCallback = null
+            return
+        }
+        @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
     }
 
     override fun onNewIntent(intent: Intent) {

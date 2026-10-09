@@ -26,6 +26,7 @@ data class LocalPrefs(
     val appLock: Boolean = false,
     val secureScreen: Boolean = false,
     val notifyOnComplete: Boolean = true,
+    val notificationsAsked: Boolean = false,
     val pricingFeed: Boolean = true,
     val onboardingDone: Boolean = false,
     /** Model used for the next new chat when no assistant default applies. */

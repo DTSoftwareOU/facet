@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android" android:ordering="sequentially">
+    <objectAnimator android:propertyName="fillColor" android:valueType="colorType" android:duration="180" android:startOffset="120" android:valueFrom="#FFF2C66D" android:valueTo="#FF49D3C1" />
+    <objectAnimator android:propertyName="fillColor" android:valueType="colorType" android:duration="180" android:valueFrom="#FF49D3C1" android:valueTo="#FF3A5BD9" />
+    <objectAnimator android:propertyName="fillColor" android:valueType="colorType" android:duration="180" android:valueFrom="#FF3A5BD9" android:valueTo="#FF6E9BFF" />
+    <objectAnimator android:propertyName="fillColor" android:valueType="colorType" android:duration="180" android:valueFrom="#FF6E9BFF" android:valueTo="#FFF2C66D" />
+</set>

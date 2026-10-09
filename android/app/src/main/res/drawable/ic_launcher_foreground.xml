@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Facet gem (docs/DESIGN.md), 59% of the visible icon area. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FFF2C66D" android:pathData="M32.84,54L54,32.84L54,45.72L45.72,54Z" />
+    <path android:fillColor="#FF6E9BFF" android:pathData="M54,32.84L75.16,54L62.28,54L54,45.72Z" />
+    <path android:fillColor="#FF3A5BD9" android:pathData="M75.16,54L54,75.16L54,62.28L62.28,54Z" />
+    <path android:fillColor="#FF49D3C1" android:pathData="M54,75.16L32.84,54L45.72,54L54,62.28Z" />
+    <path android:fillColor="#FFF4F7FB" android:pathData="M54,45.72L62.28,54L54,62.28L45.72,54Z" />
+</vector>
