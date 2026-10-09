@@ -63,6 +63,8 @@ beautiful home that syncs across all your devices.
 - Web search for every model: native provider search when available (OpenAI, Anthropic,
   OpenRouter, Perplexity), otherwise Facet's own `web_search` + `fetch_page` tools backed by
   the user's Brave, Tavily, Exa, Jina or SearXNG key. Results are cited.
+- MCP directory: 84 verified remote servers in 12 categories (search, Popular picks), each marked
+  Open, Sign in or Token.
 - MCP: remote Model Context Protocol servers (Streamable HTTP with legacy SSE fallback),
   static-token or OAuth 2.1 sign-in (discovery, dynamic client registration, PKCE, refresh).
   Tool lists are cached so tools are ready in every new chat and after restarts; per-tool
@@ -95,8 +97,10 @@ beautiful home that syncs across all your devices.
   Together, Perplexity, Fireworks, Cerebras, Ollama, LM Studio, Custom (OpenAI-compatible:
   base URL, key, extra headers).
 - Multiple keys per provider with labels ("Personal", "Work").
-- Test connection, refresh models, add model IDs manually, favorite models,
-  per-model capability overrides.
+- Test connection, refresh models, add model IDs manually, favorite models.
+- Per-model settings (synced): rename, hide from pickers (one by one or in bulk), and override
+  capabilities (images, PDFs, tools, web search, temperature, reasoning levels), context window,
+  max output and price. Long-press a model in the picker to edit it.
 - Keys are encrypted at rest with an Android Keystore key and synced end-to-end encrypted.
 - Live pricing table (public OpenRouter model feed, cached daily, can be turned off) plus
   built-in prices for first-party models.

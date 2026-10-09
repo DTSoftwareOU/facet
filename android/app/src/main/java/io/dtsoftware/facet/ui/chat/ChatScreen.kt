@@ -115,6 +115,7 @@ private sealed interface Sheet {
     data class Usage(val item: ThreadItem) : Sheet
     data class Edit(val messageId: String, val text: String) : Sheet
     data class Select(val text: String) : Sheet
+    data class ModelEdit(val providerId: String, val modelId: String) : Sheet
 }
 
 @Composable
@@ -362,6 +363,7 @@ fun ChatScreen(
                 }
             },
             onDismiss = { sheet = null },
+            onCustomize = { pid, mid -> sheet = Sheet.ModelEdit(pid, mid) },
         )
         Sheet.Settings -> ChatSettingsSheet(
             searchAvailable = state.searchAvailable,
@@ -427,6 +429,7 @@ fun ChatScreen(
         is Sheet.Usage -> UsageSheet(s.item) { sheet = null }
         is Sheet.Edit -> EditMessageSheet(s.text, onSave = { vm.edit(s.messageId, it) }, onDismiss = { sheet = null })
         is Sheet.Select -> SelectTextSheet(s.text) { sheet = null }
+        is Sheet.ModelEdit -> io.dtsoftware.facet.ui.settings.ModelEditSheet(container, s.providerId, s.modelId) { sheet = null }
         null -> Unit
     }
     if (renameOpen) {

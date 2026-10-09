@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +45,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dtsoftware.facet.AppContainer
 import io.dtsoftware.facet.R
 import io.dtsoftware.facet.data.db.McpServerEntity
+import io.dtsoftware.facet.domain.tools.McpCategory
+import io.dtsoftware.facet.domain.tools.McpDirectory
+import io.dtsoftware.facet.domain.tools.McpDirectoryEntry
 import io.dtsoftware.facet.domain.tools.McpManager
 import io.dtsoftware.facet.domain.tools.SearchConfig
 import io.dtsoftware.facet.domain.tools.SearchKind
@@ -51,11 +56,13 @@ import io.dtsoftware.facet.domain.tools.ToolApproval
 import io.dtsoftware.facet.mcp.McpAuthMode
 import io.dtsoftware.facet.ui.chat.MenuEntry
 import io.dtsoftware.facet.ui.chat.MenuSheet
+import io.dtsoftware.facet.ui.chat.SearchField
 import io.dtsoftware.facet.ui.chat.Segmented
 import io.dtsoftware.facet.ui.components.ButtonStyle
 import io.dtsoftware.facet.ui.components.ConfirmDialog
 import io.dtsoftware.facet.ui.components.EmptyState
 import io.dtsoftware.facet.ui.components.FacetButton
+import io.dtsoftware.facet.ui.components.FacetChip
 import io.dtsoftware.facet.ui.components.FacetIcon
 import io.dtsoftware.facet.ui.components.FacetSheet
 import io.dtsoftware.facet.ui.components.FacetTextField
@@ -202,17 +209,6 @@ private fun SearchSetupSheet(container: AppContainer, kind: SearchKind, existing
 
 // ---------------- MCP servers ----------------
 
-private data class McpSuggestion(val name: String, val url: String, val auth: McpAuthMode, val blurb: String)
-
-private val MCP_SUGGESTIONS = listOf(
-    McpSuggestion("DeepWiki", "https://mcp.deepwiki.com/mcp", McpAuthMode.NONE, "Ask questions about public GitHub repositories."),
-    McpSuggestion("Context7", "https://mcp.context7.com/mcp", McpAuthMode.NONE, "Up-to-date docs for popular libraries."),
-    McpSuggestion("Hugging Face", "https://huggingface.co/mcp", McpAuthMode.NONE, "Search models, datasets and papers."),
-    McpSuggestion("Notion", "https://mcp.notion.com/mcp", McpAuthMode.OAUTH, "Search and edit your Notion workspace. Sign in required."),
-    McpSuggestion("Linear", "https://mcp.linear.app/mcp", McpAuthMode.OAUTH, "Issues and projects. Sign in required."),
-    McpSuggestion("GitHub", "https://api.githubcopilot.com/mcp/", McpAuthMode.HEADERS, "Repositories, issues and PRs. Needs a personal access token."),
-)
-
 @Composable
 fun McpServersScreen(container: AppContainer, onBack: () -> Unit, onEdit: (String?) -> Unit) {
     val servers by container.mcp.observeAll().collectAsStateWithLifecycle(emptyList())
@@ -249,21 +245,10 @@ fun McpServersScreen(container: AppContainer, onBack: () -> Unit, onEdit: (Strin
                 }
             }
         }
-        val missing = MCP_SUGGESTIONS.filter { sug -> servers.none { it.url.trimEnd('/') == sug.url.trimEnd('/') } }
-        if (missing.isNotEmpty()) {
-            SettingsGroup(title = "Suggestions") {
-                missing.forEachIndexed { i, sug ->
-                    if (i > 0) GroupDivider()
-                    SettingsRow(
-                        sug.name, subtitle = sug.blurb, icon = R.drawable.ic_plus,
-                        onClick = {
-                            scope.launch {
-                                val e = container.mcp.add(sug.name, sug.url, sug.auth, emptyMap())
-                                onEdit(e.id)
-                            }
-                        },
-                    )
-                }
+        McpDirectorySection(servers) { entry ->
+            scope.launch {
+                val e = container.mcp.add(entry.name, entry.url, entry.auth, emptyMap())
+                onEdit(e.id)
             }
         }
         Text(
@@ -272,6 +257,57 @@ fun McpServersScreen(container: AppContainer, onBack: () -> Unit, onEdit: (Strin
             modifier = Modifier.padding(horizontal = 12.dp),
         )
     }
+}
+
+@Composable
+private fun McpDirectorySection(servers: List<io.dtsoftware.facet.data.db.McpServerEntity>, onAdd: (McpDirectoryEntry) -> Unit) {
+    val c = FacetTheme.colors
+    var query by rememberSaveable { mutableStateOf("") }
+    var category by rememberSaveable { mutableStateOf<McpCategory?>(null) }
+    val added = servers.map { it.url.trimEnd('/') }.toSet()
+    val q = query.trim()
+    val list = McpDirectory.entries.filter { it.url.trimEnd('/') !in added }.filter { e ->
+        when {
+            q.isNotEmpty() -> e.name.contains(q, true) || e.blurb.contains(q, true) || e.category.label.contains(q, true)
+            category == null -> e.popular
+            else -> e.category == category
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Add from the directory", style = FacetTheme.type.labelM, color = c.textTertiary, modifier = Modifier.padding(start = 12.dp))
+        SearchField(query, { query = it }, "Search ${McpDirectory.entries.size} servers")
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FacetChip("Popular", category == null && q.isEmpty(), { category = null; query = "" })
+            McpCategory.entries.forEach { cat -> FacetChip(cat.label, category == cat && q.isEmpty(), { category = cat; query = "" }) }
+        }
+        if (list.isEmpty()) {
+            Text(
+                if (q.isNotEmpty()) "No matches. You can add any remote server by its address with Add a server." else "You've added everything here.",
+                style = FacetTheme.type.body, color = c.textTertiary, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        } else {
+            SettingsGroup {
+                list.forEachIndexed { i, e ->
+                    if (i > 0) GroupDivider()
+                    SettingsRow(e.name, subtitle = e.blurb, icon = R.drawable.ic_plus, onClick = { onAdd(e) }, trailing = { AuthTag(e.auth) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AuthTag(auth: McpAuthMode) {
+    val c = FacetTheme.colors
+    val (label, color) = when (auth) {
+        McpAuthMode.NONE -> "Open" to c.primary
+        McpAuthMode.OAUTH -> "Sign in" to c.textSecondary
+        McpAuthMode.HEADERS -> "Token" to c.warning
+    }
+    Text(
+        label, style = FacetTheme.type.labelS, color = color,
+        modifier = Modifier.clip(FacetShapes.chip).background(c.surfaceHigh).padding(horizontal = 8.dp, vertical = 3.dp),
+    )
 }
 
 @Composable

@@ -166,8 +166,10 @@ data class ProviderEntity(
     val favoritesJson: String = "[]",
     /** List<ModelInfo> JSON of manually added models. */
     val customModelsJson: String = "[]",
-    /** Map<modelId, ModelCaps> JSON of user overrides. */
+    /** Map<modelId, ModelCaps> JSON of user overrides (legacy; superseded by [modelPrefsJson]). */
     val capsOverridesJson: String = "{}",
+    /** Map<modelId, ModelPrefs> JSON: the user's name, visibility, capability, limit and price edits. */
+    @ColumnInfo(defaultValue = "{}") val modelPrefsJson: String = "{}",
     val sort: Int = 0,
     val createdAt: Long,
     val updatedAt: Long,

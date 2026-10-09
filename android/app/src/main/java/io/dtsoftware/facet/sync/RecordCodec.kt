@@ -70,7 +70,7 @@ object RecordType {
 @Serializable data class ProviderPayload(
     val kind: String, val label: String, val baseUrl: String, val apiKey: String, val headersJson: String,
     val enabled: Boolean, val favoritesJson: String, val customModelsJson: String, val capsOverridesJson: String,
-    val sort: Int, val createdAt: Long,
+    val sort: Int, val createdAt: Long, val modelPrefsJson: String = "{}",
 )
 
 @Serializable data class McpPayload(
@@ -172,6 +172,7 @@ class RecordCodec(private val vaultKey: ByteArray, private val secrets: SecretBo
         val key = if (e.apiKeySealed.isBlank()) "" else runCatching { secrets.openString(e.apiKeySealed) }.getOrDefault("")
         ProviderPayload(
             e.kind, e.label, e.baseUrl, key, e.headersJson, e.enabled, e.favoritesJson, e.customModelsJson, e.capsOverridesJson, e.sort, e.createdAt,
+            e.modelPrefsJson,
         )
     }
 
@@ -245,7 +246,7 @@ class RecordCodec(private val vaultKey: ByteArray, private val secrets: SecretBo
             headersJson = p.headersJson, enabled = p.enabled,
             modelsJson = existing?.modelsJson ?: "[]", modelsFetchedAt = existing?.modelsFetchedAt ?: 0,
             favoritesJson = p.favoritesJson, customModelsJson = p.customModelsJson, capsOverridesJson = p.capsOverridesJson,
-            sort = p.sort, createdAt = p.createdAt, updatedAt = r.updatedAt, deleted = false, dirty = false,
+            modelPrefsJson = p.modelPrefsJson, sort = p.sort, createdAt = p.createdAt, updatedAt = r.updatedAt, deleted = false, dirty = false,
         )
     }
 

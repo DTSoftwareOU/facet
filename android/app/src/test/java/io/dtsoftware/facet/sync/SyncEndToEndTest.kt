@@ -15,6 +15,7 @@ import io.dtsoftware.facet.data.db.MessageEntity
 import io.dtsoftware.facet.data.prefs.SettingsStore
 import io.dtsoftware.facet.data.repo.AttachmentStore
 import io.dtsoftware.facet.data.repo.ConversationRepository
+import io.dtsoftware.facet.data.repo.ModelPrefs
 import io.dtsoftware.facet.data.repo.ProviderRepository
 import io.dtsoftware.facet.llm.GenParams
 import io.dtsoftware.facet.llm.InMemoryQuirkStore
@@ -99,6 +100,8 @@ class SyncEndToEndTest {
         val recoveryCode = a.auth.register(email, password, "Ada Lovelace")
         assertTrue(a.auth.isSignedIn)
         val provider = a.providers.add(ProviderKind.ANTHROPIC, "Personal", "", "sk-ant-test-key-123", emptyMap())
+        val opusPrefs = ModelPrefs(name = "Opus (work)", hidden = true, maxOutput = 64_000)
+        a.providers.setModelPrefs(provider.id, "claude-opus-5-5", opusPrefs)
         val conv = a.conversations.create(null, provider.id, "claude-opus-5-5", GenParams(webSearch = true))
         a.conversations.rename(conv.id, "Trip to Lisbon 🇵🇹")
         val now = Clock.now()
@@ -157,6 +160,7 @@ class SyncEndToEndTest {
         assertEquals("Thinking about trams", bMsgs.first { it.role == "assistant" }.thinking)
         val bProvider = b.providers.get(provider.id)!!
         assertEquals("sk-ant-test-key-123", b.providers.apiKey(bProvider))
+        assertEquals(opusPrefs, b.providers.modelPrefs(bProvider)["claude-opus-5-5"])
         assertEquals("I like trains", b.settings.synced.value.aboutMe)
         assertEquals("Ada Lovelace", b.settings.synced.value.profileName)
         val bServer = b.mcp.all().single()

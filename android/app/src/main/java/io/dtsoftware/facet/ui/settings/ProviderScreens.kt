@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
@@ -41,6 +44,7 @@ import io.dtsoftware.facet.llm.ApiStyle
 import io.dtsoftware.facet.llm.ModelCatalog
 import io.dtsoftware.facet.llm.ModelInfo
 import io.dtsoftware.facet.llm.ProviderKind
+import io.dtsoftware.facet.ui.chat.MenuItem
 import io.dtsoftware.facet.ui.chat.SearchField
 import io.dtsoftware.facet.ui.components.ButtonStyle
 import io.dtsoftware.facet.ui.components.ConfirmDialog
@@ -314,16 +318,53 @@ private fun ModelsSection(container: AppContainer, p: ProviderEntity, onAdd: () 
     var refreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var showAll by remember { mutableStateOf(false) }
-    val models = remember(p.modelsJson, p.customModelsJson, p.capsOverridesJson) { container.providers.models(p) }
+    var menu by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<String?>(null) }
+    val models = remember(p.modelsJson, p.customModelsJson, p.capsOverridesJson, p.modelPrefsJson) { container.providers.models(p) }
     val favorites = remember(p.favoritesJson) { container.providers.favorites(p) }
+    val prefs = remember(p.modelPrefsJson) { container.providers.modelPrefs(p) }
+    val hidden = prefs.filterValues { it.hidden }.keys
     val filtered = models.filter { query.isBlank() || it.displayName.contains(query, true) || it.id.contains(query, true) }
     val shown = if (showAll || query.isNotBlank()) filtered else filtered.take(12)
 
+    fun setHidden(ids: Collection<String>, value: Boolean) {
+        menu = false
+        scope.launch { container.providers.setHidden(p.id, ids, value) }
+    }
+
     Column {
-        Row(Modifier.padding(start = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Models", style = FacetTheme.type.labelM, color = c.textTertiary, modifier = Modifier.weight(1f))
+        Row(Modifier.padding(start = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Models" + if (hidden.isNotEmpty()) " · ${hidden.size} hidden" else "",
+                style = FacetTheme.type.labelM, color = c.textTertiary, modifier = Modifier.weight(1f),
+            )
             if (p.modelsFetchedAt > 0) Text("Updated " + Dates.relative(p.modelsFetchedAt).replaceFirstChar { it.lowercase() }, style = FacetTheme.type.labelS, color = c.textTertiary)
+            if (models.isNotEmpty()) {
+                Box {
+                    FacetIconButton(R.drawable.ic_more_horiz, "Show or hide models", { menu = true }, tint = c.textTertiary, size = 18.dp)
+                    DropdownMenu(menu, { menu = false }, containerColor = c.surface, shape = RoundedCornerShape(16.dp)) {
+                        val ids = filtered.map { it.id }
+                        val what = if (query.isBlank()) "all" else "${ids.size} matching"
+                        MenuItem(R.drawable.ic_eye, "Show $what") { setHidden(ids, false) }
+                        MenuItem(R.drawable.ic_eye_off, "Hide $what") { setHidden(ids, true) }
+                        if (query.isBlank() && favorites.isNotEmpty()) {
+                            MenuItem(R.drawable.ic_star, "Show only favorites") {
+                                menu = false
+                                scope.launch {
+                                    container.providers.setHidden(p.id, models.map { it.id }.filter { it !in favorites }, true)
+                                    container.providers.setHidden(p.id, favorites, false)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
+        Text(
+            "Tap a model to rename it, change what it can do, or set its price.",
+            style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+        )
         Column(Modifier.fillMaxWidth().clip(FacetShapes.group).background(c.surface).padding(vertical = 8.dp)) {
             Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FacetButton(
@@ -345,14 +386,30 @@ private fun ModelsSection(container: AppContainer, p: ProviderEntity, onAdd: () 
                 Text("No models yet. Refresh, or add a model ID.", style = FacetTheme.type.body, color = c.textTertiary, modifier = Modifier.padding(16.dp))
             }
             shown.forEach { m ->
+                val isHidden = m.id in hidden
+                val edited = prefs[m.id]?.customized == true
                 Row(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { editing = m.id }
+                        .padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 2.dp)
+                        .alpha(if (isHidden) 0.5f else 1f),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(m.displayName, style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(m.id, style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            listOfNotNull(if (isHidden) "Hidden" else null, if (edited) "Edited" else null, m.id).joinToString(" · "),
+                            style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
                     }
+                    FacetIconButton(
+                        if (isHidden) R.drawable.ic_eye_off else R.drawable.ic_eye,
+                        if (isHidden) "Show ${m.displayName}" else "Hide ${m.displayName}",
+                        { setHidden(listOf(m.id), !isHidden) },
+                        tint = c.textTertiary, size = 18.dp,
+                    )
                     FacetIconButton(
                         R.drawable.ic_star, if (m.id in favorites) "Unfavorite" else "Favorite",
                         { scope.launch { container.providers.toggleFavorite(p.id, m.id) } },
@@ -368,4 +425,5 @@ private fun ModelsSection(container: AppContainer, p: ProviderEntity, onAdd: () 
             }
         }
     }
+    editing?.let { id -> ModelEditSheet(container, p.id, id) { editing = null } }
 }

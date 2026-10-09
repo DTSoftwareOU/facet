@@ -10,6 +10,7 @@ import io.dtsoftware.facet.llm.LlmClient
 import io.dtsoftware.facet.llm.LlmClients
 import io.dtsoftware.facet.llm.ModelCaps
 import io.dtsoftware.facet.llm.ModelInfo
+import io.dtsoftware.facet.llm.ModelPricing
 import io.dtsoftware.facet.llm.PricingCatalog
 import io.dtsoftware.facet.llm.ProviderConfig
 import io.dtsoftware.facet.llm.ProviderKind
@@ -17,6 +18,7 @@ import io.dtsoftware.facet.llm.QuirkStore
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
 import okhttp3.OkHttpClient
 
 /** A configured provider with its parsed model list, for pickers. */
@@ -25,7 +27,33 @@ data class ProviderModels(
     val kind: ProviderKind,
     val models: List<ModelInfo>,
     val favorites: Set<String>,
+    /** Models the user hid from pickers (still usable by chats that already use them). */
+    val hidden: Set<String> = emptySet(),
 )
+
+/** The user's edits to one model, synced end-to-end encrypted with its provider. Null keeps the provider's value. */
+@Serializable
+data class ModelPrefs(
+    val name: String? = null,
+    val hidden: Boolean = false,
+    val caps: ModelCaps? = null,
+    val contextWindow: Int? = null,
+    val maxOutput: Int? = null,
+    val pricing: ModelPricing? = null,
+) {
+    val isEmpty: Boolean get() = this == ModelPrefs()
+
+    /** True when anything other than visibility is changed. */
+    val customized: Boolean get() = copy(hidden = false) != ModelPrefs()
+
+    fun applyTo(m: ModelInfo): ModelInfo = m.copy(
+        displayName = name?.takeIf { it.isNotBlank() } ?: m.displayName,
+        caps = caps ?: m.caps,
+        contextWindow = contextWindow ?: m.contextWindow,
+        maxOutput = maxOutput ?: m.maxOutput,
+        pricing = pricing ?: m.pricing,
+    )
+}
 
 class ProviderRepository(
     private val db: FacetDatabase,
@@ -43,7 +71,7 @@ class ProviderRepository(
 
     fun observeCatalog(): Flow<List<ProviderModels>> = dao.observeAll().map { list ->
         list.filter { it.enabled && !io.dtsoftware.facet.domain.tools.SearchKind.isSearch(it.kind) }.map { p ->
-            ProviderModels(p, ProviderKind.fromId(p.kind), models(p), favorites(p))
+            ProviderModels(p, ProviderKind.fromId(p.kind), models(p), favorites(p), hiddenModels(p))
         }
     }
 
@@ -165,23 +193,37 @@ class ProviderRepository(
     fun favorites(p: ProviderEntity): Set<String> =
         runCatching { AppJson.decodeFromString<List<String>>(p.favoritesJson).toSet() }.getOrDefault(emptySet())
 
-    /** Fetched + manually added models, with capability overrides and known pricing applied. */
-    fun models(p: ProviderEntity): List<ModelInfo> {
-        val key = "${p.modelsFetchedAt}|${p.customModelsJson.hashCode()}|${p.capsOverridesJson.hashCode()}|${p.modelsJson.length}"
-        modelCache[p.id]?.let { (k, v) -> if (k == key) return v }
+    /** Fetched + manually added models as the provider describes them, with known pricing filled in. */
+    fun baseModels(p: ProviderEntity): List<ModelInfo> {
         val kind = ProviderKind.fromId(p.kind)
         val fetched = runCatching { AppJson.decodeFromString<List<ModelInfo>>(p.modelsJson) }.getOrDefault(emptyList())
-        val custom = runCatching { AppJson.decodeFromString<List<ModelInfo>>(p.customModelsJson) }.getOrDefault(emptyList())
-        val overrides = runCatching { AppJson.decodeFromString<Map<String, ModelCaps>>(p.capsOverridesJson) }.getOrDefault(emptyMap())
-        val merged = (custom + fetched.filter { f -> custom.none { it.id == f.id } }).map { m ->
-            m.copy(
-                caps = overrides[m.id] ?: m.caps,
-                pricing = m.pricing ?: pricing.priceFor(kind, m.id),
-            )
+        val custom = customModels(p)
+        return (custom + fetched.filter { f -> custom.none { it.id == f.id } }).map { m ->
+            m.copy(pricing = m.pricing ?: pricing.priceFor(kind, m.id))
+        }
+    }
+
+    /** [baseModels] with the user's edits applied: what pickers, chats and cost estimates use. */
+    fun models(p: ProviderEntity): List<ModelInfo> {
+        val key = "${p.modelsFetchedAt}|${p.customModelsJson.hashCode()}|${p.capsOverridesJson.hashCode()}|${p.modelPrefsJson.hashCode()}|${p.modelsJson.length}"
+        modelCache[p.id]?.let { (k, v) -> if (k == key) return v }
+        val legacyCaps = runCatching { AppJson.decodeFromString<Map<String, ModelCaps>>(p.capsOverridesJson) }.getOrDefault(emptyMap())
+        val prefs = modelPrefs(p)
+        val merged = baseModels(p).map { m ->
+            val withLegacy = legacyCaps[m.id]?.let { m.copy(caps = it) } ?: m
+            prefs[m.id]?.applyTo(withLegacy) ?: withLegacy
         }
         modelCache[p.id] = key to merged
         return merged
     }
+
+    fun customModels(p: ProviderEntity): List<ModelInfo> =
+        runCatching { AppJson.decodeFromString<List<ModelInfo>>(p.customModelsJson) }.getOrDefault(emptyList())
+
+    fun modelPrefs(p: ProviderEntity): Map<String, ModelPrefs> =
+        runCatching { AppJson.decodeFromString<Map<String, ModelPrefs>>(p.modelPrefsJson) }.getOrDefault(emptyMap())
+
+    fun hiddenModels(p: ProviderEntity): Set<String> = modelPrefs(p).filterValues { it.hidden }.keys
 
     fun modelInfo(p: ProviderEntity, modelId: String): ModelInfo =
         models(p).firstOrNull { it.id == modelId } ?: ModelInfo(id = modelId, displayName = modelId)
@@ -197,15 +239,32 @@ class ProviderRepository(
         p.copy(customModelsJson = AppJson.encodeToString(list.filterNot { it.id == model.id } + model))
     }
 
+    /** Removes a manually added model along with its edits and favorite. */
     suspend fun removeCustomModel(id: String, modelId: String) = mutate(id) { p ->
-        val list = runCatching { AppJson.decodeFromString<List<ModelInfo>>(p.customModelsJson) }.getOrDefault(emptyList())
-        p.copy(customModelsJson = AppJson.encodeToString(list.filterNot { it.id == modelId }))
+        p.copy(
+            customModelsJson = AppJson.encodeToString(customModels(p).filterNot { it.id == modelId }),
+            modelPrefsJson = AppJson.encodeToString(modelPrefs(p) - modelId),
+            favoritesJson = AppJson.encodeToString((favorites(p) - modelId).toList()),
+        )
     }
 
-    suspend fun setCapsOverride(id: String, modelId: String, caps: ModelCaps?) = mutate(id) { p ->
-        val map = runCatching { AppJson.decodeFromString<Map<String, ModelCaps>>(p.capsOverridesJson) }.getOrDefault(emptyMap()).toMutableMap()
-        if (caps == null) map.remove(modelId) else map[modelId] = caps
-        p.copy(capsOverridesJson = AppJson.encodeToString(map.toMap()))
+    /** Saves the user's edits to one model; an empty [prefs] restores the provider's values. */
+    suspend fun setModelPrefs(id: String, modelId: String, prefs: ModelPrefs) = mutate(id) { p ->
+        val map = modelPrefs(p).toMutableMap()
+        if (prefs.isEmpty) map.remove(modelId) else map[modelId] = prefs
+        // Edits replace the older caps-only override for this model.
+        val legacy = runCatching { AppJson.decodeFromString<Map<String, ModelCaps>>(p.capsOverridesJson) }.getOrDefault(emptyMap())
+        p.copy(modelPrefsJson = AppJson.encodeToString(map.toMap()), capsOverridesJson = AppJson.encodeToString(legacy - modelId))
+    }
+
+    /** Hides or shows models in pickers. */
+    suspend fun setHidden(id: String, modelIds: Collection<String>, hidden: Boolean) = mutate(id) { p ->
+        val map = modelPrefs(p).toMutableMap()
+        modelIds.forEach { mid ->
+            val next = (map[mid] ?: ModelPrefs()).copy(hidden = hidden)
+            if (next.isEmpty) map.remove(mid) else map[mid] = next
+        }
+        p.copy(modelPrefsJson = AppJson.encodeToString(map.toMap()))
     }
 
     private suspend fun mutate(id: String, transform: (ProviderEntity) -> ProviderEntity) {

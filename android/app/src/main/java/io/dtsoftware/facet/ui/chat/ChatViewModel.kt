@@ -155,7 +155,8 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
             ?: valid(synced)
             ?: valid(if (local.lastProviderId != null && local.lastModelId != null) ModelRef(local.lastProviderId, local.lastModelId) else null)
             ?: catalog.firstNotNullOfOrNull { pm ->
-                val fav = pm.models.firstOrNull { it.id in pm.favorites } ?: pm.models.firstOrNull()
+                val visible = pm.models.filter { it.id !in pm.hidden }
+                val fav = visible.firstOrNull { it.id in pm.favorites } ?: visible.firstOrNull()
                 fav?.let { ModelRef(pm.provider.id, it.id) }
             }
     }

@@ -72,7 +72,11 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
-            all { it.systemProperty("robolectric.pixelCopyRenderMode", "hardware") }
+            all {
+                it.systemProperty("robolectric.pixelCopyRenderMode", "hardware")
+                // Robolectric screenshot tests of long screens need more than the 512 MB default.
+                it.maxHeapSize = "2g"
+            }
         }
     }
 

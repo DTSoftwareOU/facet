@@ -279,5 +279,36 @@ class AppScreenshotTest {
         val (c, _) = container(seed = false)
         shoot("provider_edit_dark", ThemeMode.DARK) { ProviderEditScreen(c, null, "anthropic") {} }
     }
+
+    private fun editedModels(c: AppContainer) = runBlocking {
+        c.providers.setModelPrefs("p-anthropic", "claude-haiku-5-5", io.dtsoftware.facet.data.repo.ModelPrefs(hidden = true))
+        c.providers.setModelPrefs("p-anthropic", "claude-sonnet-5-5", io.dtsoftware.facet.data.repo.ModelPrefs(name = "Sonnet for work", maxOutput = 32_000))
+    }
+
+    /** A tall screen, so the model list below the provider form is in frame. */
+    @Test
+    @Config(qualifiers = "w412dp-h1500dp-xxhdpi")
+    fun providerModelsDark() {
+        val (c, _) = container()
+        editedModels(c)
+        shoot("provider_models_dark", ThemeMode.DARK) { ProviderEditScreen(c, "p-anthropic", null) {} }
+    }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1500dp-xxhdpi")
+    fun mcpDirectoryDark() {
+        val (c, _) = container(seed = false)
+        shoot("mcp_directory_dark", ThemeMode.DARK) { io.dtsoftware.facet.ui.settings.McpServersScreen(c, {}, {}) }
+    }
+
+    @Test
+    fun modelEditDark() {
+        val (c, _) = container()
+        editedModels(c)
+        val p = runBlocking { c.providers.get("p-anthropic")!! }
+        shoot("model_edit_dark", ThemeMode.DARK) {
+            Box(Modifier.background(FacetTheme.colors.surface)) { io.dtsoftware.facet.ui.settings.ModelEditForm(c, p, "claude-sonnet-5-5") {} }
+        }
+    }
 }
 

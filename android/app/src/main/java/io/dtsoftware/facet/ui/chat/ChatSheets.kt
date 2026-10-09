@@ -3,6 +3,7 @@ package io.dtsoftware.facet.ui.chat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
@@ -75,8 +77,11 @@ fun ModelPickerSheet(
     onManageProviders: () -> Unit,
     onRefresh: (String) -> Unit,
     onDismiss: () -> Unit,
+    /** Long-press on a model opens its settings (provider id, model id). */
+    onCustomize: ((String, String) -> Unit)? = null,
 ) {
     var query by remember { mutableStateOf("") }
+    var revealed by remember { mutableStateOf(emptySet<String>()) }
     val c = FacetTheme.colors
     FacetSheet(onDismiss) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f).imePadding()) {
@@ -97,18 +102,22 @@ fun ModelPickerSheet(
             }
             val q = query.trim().lowercase()
             LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)) {
-                val favorites = catalog.flatMap { pm -> pm.models.filter { it.id in pm.favorites }.map { pm to it } }
+                val favorites = catalog.flatMap { pm -> pm.models.filter { it.id in pm.favorites && it.id !in pm.hidden }.map { pm to it } }
                     .filter { (_, m) -> q.isEmpty() || m.displayName.lowercase().contains(q) || m.id.lowercase().contains(q) }
                 if (favorites.isNotEmpty()) {
                     item(key = "fav-header") { SectionLabel("Favorites", Modifier.padding(start = 20.dp, top = 12.dp)) }
                     items(favorites, key = { (pm, m) -> "fav/${pm.provider.id}/${m.id}" }) { (pm, m) ->
-                        ModelRow(pm, m, selected, true, showProvider = true, onSelect = { onSelect(ModelRef(pm.provider.id, m.id)) }) {
-                            onToggleFavorite(pm.provider.id, m.id)
-                        }
+                        ModelRow(
+                            pm, m, selected, true, showProvider = true, onSelect = { onSelect(ModelRef(pm.provider.id, m.id)) },
+                            onLongClick = onCustomize?.let { f -> { f(pm.provider.id, m.id) } },
+                        ) { onToggleFavorite(pm.provider.id, m.id) }
                     }
                 }
                 catalog.forEach { pm ->
-                    val models = pm.models.filter { q.isEmpty() || it.displayName.lowercase().contains(q) || it.id.lowercase().contains(q) }
+                    val matching = pm.models.filter { q.isEmpty() || it.displayName.lowercase().contains(q) || it.id.lowercase().contains(q) }
+                    val hiddenMatches = matching.filter { it.id in pm.hidden }
+                    val showHidden = pm.provider.id in revealed
+                    val models = if (showHidden) matching else matching.filter { it.id !in pm.hidden }
                     item(key = "hdr/${pm.provider.id}") {
                         Row(
                             Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 4.dp),
@@ -120,7 +129,7 @@ fun ModelPickerSheet(
                             FacetIconButton(R.drawable.ic_sync, "Refresh models", { onRefresh(pm.provider.id) }, tint = c.textTertiary, size = 16.dp)
                         }
                     }
-                    if (models.isEmpty()) {
+                    if (models.isEmpty() && hiddenMatches.isEmpty()) {
                         item(key = "empty/${pm.provider.id}") {
                             Text(
                                 if (q.isEmpty()) "No models loaded. Tap refresh, or add a model ID in Providers." else "No matches.",
@@ -131,8 +140,23 @@ fun ModelPickerSheet(
                         }
                     }
                     items(models, key = { "${pm.provider.id}/${it.id}" }) { m ->
-                        ModelRow(pm, m, selected, m.id in pm.favorites, showProvider = false, onSelect = { onSelect(ModelRef(pm.provider.id, m.id)) }) {
-                            onToggleFavorite(pm.provider.id, m.id)
+                        ModelRow(
+                            pm, m, selected, m.id in pm.favorites, showProvider = false, onSelect = { onSelect(ModelRef(pm.provider.id, m.id)) },
+                            dimmed = m.id in pm.hidden,
+                            onLongClick = onCustomize?.let { f -> { f(pm.provider.id, m.id) } },
+                        ) { onToggleFavorite(pm.provider.id, m.id) }
+                    }
+                    if (hiddenMatches.isNotEmpty()) {
+                        item(key = "hidden/${pm.provider.id}") {
+                            Text(
+                                if (showHidden) "Hide ${hiddenMatches.size} hidden" else "${hiddenMatches.size} hidden · Show",
+                                style = FacetTheme.type.labelM, color = c.textTertiary,
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { revealed = if (showHidden) revealed - pm.provider.id else revealed + pm.provider.id }
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                            )
                         }
                     }
                 }
@@ -149,6 +173,8 @@ private fun ModelRow(
     favorite: Boolean,
     showProvider: Boolean,
     onSelect: () -> Unit,
+    dimmed: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
     onFavorite: () -> Unit,
 ) {
     val c = FacetTheme.colors
@@ -159,7 +185,8 @@ private fun ModelRow(
             .padding(horizontal = 8.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(if (isSelected) c.primaryContainer else androidx.compose.ui.graphics.Color.Transparent)
-            .clickable(onClick = onSelect)
+            .combinedClickable(onClick = onSelect, onLongClick = onLongClick, onLongClickLabel = if (onLongClick != null) "Edit model" else null)
+            .alpha(if (dimmed) 0.5f else 1f)
             .padding(start = 12.dp, end = 2.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
