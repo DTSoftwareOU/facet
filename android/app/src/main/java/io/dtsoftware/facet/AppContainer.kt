@@ -68,7 +68,8 @@ class AppContainer(private val app: Application) {
     val webSearch = WebSearch(http)
     val skills = SkillRepository(db, http, onLocalChange)
     val mcp = McpManager(app, db, secrets, http, scope, onLocalChange)
-    val tools = ToolRegistry(webSearch, providers, mcp, skills, settings)
+    val media = io.dtsoftware.facet.domain.media.MediaService(providers, settings, attachments, http, app.cacheDir)
+    val tools = ToolRegistry(webSearch, providers, mcp, skills, settings, media)
     val chat = ChatEngine(
         scope, conversations, providers, assistants, attachments, settings, pricing, sync, tools,
         mcpAutoApprove = { serverId, tool -> mcp.setAutoApprove(serverId, tool, true) },

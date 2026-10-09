@@ -9,7 +9,8 @@ import kotlinx.serialization.Serializable
  */
 
 /** Wire protocol a provider speaks. */
-enum class ApiStyle { ANTHROPIC, OPENAI_RESPONSES, OPENAI_CHAT }
+/** MEDIA providers make images, video, speech, music or transcripts, but no chat. */
+enum class ApiStyle { ANTHROPIC, OPENAI_RESPONSES, OPENAI_CHAT, MEDIA }
 
 /** A configured provider instance (one API key). Secrets are decrypted only in memory. */
 data class ProviderConfig(
@@ -89,6 +90,17 @@ data class ModelPricing(
     val cacheWrite: Double? = null,
 )
 
+/** What a model produces. Chat pickers list TEXT models; the others are media models chosen in Settings. */
+@Serializable
+enum class ModelOutput(val label: String, val noun: String) {
+    TEXT("Chat", "chat"),
+    IMAGE("Images", "image"),
+    VIDEO("Video", "video"),
+    SPEECH("Speech", "speech"),
+    MUSIC("Music & sound", "music"),
+    TRANSCRIPTION("Transcription", "transcription"),
+}
+
 @Serializable
 data class ModelInfo(
     val id: String,
@@ -98,6 +110,7 @@ data class ModelInfo(
     val caps: ModelCaps = ModelCaps(),
     val pricing: ModelPricing? = null,
     val createdAt: Long? = null,
+    val output: ModelOutput = ModelOutput.TEXT,
 )
 
 /** Per-conversation generation settings. Null = provider default. */

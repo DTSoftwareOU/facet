@@ -10,6 +10,7 @@ import io.dtsoftware.facet.llm.LlmClient
 import io.dtsoftware.facet.llm.LlmClients
 import io.dtsoftware.facet.llm.ModelCaps
 import io.dtsoftware.facet.llm.ModelInfo
+import io.dtsoftware.facet.llm.ModelOutput
 import io.dtsoftware.facet.llm.ModelPricing
 import io.dtsoftware.facet.llm.PricingCatalog
 import io.dtsoftware.facet.llm.ProviderConfig
@@ -29,6 +30,8 @@ data class ProviderModels(
     val favorites: Set<String>,
     /** Models the user hid from pickers (still usable by chats that already use them). */
     val hidden: Set<String> = emptySet(),
+    /** Image, video, speech, music and transcription models ([models] holds the chat models). */
+    val media: List<ModelInfo> = emptyList(),
 )
 
 /** The user's edits to one model, synced end-to-end encrypted with its provider. Null keeps the provider's value. */
@@ -40,6 +43,8 @@ data class ModelPrefs(
     val contextWindow: Int? = null,
     val maxOutput: Int? = null,
     val pricing: ModelPricing? = null,
+    /** Corrects what the model makes when the automatic sorting got it wrong. */
+    val output: ModelOutput? = null,
 ) {
     val isEmpty: Boolean get() = this == ModelPrefs()
 
@@ -52,6 +57,7 @@ data class ModelPrefs(
         contextWindow = contextWindow ?: m.contextWindow,
         maxOutput = maxOutput ?: m.maxOutput,
         pricing = pricing ?: m.pricing,
+        output = output ?: m.output,
     )
 }
 
@@ -70,8 +76,13 @@ class ProviderRepository(
     fun observeAll(): Flow<List<ProviderEntity>> = dao.observeAll()
 
     fun observeCatalog(): Flow<List<ProviderModels>> = dao.observeAll().map { list ->
-        list.filter { it.enabled && !io.dtsoftware.facet.domain.tools.SearchKind.isSearch(it.kind) }.map { p ->
-            ProviderModels(p, ProviderKind.fromId(p.kind), models(p), favorites(p), hiddenModels(p))
+        // Chat pickers: providers with chat models (media-only providers are chosen in Settings → Media models).
+        list.filter { it.enabled && !io.dtsoftware.facet.domain.tools.SearchKind.isSearch(it.kind) && ProviderKind.fromId(it.kind).style != io.dtsoftware.facet.llm.ApiStyle.MEDIA }.map { p ->
+            val all = models(p)
+            ProviderModels(
+                p, ProviderKind.fromId(p.kind), all.filter { it.output == ModelOutput.TEXT }, favorites(p), hiddenModels(p),
+                media = all.filter { it.output != ModelOutput.TEXT },
+            )
         }
     }
 

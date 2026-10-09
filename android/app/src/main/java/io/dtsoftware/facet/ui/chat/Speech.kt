@@ -9,14 +9,25 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import java.io.File
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
-/** Read-aloud with the system text-to-speech engine. */
+/** Read-aloud with the speech model chosen in Settings, or the system text-to-speech engine. */
 @Stable
-class Speaker(context: Context) {
+class Speaker(context: Context, private val scope: CoroutineScope) {
     var speakingId by mutableStateOf<String?>(null)
         private set
+
+    /** Makes an audio file of the text with the chosen speech model; null means "use the phone's voice". */
+    var aiVoice: (suspend (String) -> File?)? = null
+    var onError: (String) -> Unit = {}
+    private var aiJob: Job? = null
     private var ready = false
     private var pending: Pair<String, String>? = null
     private val tts: TextToSpeech = TextToSpeech(context.applicationContext) { status ->
@@ -39,6 +50,30 @@ class Speaker(context: Context) {
     }
 
     private fun speak(id: String, markdown: String) {
+        val ai = aiVoice
+        if (ai != null) {
+            stop()
+            speakingId = id
+            aiJob = scope.launch {
+                val file = try {
+                    ai(plain(markdown))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    onError(e.message ?: "Couldn't create the voice.")
+                    if (speakingId == id) speakingId = null
+                    return@launch
+                }
+                if (speakingId != id) return@launch
+                if (file != null) AudioPlayback.play(PLAYBACK_PREFIX + id, file) { if (speakingId == id) speakingId = null }
+                else systemSpeak(id, markdown)
+            }
+            return
+        }
+        systemSpeak(id, markdown)
+    }
+
+    private fun systemSpeak(id: String, markdown: String) {
         if (!ready) {
             pending = id to markdown
             return
@@ -52,13 +87,18 @@ class Speaker(context: Context) {
     }
 
     fun stop() {
+        aiJob?.cancel()
+        aiJob = null
         tts.stop()
+        if (AudioPlayback.currentId?.startsWith(PLAYBACK_PREFIX) == true) AudioPlayback.stop()
         speakingId = null
     }
 
     fun shutdown() = tts.shutdown()
 
     companion object {
+        private const val PLAYBACK_PREFIX = "speak:"
+
         /** Markdown → speakable text: drops code blocks and syntax characters. */
         fun plain(md: String): String = md
             .replace(Regex("```[\\s\\S]*?(```|$)"), " Code omitted. ")
@@ -77,7 +117,8 @@ class Speaker(context: Context) {
 @Composable
 fun rememberSpeaker(): Speaker {
     val context = LocalContext.current
-    val speaker = remember { Speaker(context) }
+    val scope = rememberCoroutineScope()
+    val speaker = remember { Speaker(context, scope) }
     DisposableEffect(Unit) { onDispose { speaker.shutdown() } }
     return speaker
 }

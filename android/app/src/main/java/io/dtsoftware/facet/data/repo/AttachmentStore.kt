@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.ExifInterface
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.LruCache
@@ -179,6 +180,7 @@ class AttachmentStore(
         thumbs.get(key)?.let { return@withContext it }
         val a = dao.get(id) ?: return@withContext null
         val f = file(a) ?: return@withContext null
+        if (a.kind == "video") return@withContext videoFrame(f, maxPx)?.also { thumbs.put(key, it) }
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(f.path, bounds)
         var sample = 1
@@ -187,9 +189,87 @@ class AttachmentStore(
         bmp.asImageBitmap().also { thumbs.put(key, it) }
     }
 
+    private fun videoFrame(f: File, maxPx: Int): ImageBitmap? = runCatching {
+        val r = MediaMetadataRetriever()
+        try {
+            r.setDataSource(f.path)
+            val frame = r.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) ?: return null
+            val scale = minOf(1f, maxPx.toFloat() / maxOf(frame.width, frame.height))
+            val sized = if (scale < 1f) Bitmap.createScaledBitmap(frame, (frame.width * scale).toInt(), (frame.height * scale).toInt(), true) else frame
+            if (sized !== frame) frame.recycle()
+            sized.asImageBitmap()
+        } finally {
+            r.release()
+        }
+    }.getOrNull()
+
+    /** Length of an audio or video attachment in milliseconds, if it can be read. */
+    suspend fun durationMs(id: String): Long? = withContext(Dispatchers.IO) {
+        val f = dao.get(id)?.let { file(it) } ?: return@withContext null
+        runCatching {
+            val r = MediaMetadataRetriever()
+            try {
+                r.setDataSource(f.path)
+                r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+            } finally {
+                r.release()
+            }
+        }.getOrNull()
+    }
+
+    /**
+     * Saves a generated image, video or audio file as a conversation attachment, queued for
+     * end-to-end encrypted sync like any other attachment.
+     */
+    suspend fun storeGenerated(bytes: ByteArray, mimeType: String, name: String, conversationId: String): AttachmentEntity = withContext(Dispatchers.IO) {
+        val kind = when {
+            mimeType.startsWith("image/") -> "image"
+            mimeType.startsWith("video/") -> "video"
+            mimeType.startsWith("audio/") -> "audio"
+            else -> "file"
+        }
+        val id = Ids.new()
+        val fileName = "$id.${io.dtsoftware.facet.llm.media.MediaGen.extensionFor(mimeType)}"
+        File(dir, fileName).writeBytes(bytes)
+        var w: Int? = null
+        var h: Int? = null
+        // Dimensions are best effort: an unreadable header only costs the layout hint.
+        if (kind == "image") {
+            runCatching {
+                val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, o)
+                if (o.outWidth > 0) { w = o.outWidth; h = o.outHeight }
+            }
+        } else if (kind == "video") {
+            runCatching {
+                val r = MediaMetadataRetriever()
+                try {
+                    r.setDataSource(File(dir, fileName).path)
+                    w = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
+                    h = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()
+                } finally {
+                    r.release()
+                }
+            }
+        }
+        val now = Clock.now()
+        val entity = AttachmentEntity(
+            id = id, conversationId = conversationId, kind = kind, mimeType = mimeType, name = name,
+            sizeBytes = bytes.size.toLong(), width = w, height = h, localFile = fileName,
+            createdAt = now, updatedAt = now, dirty = true,
+        )
+        dao.upsert(entity)
+        onLocalChange()
+        entity
+    }
+
     /** Stores bytes downloaded from the sync server for an attachment record. */
     suspend fun storeDownloaded(a: AttachmentEntity, bytes: ByteArray) = withContext(Dispatchers.IO) {
-        val ext = when (a.kind) { "image" -> if (a.mimeType == "image/png") "png" else "jpg"; "pdf" -> "pdf"; else -> "txt" }
+        val ext = when (a.kind) {
+            "pdf" -> "pdf"
+            "text", "file" -> "txt"
+            else -> io.dtsoftware.facet.llm.media.MediaGen.extensionFor(a.mimeType).takeIf { it != "bin" } ?: if (a.kind == "image") "jpg" else "bin"
+        }
         val fileName = "${a.id}.$ext"
         File(dir, fileName).writeBytes(bytes)
         dao.setLocalFile(a.id, fileName)

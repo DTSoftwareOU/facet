@@ -155,7 +155,9 @@ class OpenAiChatClientTest : MockServerTest() {
             {"id":"black-forest-labs/flux-pro","name":"Flux","architecture":{"input_modalities":["text"],"output_modalities":["image"]},"pricing":{"prompt":"0","completion":"0"}}
         ]}"""))
         val models = client(ProviderKind.OPENROUTER).listModels()
-        val m = models.single()
+        // Image-output models go to the image list.
+        assertEquals(ModelOutput.IMAGE, models.single { it.id == "black-forest-labs/flux-pro" }.output)
+        val m = models.single { it.output == ModelOutput.TEXT }
         assertEquals("Anthropic: Claude Sonnet 4.5", m.displayName)
         assertTrue(m.caps.vision && m.caps.pdf && m.caps.webSearch)
         assertFalse(m.caps.sampling)
@@ -169,8 +171,12 @@ class OpenAiChatClientTest : MockServerTest() {
     @Test
     fun geminiModelListStripsPrefixAndFilters() = runBlocking {
         server.enqueue(json(200, """{"object":"list","data":[{"id":"models/gemini-2.5-flash","object":"model","owned_by":"google"},{"id":"models/text-embedding-004","object":"model","owned_by":"google"},{"id":"models/gemini-2.5-pro","object":"model","owned_by":"google"}]}"""))
-        val models = client(ProviderKind.GOOGLE).listModels()
+        val all = client(ProviderKind.GOOGLE).listModels()
+        val models = all.filter { it.output == ModelOutput.TEXT }
         assertEquals(listOf("gemini-2.5-flash", "gemini-2.5-pro"), models.map { it.id })
+        // The list had no media models, so the current Gemini ones are added (one per kind); embeddings stay out.
+        assertEquals(setOf(ModelOutput.IMAGE, ModelOutput.VIDEO, ModelOutput.SPEECH, ModelOutput.MUSIC), all.filter { it.output != ModelOutput.TEXT }.map { it.output }.toSet())
+        assertTrue(all.none { "embedding" in it.id })
         assertEquals("Gemini 2.5 Flash", models[0].displayName)
         assertTrue(Effort.NONE in models[0].caps.reasoning.efforts)
         assertFalse(Effort.NONE in models[1].caps.reasoning.efforts)

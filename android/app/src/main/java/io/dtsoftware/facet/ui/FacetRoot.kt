@@ -67,6 +67,7 @@ object Routes {
     @Serializable data class AssistantEdit(val assistantId: String? = null)
     @Serializable object Prompts
     @Serializable object WebSearch
+    @Serializable object MediaModels
     @Serializable object McpServers
     @Serializable data class McpServerEdit(val serverId: String? = null)
     @Serializable object Skills
@@ -187,6 +188,9 @@ fun FacetRoot(container: AppContainer, launchRequests: MutableStateFlow<LaunchRe
                 }
                 composable<Routes.Prompts> { PromptsScreen(container) { nav.popBackStack() } }
                 composable<Routes.WebSearch> { io.dtsoftware.facet.ui.settings.WebSearchScreen(container) { nav.popBackStack() } }
+                composable<Routes.MediaModels> {
+                    io.dtsoftware.facet.ui.settings.MediaModelsScreen(container, onBack = { nav.popBackStack() }, onProviders = { nav.navigate(Routes.Providers) })
+                }
                 composable<Routes.McpServers> {
                     io.dtsoftware.facet.ui.settings.McpServersScreen(container, onBack = { nav.popBackStack() }) { id -> nav.navigate(Routes.McpServerEdit(id)) }
                 }

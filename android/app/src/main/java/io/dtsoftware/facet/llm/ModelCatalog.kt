@@ -399,6 +399,107 @@ object ModelCatalog {
         ModelInfo(id, name, contextWindow = 128_000, caps = compatCaps(ProviderKind.PERPLEXITY, id))
     }
 
+    // ---------------------------------------------------------------- Media models
+
+    private val notMedia = listOf("embed", "rerank", "moderation", "guard", "realtime", "native-audio", "-live", "live-", "search")
+
+    /** What a non-chat model produces, judged from its id; null when it isn't a media model Facet can run. */
+    fun mediaOutput(kind: ProviderKind, id: String): ModelOutput? {
+        val s = id.lowercase(Locale.ROOT).removePrefix("models/")
+        if (notMedia.any { it in s }) return null
+        return when {
+            "transcribe" in s || "whisper" in s || s.startsWith("scribe") || s.startsWith("nova-") -> ModelOutput.TRANSCRIPTION
+            "tts" in s || s.startsWith("aura") || s.startsWith("eleven_") -> ModelOutput.SPEECH
+            "lyria" in s || s.startsWith("music_") || "stable-audio" in s || s == "sound_effects" -> ModelOutput.MUSIC
+            "veo-" in s || (kind == ProviderKind.GOOGLE && "omni" in s) || "-video" in s || "video-" in s -> ModelOutput.VIDEO
+            "image" in s || "dall-e" in s || "imagen" in s || "nano-banana" in s || "flux" in s || "stable-diffusion" in s ||
+                "sdxl" in s || s.startsWith("sd3") || "seedream" in s || "ideogram" in s || "recraft" in s || "hidream" in s -> ModelOutput.IMAGE
+            else -> null
+        }
+    }
+
+    /** Whether Facet can run [output] models from [kind] (see MediaGen for the APIs behind each pair). */
+    fun canRun(kind: ProviderKind, output: ModelOutput): Boolean = when (output) {
+        ModelOutput.TEXT -> kind.style != ApiStyle.MEDIA
+        ModelOutput.IMAGE -> kind in setOf(
+            ProviderKind.OPENAI, ProviderKind.GOOGLE, ProviderKind.OPENROUTER, ProviderKind.XAI, ProviderKind.TOGETHER,
+            ProviderKind.DEEPINFRA, ProviderKind.NEBIUS, ProviderKind.STABILITY, ProviderKind.BFL, ProviderKind.CUSTOM,
+        )
+        ModelOutput.VIDEO -> kind == ProviderKind.GOOGLE
+        ModelOutput.SPEECH -> kind in setOf(ProviderKind.OPENAI, ProviderKind.GOOGLE, ProviderKind.ELEVENLABS, ProviderKind.DEEPGRAM, ProviderKind.CUSTOM)
+        ModelOutput.MUSIC -> kind in setOf(ProviderKind.GOOGLE, ProviderKind.ELEVENLABS, ProviderKind.STABILITY)
+        ModelOutput.TRANSCRIPTION -> kind in setOf(
+            ProviderKind.OPENAI, ProviderKind.GROQ, ProviderKind.TOGETHER, ProviderKind.DEEPINFRA,
+            ProviderKind.ELEVENLABS, ProviderKind.DEEPGRAM, ProviderKind.CUSTOM,
+        )
+    }
+
+    /** Built-in lists for providers that make only media (their APIs don't list models, or list only some). */
+    fun mediaProviderModels(kind: ProviderKind): List<ModelInfo> {
+        fun m(id: String, name: String, out: ModelOutput) = ModelInfo(id, name, output = out)
+        return when (kind) {
+            ProviderKind.ELEVENLABS -> listOf(
+                m("eleven_v3", "Eleven v3", ModelOutput.SPEECH),
+                m("eleven_multilingual_v2", "Eleven Multilingual v2", ModelOutput.SPEECH),
+                m("eleven_flash_v2_5", "Eleven Flash v2.5", ModelOutput.SPEECH),
+                m("music_v2_5", "Eleven Music v2.5", ModelOutput.MUSIC),
+                m("music_v1", "Eleven Music", ModelOutput.MUSIC),
+                m("sound_effects", "Sound effects", ModelOutput.MUSIC),
+                m("scribe_v2", "Scribe v2", ModelOutput.TRANSCRIPTION),
+            )
+            ProviderKind.STABILITY -> listOf(
+                m("stable-image-ultra", "Stable Image Ultra", ModelOutput.IMAGE),
+                m("stable-image-core", "Stable Image Core", ModelOutput.IMAGE),
+                m("sd3.5-large", "Stable Diffusion 3.5 Large", ModelOutput.IMAGE),
+                m("sd3.5-large-turbo", "Stable Diffusion 3.5 Large Turbo", ModelOutput.IMAGE),
+                m("sd3.5-medium", "Stable Diffusion 3.5 Medium", ModelOutput.IMAGE),
+                m("stable-audio-2.5", "Stable Audio 2.5", ModelOutput.MUSIC),
+            )
+            ProviderKind.BFL -> listOf(
+                m("flux-2-max", "FLUX.2 [max]", ModelOutput.IMAGE),
+                m("flux-2-pro", "FLUX.2 [pro]", ModelOutput.IMAGE),
+                m("flux-2-flex", "FLUX.2 [flex]", ModelOutput.IMAGE),
+                m("flux-kontext-max", "FLUX.1 Kontext [max]", ModelOutput.IMAGE),
+                m("flux-kontext-pro", "FLUX.1 Kontext [pro]", ModelOutput.IMAGE),
+                m("flux-pro-1.1-ultra", "FLUX1.1 [pro] Ultra", ModelOutput.IMAGE),
+            )
+            ProviderKind.DEEPGRAM -> listOf(
+                m("nova-3", "Nova-3", ModelOutput.TRANSCRIPTION),
+                m("nova-2", "Nova-2", ModelOutput.TRANSCRIPTION),
+                m("aura-2", "Aura-2", ModelOutput.SPEECH),
+            )
+            else -> emptyList()
+        }
+    }
+
+    /** Current Gemini media models, used when the model list doesn't include any of a kind. */
+    val geminiMediaDefaults = listOf(
+        ModelInfo("gemini-nano-banana-2.1", "Nano Banana 2.1", output = ModelOutput.IMAGE),
+        ModelInfo("gemini-omni-1.1-flash", "Gemini Omni 1.1 Flash", output = ModelOutput.VIDEO),
+        ModelInfo("gemini-3.8-flash-tts", "Gemini 3.8 Flash TTS", output = ModelOutput.SPEECH),
+        ModelInfo("lyria-3.5", "Lyria 3.5", output = ModelOutput.MUSIC),
+    )
+
+    private val mediaNames = mapOf(
+        "gpt-image-1" to "GPT Image 1", "gpt-image-1-mini" to "GPT Image 1 mini", "dall-e-3" to "DALL·E 3", "dall-e-2" to "DALL·E 2",
+        "tts-1" to "TTS 1", "tts-1-hd" to "TTS 1 HD", "gpt-4o-mini-tts" to "GPT-4o mini TTS", "whisper-1" to "Whisper",
+        "gpt-4o-transcribe" to "GPT-4o Transcribe", "gpt-4o-mini-transcribe" to "GPT-4o mini Transcribe",
+    )
+
+    /** Picks the most capable media model of [output] from [models] when the user hasn't chosen one. */
+    fun preferredMedia(output: ModelOutput, models: List<ModelInfo>): ModelInfo? {
+        val ranking = when (output) {
+            ModelOutput.IMAGE -> listOf("nano-banana", "gpt-image", "flux-2-pro", "stable-image-ultra", "grok", "flux", "image")
+            ModelOutput.VIDEO -> listOf("omni", "veo-3.1-generate", "veo")
+            ModelOutput.SPEECH -> listOf("gpt-4o-mini-tts", "eleven_multilingual", "eleven", "flash-tts", "tts", "aura")
+            ModelOutput.MUSIC -> listOf("music_v2", "music", "lyria", "stable-audio", "sound")
+            ModelOutput.TRANSCRIPTION -> listOf("gpt-4o-transcribe", "scribe", "nova-3", "whisper-large-v3-turbo", "transcribe", "whisper")
+            ModelOutput.TEXT -> emptyList()
+        }
+        val ofKind = models.filter { it.output == output }
+        return ranking.firstNotNullOfOrNull { key -> ofKind.firstOrNull { key in it.id.lowercase(Locale.ROOT) } } ?: ofKind.firstOrNull()
+    }
+
     // ---------------------------------------------------------------- Display names
 
     private val wordMap = mapOf(
@@ -412,6 +513,7 @@ object ModelCatalog {
 
     fun displayName(kind: ProviderKind, id: String): String {
         val raw = id.removePrefix("models/")
+        mediaNames[raw.lowercase(Locale.ROOT)]?.let { return it }
         if (kind == ProviderKind.OPENAI || raw.startsWith("gpt-") || raw.startsWith("chatgpt-")) {
             openAiDisplayName(raw)?.let { return it }
         }

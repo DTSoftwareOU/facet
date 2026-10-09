@@ -79,6 +79,22 @@ beautiful home that syncs across all your devices.
   it's on; tap it to turn it off. Turning it on also approves calls that are already waiting.
   Synced, so it applies on every device.
 
+### Media models
+- Every provider's models are sorted automatically by what they make: chat, images, video,
+  speech, music & sound, transcription (provider metadata where available, model names
+  otherwise). A model's settings can correct the sorting.
+- Settings → Media models: pick a model per kind (or Automatic, the best one you have), image and
+  video shape, music length and voice.
+- Chat models get `generate_image`, `generate_video`, `generate_speech` and `generate_music` tools.
+  Results appear in the reply (image, video player, audio player), open full screen, can be
+  shared, and sync end-to-end encrypted like any attachment.
+- Read aloud can use the chosen speech model; dictation can record and use the chosen
+  transcription model.
+- Backends: OpenAI (GPT Image, TTS, Whisper/Transcribe), Google Gemini Interactions API (Nano
+  Banana, Omni video, TTS, Lyria) and Veo, OpenRouter image models, xAI, Together, Groq,
+  DeepInfra, Nebius, ElevenLabs, Stability AI, Black Forest Labs, Deepgram. (OpenAI's Sora API
+  was shut down on 2026-09-24, so OpenAI offers no video.)
+
 ### Organization
 - Drawer with chats grouped by Today / Yesterday / Previous 7 days / Previous 30 days / month.
 - Full-text search across all messages (SQLite FTS4) with highlighted snippets.
@@ -93,9 +109,13 @@ beautiful home that syncs across all your devices.
 - Custom instructions ("About you" + "How to respond") applied to every chat.
 
 ### Providers and keys
-- Presets: OpenAI, Anthropic, Google Gemini, OpenRouter, Groq, Mistral, DeepSeek, xAI,
-  Together, Perplexity, Fireworks, Cerebras, Ollama, LM Studio, Custom (OpenAI-compatible:
-  base URL, key, extra headers).
+- Chat presets: OpenAI, Anthropic, Google Gemini, OpenRouter, xAI, DeepSeek, Mistral, Groq,
+  Cerebras, Together, Fireworks, Perplexity, Hugging Face, Moonshot (Kimi), Z.ai (GLM), Alibaba
+  Qwen, MiniMax, Cohere, NVIDIA NIM, DeepInfra, Nebius, SambaNova, Hyperbolic, Novita, Venice,
+  Vercel AI Gateway, Inception, Ollama, LM Studio, Custom (OpenAI-compatible: base URL, key,
+  extra headers).
+- Media-only presets: ElevenLabs (voices, music, sound effects, Scribe transcription),
+  Stability AI (Stable Image, Stable Audio), Black Forest Labs (FLUX), Deepgram (Nova, Aura).
 - Multiple keys per provider with labels ("Personal", "Work").
 - Test connection, refresh models, add model IDs manually, favorite models.
 - Per-model settings (synced): rename, hide from pickers (one by one or in bulk), and override

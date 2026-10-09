@@ -34,6 +34,7 @@ import io.dtsoftware.facet.llm.ApiStyle
 import io.dtsoftware.facet.llm.Effort
 import io.dtsoftware.facet.llm.ModelCaps
 import io.dtsoftware.facet.llm.ModelInfo
+import io.dtsoftware.facet.llm.ModelOutput
 import io.dtsoftware.facet.llm.ModelPricing
 import io.dtsoftware.facet.llm.ProviderKind
 import io.dtsoftware.facet.llm.ReasoningKind
@@ -76,6 +77,7 @@ internal fun ModelEditForm(container: AppContainer, p: ProviderEntity, modelId: 
     var name by remember { mutableStateOf(saved.name.orEmpty()) }
     var hidden by remember { mutableStateOf(saved.hidden) }
     var caps by remember { mutableStateOf(current.caps) }
+    var output by remember { mutableStateOf(current.output) }
     var context by remember { mutableStateOf(saved.contextWindow?.toString().orEmpty()) }
     var maxOutput by remember { mutableStateOf(saved.maxOutput?.toString().orEmpty()) }
     var priceIn by remember { mutableStateOf(saved.pricing?.input?.let(::plain).orEmpty()) }
@@ -92,6 +94,7 @@ internal fun ModelEditForm(container: AppContainer, p: ProviderEntity, modelId: 
     fun draft() = ModelPrefs(
         name = name.trim().takeIf { it.isNotEmpty() && it != base.displayName },
         hidden = hidden,
+        output = output.takeIf { it != base.output },
         caps = caps.takeIf { it != base.caps },
         contextWindow = contextValue?.takeIf { it != base.contextWindow },
         maxOutput = maxOutputValue?.takeIf { it != base.maxOutput },
@@ -104,7 +107,7 @@ internal fun ModelEditForm(container: AppContainer, p: ProviderEntity, modelId: 
     )
 
     fun resetDraft() {
-        name = ""; hidden = false; caps = base.caps
+        name = ""; hidden = false; caps = base.caps; output = base.output
         context = ""; maxOutput = ""; priceIn = ""; priceOut = ""
     }
 
@@ -135,97 +138,111 @@ internal fun ModelEditForm(container: AppContainer, p: ProviderEntity, modelId: 
             )
         }
 
-        SettingsGroup(title = "Capabilities") {
-            SwitchRow("Images", caps.vision, { caps = caps.copy(vision = it) }, subtitle = "Accepts photos and screenshots.", icon = R.drawable.ic_image)
-            GroupDivider()
-            SwitchRow("PDFs", caps.pdf, { caps = caps.copy(pdf = it) }, subtitle = "Reads PDF files directly.", icon = R.drawable.ic_file_text)
-            GroupDivider()
-            SwitchRow("Tools", caps.tools, { caps = caps.copy(tools = it) }, subtitle = "Facet search, MCP servers and skills.", icon = R.drawable.ic_wand)
-            GroupDivider()
-            SwitchRow("Built-in web search", caps.webSearch, { caps = caps.copy(webSearch = it) }, subtitle = "The provider searches the web itself.", icon = R.drawable.ic_globe)
-            GroupDivider()
-            SwitchRow("Temperature", caps.sampling, { caps = caps.copy(sampling = it) }, subtitle = "Accepts temperature and top-p.", icon = R.drawable.ic_gauge)
-            when (kind.style) {
-                ApiStyle.OPENAI_RESPONSES -> {
-                    GroupDivider()
-                    SwitchRow("Verbosity", caps.verbosity, { caps = caps.copy(verbosity = it) }, subtitle = "Concise, balanced or detailed answers.", icon = R.drawable.ic_text_size)
-                    GroupDivider()
-                    SwitchRow("Pro mode", caps.proMode, { caps = caps.copy(proMode = it) }, subtitle = "More work per answer.", icon = R.drawable.ic_gem)
-                }
-                ApiStyle.ANTHROPIC -> {
-                    GroupDivider()
-                    SwitchRow("Fast mode", caps.fastMode, { caps = caps.copy(fastMode = it) }, subtitle = "Faster output at premium pricing.", icon = R.drawable.ic_zap)
-                }
-                ApiStyle.OPENAI_CHAT -> Unit
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionLabel("Makes", Modifier.padding(start = 12.dp))
+            Segmented(ModelOutput.entries.toList(), output, { it.label }, { output = it })
+            if (output != base.output) {
+                Text(
+                    "Sorted as ${base.output.label.lowercase()} automatically. Your choice moves it to the ${output.label.lowercase()} list.",
+                    style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary, modifier = Modifier.padding(start = 12.dp),
+                )
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SectionLabel("Reasoning", Modifier.padding(start = 12.dp))
-            val r = caps.reasoning
-            Segmented(
-                options = ReasoningKind.entries.toList(),
-                selected = r.kind,
-                label = {
-                    when (it) {
-                        ReasoningKind.NONE -> "None"
-                        ReasoningKind.EFFORT -> "Effort levels"
-                        ReasoningKind.BUDGET -> "Thinking budget"
+        if (output == ModelOutput.TEXT) {
+            SettingsGroup(title = "Capabilities") {
+                SwitchRow("Images", caps.vision, { caps = caps.copy(vision = it) }, subtitle = "Accepts photos and screenshots.", icon = R.drawable.ic_image)
+                GroupDivider()
+                SwitchRow("PDFs", caps.pdf, { caps = caps.copy(pdf = it) }, subtitle = "Reads PDF files directly.", icon = R.drawable.ic_file_text)
+                GroupDivider()
+                SwitchRow("Tools", caps.tools, { caps = caps.copy(tools = it) }, subtitle = "Facet search, MCP servers and skills.", icon = R.drawable.ic_wand)
+                GroupDivider()
+                SwitchRow("Built-in web search", caps.webSearch, { caps = caps.copy(webSearch = it) }, subtitle = "The provider searches the web itself.", icon = R.drawable.ic_globe)
+                GroupDivider()
+                SwitchRow("Temperature", caps.sampling, { caps = caps.copy(sampling = it) }, subtitle = "Accepts temperature and top-p.", icon = R.drawable.ic_gauge)
+                when (kind.style) {
+                    ApiStyle.OPENAI_RESPONSES -> {
+                        GroupDivider()
+                        SwitchRow("Verbosity", caps.verbosity, { caps = caps.copy(verbosity = it) }, subtitle = "Concise, balanced or detailed answers.", icon = R.drawable.ic_text_size)
+                        GroupDivider()
+                        SwitchRow("Pro mode", caps.proMode, { caps = caps.copy(proMode = it) }, subtitle = "More work per answer.", icon = R.drawable.ic_gem)
                     }
-                },
-                onSelect = { k ->
-                    caps = caps.copy(
-                        reasoning = if (k == ReasoningKind.NONE) r.copy(kind = k, efforts = emptyList(), defaultEffort = null)
-                        else r.copy(kind = k, efforts = r.efforts.ifEmpty { listOf(Effort.LOW, Effort.MEDIUM, Effort.HIGH) }),
-                    )
-                },
-            )
-            if (r.kind != ReasoningKind.NONE) {
-                Text("Levels it accepts", style = FacetTheme.type.labelS, color = c.textTertiary, modifier = Modifier.padding(start = 12.dp, top = 4.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Effort.entries.forEach { e ->
-                        FacetChip(e.label, e in r.efforts, {
-                            val next = if (e in r.efforts) r.efforts - e else (r.efforts + e).sortedBy { it.ordinal }
-                            caps = caps.copy(reasoning = r.copy(efforts = next, defaultEffort = r.defaultEffort?.takeIf { it in next }))
-                        })
+                    ApiStyle.ANTHROPIC -> {
+                        GroupDivider()
+                        SwitchRow("Fast mode", caps.fastMode, { caps = caps.copy(fastMode = it) }, subtitle = "Faster output at premium pricing.", icon = R.drawable.ic_zap)
                     }
+                    ApiStyle.OPENAI_CHAT, ApiStyle.MEDIA -> Unit
                 }
-                if (r.efforts.isNotEmpty()) {
-                    Text("Default level", style = FacetTheme.type.labelS, color = c.textTertiary, modifier = Modifier.padding(start = 12.dp, top = 4.dp))
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel("Reasoning", Modifier.padding(start = 12.dp))
+                val r = caps.reasoning
+                Segmented(
+                    options = ReasoningKind.entries.toList(),
+                    selected = r.kind,
+                    label = {
+                        when (it) {
+                            ReasoningKind.NONE -> "None"
+                            ReasoningKind.EFFORT -> "Effort levels"
+                            ReasoningKind.BUDGET -> "Thinking budget"
+                        }
+                    },
+                    onSelect = { k ->
+                        caps = caps.copy(
+                            reasoning = if (k == ReasoningKind.NONE) r.copy(kind = k, efforts = emptyList(), defaultEffort = null)
+                            else r.copy(kind = k, efforts = r.efforts.ifEmpty { listOf(Effort.LOW, Effort.MEDIUM, Effort.HIGH) }),
+                        )
+                    },
+                )
+                if (r.kind != ReasoningKind.NONE) {
+                    Text("Levels it accepts", style = FacetTheme.type.labelS, color = c.textTertiary, modifier = Modifier.padding(start = 12.dp, top = 4.dp))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        r.efforts.forEach { e ->
-                            FacetChip(e.label, r.defaultEffort == e, {
-                                caps = caps.copy(reasoning = r.copy(defaultEffort = if (r.defaultEffort == e) null else e))
+                        Effort.entries.forEach { e ->
+                            FacetChip(e.label, e in r.efforts, {
+                                val next = if (e in r.efforts) r.efforts - e else (r.efforts + e).sortedBy { it.ordinal }
+                                caps = caps.copy(reasoning = r.copy(efforts = next, defaultEffort = r.defaultEffort?.takeIf { it in next }))
                             })
                         }
                     }
+                    if (r.efforts.isNotEmpty()) {
+                        Text("Default level", style = FacetTheme.type.labelS, color = c.textTertiary, modifier = Modifier.padding(start = 12.dp, top = 4.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            r.efforts.forEach { e ->
+                                FacetChip(e.label, r.defaultEffort == e, {
+                                    caps = caps.copy(reasoning = r.copy(defaultEffort = if (r.defaultEffort == e) null else e))
+                                })
+                            }
+                        }
+                    }
+                    SettingsGroup {
+                        SwitchRow(
+                            "Shows its thinking", r.summaries, { caps = caps.copy(reasoning = r.copy(summaries = it)) },
+                            subtitle = "Streams readable reasoning you can expand.", icon = R.drawable.ic_brain,
+                        )
+                    }
                 }
-                SettingsGroup {
-                    SwitchRow(
-                        "Shows its thinking", r.summaries, { caps = caps.copy(reasoning = r.copy(summaries = it)) },
-                        subtitle = "Streams readable reasoning you can expand.", icon = R.drawable.ic_brain,
+            }
+
+            SettingsGroup(title = "Limits") {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FacetTextField(
+                        context, { context = it }, label = "Context window (tokens)",
+                        placeholder = base.contextWindow?.let { Format.contextWindow(it) } ?: "Unknown",
+                        keyboardType = KeyboardType.Number, isError = context.isNotBlank() && contextValue == null,
+                    )
+                    FacetTextField(
+                        maxOutput, { maxOutput = it }, label = "Max output (tokens)",
+                        placeholder = base.maxOutput?.let { Format.tokens(it.toLong()) } ?: "Provider default",
+                        keyboardType = KeyboardType.Number, isError = maxOutput.isNotBlank() && maxOutputValue == null,
+                        supporting = "Empty uses the provider's value. You can type 128k or 1m.",
                     )
                 }
             }
+
         }
 
-        SettingsGroup(title = "Limits") {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                FacetTextField(
-                    context, { context = it }, label = "Context window (tokens)",
-                    placeholder = base.contextWindow?.let { Format.contextWindow(it) } ?: "Unknown",
-                    keyboardType = KeyboardType.Number, isError = context.isNotBlank() && contextValue == null,
-                )
-                FacetTextField(
-                    maxOutput, { maxOutput = it }, label = "Max output (tokens)",
-                    placeholder = base.maxOutput?.let { Format.tokens(it.toLong()) } ?: "Provider default",
-                    keyboardType = KeyboardType.Number, isError = maxOutput.isNotBlank() && maxOutputValue == null,
-                    supporting = "Empty uses the provider's value. You can type 128k or 1m.",
-                )
-            }
-        }
-
-        SettingsGroup(title = "Price, USD per 1M tokens") {
+        if (output == ModelOutput.TEXT) SettingsGroup(title = "Price, USD per 1M tokens") {
             Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FacetTextField(
                     priceIn, { priceIn = it }, label = "Input", placeholder = base.pricing?.input?.let(::plain) ?: "Unknown",

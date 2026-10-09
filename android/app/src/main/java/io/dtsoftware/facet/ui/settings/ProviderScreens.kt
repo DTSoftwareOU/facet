@@ -63,12 +63,19 @@ import io.dtsoftware.facet.ui.theme.FacetTheme
 import kotlinx.coroutines.launch
 
 /** Presets in the order they're offered. */
+/** Providers with chat models, in the order the pickers show them. */
 val ProviderOrder = listOf(
     ProviderKind.OPENAI, ProviderKind.ANTHROPIC, ProviderKind.GOOGLE, ProviderKind.OPENROUTER,
     ProviderKind.XAI, ProviderKind.DEEPSEEK, ProviderKind.MISTRAL, ProviderKind.GROQ, ProviderKind.CEREBRAS,
-    ProviderKind.TOGETHER, ProviderKind.FIREWORKS, ProviderKind.PERPLEXITY, ProviderKind.OLLAMA,
-    ProviderKind.LMSTUDIO, ProviderKind.CUSTOM,
+    ProviderKind.TOGETHER, ProviderKind.FIREWORKS, ProviderKind.PERPLEXITY, ProviderKind.HUGGINGFACE,
+    ProviderKind.MOONSHOT, ProviderKind.ZAI, ProviderKind.QWEN, ProviderKind.MINIMAX, ProviderKind.COHERE,
+    ProviderKind.NVIDIA, ProviderKind.DEEPINFRA, ProviderKind.NEBIUS, ProviderKind.SAMBANOVA, ProviderKind.HYPERBOLIC,
+    ProviderKind.NOVITA, ProviderKind.VENICE, ProviderKind.VERCEL, ProviderKind.INCEPTION,
+    ProviderKind.OLLAMA, ProviderKind.LMSTUDIO, ProviderKind.CUSTOM,
 )
+
+/** Providers that only make media (images, video, speech, music, transcripts). */
+val MediaProviderOrder = listOf(ProviderKind.ELEVENLABS, ProviderKind.STABILITY, ProviderKind.BFL, ProviderKind.DEEPGRAM)
 
 @Composable
 fun ProvidersScreen(container: AppContainer, onBack: () -> Unit, onEdit: (String) -> Unit, onAdd: (String) -> Unit) {
@@ -100,8 +107,19 @@ fun ProvidersScreen(container: AppContainer, onBack: () -> Unit, onEdit: (String
                 }
             }
         }
-        SettingsGroup(title = if (providers.isEmpty()) null else "Add another") {
+        SettingsGroup(title = if (providers.isEmpty()) "Chat" else "Add chat models") {
             ProviderOrder.forEachIndexed { i, kind ->
+                if (i > 0) GroupDivider()
+                SettingsRow(
+                    kind.displayName, subtitle = kind.blurb,
+                    leading = { ProviderBadge(kind, size = 34.dp) },
+                    onClick = { onAdd(kind.id) },
+                    trailing = { FacetIcon(R.drawable.ic_plus, null, tint = c.textTertiary, size = 18.dp) },
+                )
+            }
+        }
+        SettingsGroup(title = "Media only") {
+            MediaProviderOrder.forEachIndexed { i, kind ->
                 if (i > 0) GroupDivider()
                 SettingsRow(
                     kind.displayName, subtitle = kind.blurb,
@@ -297,12 +315,16 @@ fun ProviderEditScreen(container: AppContainer, providerId: String?, kindId: Str
             onConfirm = { id ->
                 val p = existing ?: return@TextInputDialog
                 val mid = id.trim()
-                val caps = when (kind.style) {
-                    ApiStyle.ANTHROPIC -> ModelCatalog.claudeCaps(mid)
-                    ApiStyle.OPENAI_RESPONSES -> ModelCatalog.openAiCaps(mid)
-                    ApiStyle.OPENAI_CHAT -> ModelCatalog.compatCaps(kind, mid)
+                // Media-looking IDs (gpt-image-…, …-tts, flux-…) go to their media kind; you can correct it in the model's settings.
+                val output = ModelCatalog.mediaOutput(kind, mid)?.takeIf { ModelCatalog.canRun(kind, it) }
+                    ?: if (kind.style == ApiStyle.MEDIA) io.dtsoftware.facet.llm.ModelOutput.IMAGE else io.dtsoftware.facet.llm.ModelOutput.TEXT
+                val caps = when {
+                    output != io.dtsoftware.facet.llm.ModelOutput.TEXT -> io.dtsoftware.facet.llm.ModelCaps(tools = false)
+                    kind.style == ApiStyle.ANTHROPIC -> ModelCatalog.claudeCaps(mid)
+                    kind.style == ApiStyle.OPENAI_RESPONSES -> ModelCatalog.openAiCaps(mid)
+                    else -> ModelCatalog.compatCaps(kind, mid)
                 }
-                scope.launch { container.providers.addCustomModel(p.id, ModelInfo(mid, ModelCatalog.displayName(kind, mid), caps = caps)) }
+                scope.launch { container.providers.addCustomModel(p.id, ModelInfo(mid, ModelCatalog.displayName(kind, mid), caps = caps, output = output)) }
             },
             onDismiss = { addModel = false },
             placeholder = "e.g. gpt-5.5 or claude-opus-5-5",
@@ -361,7 +383,7 @@ private fun ModelsSection(container: AppContainer, p: ProviderEntity, onAdd: () 
             }
         }
         Text(
-            "Tap a model to rename it, change what it can do, or set its price.",
+            "Tap a model to rename it, change what it makes or can do, or set its price.",
             style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
             modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
         )
@@ -399,7 +421,10 @@ private fun ModelsSection(container: AppContainer, p: ProviderEntity, onAdd: () 
                     Column(Modifier.weight(1f)) {
                         Text(m.displayName, style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            listOfNotNull(if (isHidden) "Hidden" else null, if (edited) "Edited" else null, m.id).joinToString(" · "),
+                            listOfNotNull(
+                                if (isHidden) "Hidden" else null, if (edited) "Edited" else null,
+                                m.output.takeIf { it != io.dtsoftware.facet.llm.ModelOutput.TEXT }?.label, m.id,
+                            ).joinToString(" · "),
                             style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )

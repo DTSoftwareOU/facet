@@ -85,6 +85,7 @@ private fun iconFor(kind: ToolKind) = when (kind) {
     ToolKind.FETCH -> R.drawable.ic_file_text
     ToolKind.SKILL -> R.drawable.ic_wand
     ToolKind.MCP -> R.drawable.ic_server
+    ToolKind.MEDIA -> R.drawable.ic_sparkles
 }
 
 @Composable

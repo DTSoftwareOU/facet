@@ -89,7 +89,7 @@ private fun StatusBanner(ok: Boolean, text: String) {
 }
 
 @Composable
-private fun Intro(text: String) {
+internal fun Intro(text: String) {
     Text(text, style = FacetTheme.type.body, color = FacetTheme.colors.textSecondary, modifier = Modifier.padding(horizontal = 4.dp))
 }
 

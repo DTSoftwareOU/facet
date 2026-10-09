@@ -301,6 +301,71 @@ class AppScreenshotTest {
         shoot("mcp_directory_dark", ThemeMode.DARK) { io.dtsoftware.facet.ui.settings.McpServersScreen(c, {}, {}) }
     }
 
+    /** A reply with a generated image and a generated song. */
+    @Test
+    fun chatMediaDark() {
+        val (c, _) = container()
+        val conv = runBlocking {
+            val now = Clock.now()
+            val id = Ids.new()
+            c.db.conversations().upsert(
+                ConversationEntity(
+                    id = id, title = "Fox poster", titleSet = true, providerId = "p-openai", modelId = "gpt-5.5",
+                    paramsJson = AppJson.encodeToString(GenParams()), createdAt = now, lastActivityAt = now, updatedAt = now,
+                ),
+            )
+            val bmp = android.graphics.Bitmap.createBitmap(512, 512, android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bmp)
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+            paint.shader = android.graphics.LinearGradient(0f, 0f, 0f, 512f, 0xFF27406B.toInt(), 0xFFE7EEF7.toInt(), android.graphics.Shader.TileMode.CLAMP)
+            canvas.drawRect(0f, 0f, 512f, 512f, paint)
+            paint.shader = null
+            paint.color = 0xFFE0662E.toInt()
+            canvas.drawCircle(256f, 300f, 110f, paint)
+            paint.color = 0xFFFFFFFF.toInt()
+            canvas.drawRect(0f, 420f, 512f, 512f, paint)
+            val png = java.io.ByteArrayOutputStream().also { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+            val img = c.attachments.storeGenerated(png, "image/png", "red-fox-poster.png", id)
+            val song = c.attachments.storeGenerated("ID3".toByteArray() + ByteArray(4096), "audio/mpeg", "fox-theme-lofi.mp3", id)
+            val u = MessageEntity(Ids.new(), id, null, "user", "Make a poster of a red fox in the snow, and a short theme song for it.", createdAt = now - 60_000, updatedAt = now - 60_000)
+            val calls = listOf(
+                io.dtsoftware.facet.domain.tools.ToolCallRecord("c1", "generate_image", "MEDIA", "Created image with GPT Image 1", "{}", "ok", false),
+                io.dtsoftware.facet.domain.tools.ToolCallRecord("c2", "generate_music", "MEDIA", "Created track with Eleven Music", "{}", "ok", false),
+            )
+            val text = "Here's a poster of a red fox in fresh snow, plus a 30-second lo-fi theme to go with it. Want another style, or a longer track?"
+            val a = MessageEntity(
+                Ids.new(), id, u.id, "assistant", text,
+                providerId = "p-openai", modelId = "gpt-5.5", modelName = "GPT-5.5",
+                stepsJson = AppJson.encodeToString(io.dtsoftware.facet.domain.tools.ToolTrace(listOf(io.dtsoftware.facet.domain.tools.ToolStep("", calls)), text)),
+                attachmentsJson = AppJson.encodeToString(listOf(io.dtsoftware.facet.data.repo.AttachmentStore.ref(img), io.dtsoftware.facet.data.repo.AttachmentStore.ref(song))),
+                createdAt = now - 50_000, updatedAt = now - 50_000,
+            )
+            listOf(u, a).forEach { c.db.messages().upsert(it) }
+            c.db.conversations().upsert(c.db.conversations().get(id)!!.copy(currentLeafId = a.id))
+            id
+        }
+        val requests = MutableStateFlow<LaunchRequest?>(LaunchRequest.OpenConversation(conv))
+        shoot("chat_media_dark", ThemeMode.DARK) { HomeScreen(c, requests, {}, {}, {}, {}, {}) }
+    }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1500dp-xxhdpi")
+    fun mediaModelsDark() {
+        val (c, _) = container()
+        runBlocking {
+            val out = io.dtsoftware.facet.llm.ModelOutput.entries
+            val models = listOf(
+                ModelInfo("gpt-5.5", "GPT-5.5"),
+                ModelInfo("gpt-image-1", "GPT Image 1", output = out[1]),
+                ModelInfo("gpt-4o-mini-tts", "GPT-4o mini TTS", output = io.dtsoftware.facet.llm.ModelOutput.SPEECH),
+                ModelInfo("gpt-4o-transcribe", "GPT-4o Transcribe", output = io.dtsoftware.facet.llm.ModelOutput.TRANSCRIPTION),
+            )
+            c.db.providers().setModels("p-openai", AppJson.encodeToString(models), Clock.now())
+            c.settings.updateSynced { it.copy(media = it.media.copy(speech = io.dtsoftware.facet.data.prefs.ModelRef("p-openai", "gpt-4o-mini-tts"))) }
+        }
+        shoot("media_models_dark", ThemeMode.DARK) { io.dtsoftware.facet.ui.settings.MediaModelsScreen(c, {}, {}) }
+    }
+
     @Test
     fun modelEditDark() {
         val (c, _) = container()

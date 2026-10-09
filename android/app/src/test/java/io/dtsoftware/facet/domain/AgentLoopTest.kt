@@ -5,6 +5,7 @@ import io.dtsoftware.facet.core.crypto.FacetCrypto
 import io.dtsoftware.facet.core.crypto.SecretBox
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.core.util.Clock
+import io.dtsoftware.facet.data.attachments
 import io.dtsoftware.facet.data.db.FacetDatabase
 import io.dtsoftware.facet.data.db.McpServerEntity
 import io.dtsoftware.facet.data.db.MessageStatus
@@ -43,6 +44,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -55,6 +57,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+
+private val PNG = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13)
 
 /** The tool loop end to end with a scripted model: call → run tool → feed result → answer → replay later. */
 @RunWith(RobolectricTestRunner::class)
@@ -107,13 +111,67 @@ class AgentLoopTest {
         val sync = SyncEngine(ctx, scope, db, auth, api, settings, attachments, secrets, http)
         val skills = SkillRepository(db, http) {}
         val mcp = McpManager(ctx, db, secrets, http, scope) {}
-        val tools = ToolRegistry(WebSearch(http), providers, mcp, skills, settings)
+        val jobs: MutableList<io.dtsoftware.facet.llm.media.MediaJob> = Collections.synchronizedList(ArrayList())
+        val media = io.dtsoftware.facet.domain.media.MediaService(providers, settings, attachments, http, ctx.cacheDir) { _, _, job, onProgress ->
+            jobs += job
+            onProgress("Creating an image · 50%")
+            io.dtsoftware.facet.llm.media.MediaFile(PNG, "image/png")
+        }
+        val tools = ToolRegistry(WebSearch(http), providers, mcp, skills, settings, media)
         val chat = ChatEngine(scope, conversations, providers, assistants, attachments, settings, PricingCatalog(null, null), sync, tools)
 
         suspend fun awaitIdle() = withTimeout(10_000) {
             delay(100)
             while (chat.active.value.isNotEmpty()) delay(50)
         }
+    }
+
+    private suspend fun Env.providerWithImageModel(): io.dtsoftware.facet.data.db.ProviderEntity {
+        val p = providers.add(ProviderKind.CUSTOM, "Test", "http://localhost", "", emptyMap())
+        val list = listOf(ModelInfo("m1", "M1"), ModelInfo("img-1", "Img One", output = io.dtsoftware.facet.llm.ModelOutput.IMAGE))
+        db.providers().setModels(p.id, AppJson.encodeToString(list), Clock.now())
+        return providers.get(p.id)!!
+    }
+
+    @Test
+    fun imageToolAttachesTheImageToTheReply() = runBlocking {
+        val env = Env()
+        val p = env.providerWithImageModel()
+        val client = ScriptedClient(env.providers.config(p), { "generate_image" }, """{"prompt":"A red fox in the snow","aspect_ratio":"portrait"}""")
+        env.providers.clientOverride = { client }
+        val convId = env.chat.send(null, "Draw a fox", emptyList(), io.dtsoftware.facet.domain.NewChatSpec(null, ModelRef(p.id, "m1"), GenParams()))
+        env.awaitIdle()
+
+        // The image model is offered automatically, and isn't listed as a chat model.
+        assertTrue(client.requests[0].tools.any { it.name == "generate_image" && it.description.contains("Img One") })
+        assertTrue(env.providers.observeCatalog().first().single().models.none { it.id == "img-1" })
+        assertEquals(io.dtsoftware.facet.llm.media.Aspect.PORTRAIT, env.jobs.single().aspect)
+
+        val reply = env.conversations.messages(convId).last { it.role == "assistant" }
+        val refs = reply.attachments()
+        assertEquals(1, refs.size)
+        assertEquals("image", refs[0].kind)
+        assertEquals("red-fox-in-snow.png", refs[0].name)
+        val stored = env.attachments.get(refs[0].id)!!
+        assertEquals(convId, stored.conversationId)
+        assertTrue("queued for encrypted sync", stored.dirty)
+        val trace = AppJson.decodeFromString<ToolTrace>(reply.stepsJson!!)
+        assertTrue(trace.steps[0].calls[0].label.startsWith("Created image"))
+    }
+
+    @Test
+    fun mediaToolsFollowSettings() = runBlocking {
+        val env = Env()
+        val p = env.providerWithImageModel()
+        val caps = io.dtsoftware.facet.llm.ModelCaps(tools = true)
+        assertTrue(env.tools.prepare(GenParams(), caps).defs.any { it.spec.name == "generate_image" })
+        // An explicit choice wins; turning the tools off removes them.
+        env.settings.updateSynced { it.copy(media = it.media.copy(image = ModelRef(p.id, "img-1"))) }
+        assertTrue(env.media.resolve(io.dtsoftware.facet.llm.ModelOutput.IMAGE)!!.explicit)
+        env.settings.updateSynced { it.copy(media = it.media.copy(chatTools = false)) }
+        assertTrue(env.tools.prepare(GenParams(), caps).defs.none { it.spec.name == "generate_image" })
+        // No speech model: Read aloud falls back to the phone's voice.
+        assertEquals(null, env.media.speak("hello"))
     }
 
     @Test

@@ -17,6 +17,7 @@ import io.dtsoftware.facet.llm.LlmException
 import io.dtsoftware.facet.llm.ModelCaps
 import io.dtsoftware.facet.llm.ModelCatalog
 import io.dtsoftware.facet.llm.ModelInfo
+import io.dtsoftware.facet.llm.ModelOutput
 import io.dtsoftware.facet.llm.ParamHealer
 import io.dtsoftware.facet.llm.ParamSpec
 import io.dtsoftware.facet.llm.Part
@@ -110,27 +111,59 @@ internal class OpenAiChatClient(
         return if (kind == ProviderKind.OPENROUTER) {
             models.mapNotNull { openRouterModel(it) }
         } else {
-            models.mapNotNull { m ->
+            val listed = models.mapNotNull { m ->
                 val rawId = m.str("id") ?: m.str("name") ?: return@mapNotNull null
                 val id = rawId.removePrefix("models/")
-                if (!ModelCatalog.isCompatChatModel(id)) return@mapNotNull null
+                val output = outputOf(id, m.str("type")) ?: return@mapNotNull null
                 ModelInfo(
                     id = id,
                     displayName = m.str("display_name")?.takeIf { kind == ProviderKind.GOOGLE }
                         ?: ModelCatalog.displayName(kind, id),
                     contextWindow = (m.long("context_length") ?: m.long("context_window") ?: m.long("max_context_length"))?.toInt(),
-                    caps = ModelCatalog.compatCaps(kind, id),
+                    caps = if (output == ModelOutput.TEXT) ModelCatalog.compatCaps(kind, id) else ModelCaps(tools = false),
                     pricing = pricing?.priceFor(kind, id),
                     createdAt = m.long("created")?.times(1000),
+                    output = output,
                 )
             }
+            if (kind == ProviderKind.GOOGLE) {
+                // Gemini's OpenAI-compatible list may leave out media models; add the current ones it lacks.
+                listed + ModelCatalog.geminiMediaDefaults.filter { d -> listed.none { it.output == d.output } }
+            } else listed
         }
+    }
+
+    /** Chat, a runnable media kind, or null to leave the model out (embeddings, rerankers, unsupported media). */
+    private fun outputOf(id: String, type: String?): ModelOutput? {
+        // Together labels every model with a type.
+        val typed = when (type?.lowercase()) {
+            "chat", "language", "code" -> ModelOutput.TEXT
+            "image" -> ModelOutput.IMAGE
+            "audio" -> ModelOutput.SPEECH
+            "transcribe" -> ModelOutput.TRANSCRIPTION
+            "video" -> ModelOutput.VIDEO
+            "embedding", "rerank", "moderation" -> return null
+            else -> null
+        }
+        val output = typed ?: ModelCatalog.mediaOutput(kind, id) ?: if (ModelCatalog.isCompatChatModel(id)) ModelOutput.TEXT else return null
+        return output.takeIf { ModelCatalog.canRun(kind, it) }
     }
 
     private fun openRouterModel(m: JsonObject): ModelInfo? {
         val id = m.str("id") ?: return null
         val arch = m.obj("architecture")
         val outputs = arch?.arr("output_modalities")?.mapNotNull { it.stringOrNull() }.orEmpty()
+        // Models that draw (e.g. Gemini image models) go to the image list; they answer through chat completions.
+        if ("image" in outputs) {
+            return ModelInfo(
+                id = id,
+                displayName = m.str("name") ?: ModelCatalog.displayName(kind, id),
+                caps = ModelCaps(tools = false),
+                pricing = PricingCatalog.openRouterPricing(m.obj("pricing")),
+                createdAt = m.long("created")?.times(1000),
+                output = ModelOutput.IMAGE,
+            )
+        }
         if (outputs.isNotEmpty() && "text" !in outputs) return null
         val inputs = arch?.arr("input_modalities")?.mapNotNull { it.stringOrNull() }.orEmpty()
         val params = m.arr("supported_parameters")?.mapNotNull { it.stringOrNull() }?.toSet()

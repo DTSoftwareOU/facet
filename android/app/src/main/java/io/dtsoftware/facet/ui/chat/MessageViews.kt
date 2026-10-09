@@ -99,6 +99,9 @@ class MessageActions(
     val onOpenAttachment: (AttachmentRef) -> Unit,
     val thumbnail: suspend (String, Int) -> ImageBitmap?,
     val onApproval: (String, io.dtsoftware.facet.domain.ApprovalDecision) -> Unit = { _, _ -> },
+    /** Local file of an attachment (downloaded if needed), for playing audio. */
+    val mediaFile: suspend (String) -> java.io.File? = { null },
+    val mediaDuration: suspend (String) -> Long? = { null },
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -250,6 +253,12 @@ fun AssistantMessage(
         if (toolActivities.isNotEmpty()) {
             ToolActivityList(toolActivities, actions.onApproval)
             Spacer(Modifier.height(10.dp))
+        }
+
+        val media = live?.attachments?.takeIf { it.isNotEmpty() } ?: remember(m.attachmentsJson) { m.attachments() }
+        if (media.isNotEmpty()) {
+            MediaAttachments(media, actions)
+            Spacer(Modifier.height(12.dp))
         }
 
         if (text.isNotEmpty()) {

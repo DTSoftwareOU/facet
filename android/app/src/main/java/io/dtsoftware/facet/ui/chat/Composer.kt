@@ -2,6 +2,8 @@ package io.dtsoftware.facet.ui.chat
 
 import android.content.Context
 import android.content.Intent
+import android.media.MediaRecorder
+import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -82,6 +84,13 @@ import io.dtsoftware.facet.ui.components.FacetIconButton
 import io.dtsoftware.facet.ui.components.SendButton
 import io.dtsoftware.facet.ui.theme.FacetShapes
 import io.dtsoftware.facet.ui.theme.FacetTheme
+import java.io.File
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun Composer(
@@ -141,6 +150,8 @@ fun Composer(
             }
             if (voice.listening) {
                 ListeningRow(voice)
+            } else if (voice.transcribing) {
+                TranscribingRow()
             } else {
                 Box(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 4.dp)) {
                     if (value.text.isEmpty()) {
@@ -325,13 +336,23 @@ private fun ListeningRow(voice: VoiceInput) {
         Waveform(voice.level, Modifier.height(22.dp).width(46.dp))
         Spacer(Modifier.width(12.dp))
         Text(
-            voice.partial.ifBlank { "Listening…" },
+            voice.partial.ifBlank { if (voice.recording) "Listening… tap the mic to finish" else "Listening…" },
             style = FacetTheme.type.chat,
             color = if (voice.partial.isBlank()) c.textTertiary else c.text,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+    }
+}
+
+@Composable
+private fun TranscribingRow() {
+    val c = FacetTheme.colors
+    Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), color = c.primary, strokeWidth = 2.dp)
+        Spacer(Modifier.width(12.dp))
+        Text("Transcribing…", style = FacetTheme.type.chat, color = c.textTertiary)
     }
 }
 
@@ -358,7 +379,90 @@ class VoiceInput(private val context: Context) {
         private set
     private var recognizer: SpeechRecognizer? = null
 
+    /** True while recording for an AI transcription model (as opposed to the system recognizer). */
+    var recording by mutableStateOf(false)
+        private set
+    var transcribing by mutableStateOf(false)
+        private set
+    private var recorder: MediaRecorder? = null
+    private var recordFile: File? = null
+    private var onRecorded: (() -> Unit)? = null
+
     val available: Boolean get() = SpeechRecognizer.isRecognitionAvailable(context)
+
+    /**
+     * Records from the microphone until [stop], then sends the audio to [transcribe] (the transcription
+     * model chosen in Settings) and delivers the text.
+     */
+    fun startRecording(
+        scope: CoroutineScope,
+        transcribe: suspend (audio: ByteArray, mimeType: String, fileName: String) -> String,
+        onResult: (String) -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        if (listening || transcribing) return
+        val file = File(context.cacheDir, "dictation.m4a").apply { delete() }
+        val r = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else @Suppress("DEPRECATION") MediaRecorder()
+        try {
+            r.setAudioSource(MediaRecorder.AudioSource.MIC)
+            r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            r.setAudioSamplingRate(16_000)
+            r.setAudioEncodingBitRate(64_000)
+            r.setAudioChannels(1)
+            r.setOutputFile(file.path)
+            r.prepare()
+            r.start()
+        } catch (e: Exception) {
+            r.release()
+            onError("Couldn't start the microphone.")
+            return
+        }
+        recorder = r
+        recordFile = file
+        recording = true
+        listening = true
+        scope.launch {
+            while (recording) {
+                level = (runCatching { r.maxAmplitude }.getOrDefault(0) / 12_000f).coerceIn(0f, 1f)
+                delay(90)
+            }
+            level = 0f
+        }
+        onRecorded = {
+            transcribing = true
+            scope.launch {
+                try {
+                    val bytes = withContext(Dispatchers.IO) { file.readBytes() }
+                    if (bytes.size < 1_000) {
+                        onError("Didn't catch that. Try again.")
+                    } else {
+                        val text = transcribe(bytes, "audio/mp4", "dictation.m4a")
+                        if (text.isNotBlank()) onResult(text) else onError("Didn't catch that. Try again.")
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    onError(e.message ?: "Transcription failed.")
+                } finally {
+                    transcribing = false
+                    file.delete()
+                }
+            }
+        }
+    }
+
+    private fun finishRecording() {
+        val r = recorder ?: return
+        recorder = null
+        recording = false
+        listening = false
+        val ok = runCatching { r.stop() }.isSuccess
+        r.release()
+        val done = onRecorded
+        onRecorded = null
+        if (ok) done?.invoke() else recordFile?.delete()
+    }
 
     fun start(onResult: (String) -> Unit, onError: (String) -> Unit) {
         if (listening) return
@@ -408,10 +512,14 @@ class VoiceInput(private val context: Context) {
     }
 
     fun stop() {
-        recognizer?.stopListening()
+        if (recorder != null) finishRecording() else recognizer?.stopListening()
     }
 
     fun destroy() {
+        recorder?.runCatching { stop() }
+        recorder?.release()
+        recorder = null
+        recording = false
         recognizer?.destroy()
         recognizer = null
         listening = false

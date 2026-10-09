@@ -1,6 +1,7 @@
 package io.dtsoftware.facet.llm
 
 import io.dtsoftware.facet.llm.anthropic.AnthropicClient
+import io.dtsoftware.facet.llm.media.MediaProviderClient
 import io.dtsoftware.facet.llm.openai.OpenAiChatClient
 import io.dtsoftware.facet.llm.openai.OpenAiResponsesClient
 import okhttp3.OkHttpClient
@@ -21,5 +22,6 @@ object LlmClients {
         ApiStyle.ANTHROPIC -> AnthropicClient(config, http, quirks, pricing)
         ApiStyle.OPENAI_RESPONSES -> OpenAiResponsesClient(config, http, quirks, pricing)
         ApiStyle.OPENAI_CHAT -> OpenAiChatClient(config, http, quirks, pricing)
+        ApiStyle.MEDIA -> MediaProviderClient(config, http)
     }
 }

@@ -21,6 +21,7 @@ import io.dtsoftware.facet.data.repo.ConversationRepository
 import io.dtsoftware.facet.data.repo.ProviderRepository
 import io.dtsoftware.facet.domain.tools.PreparedTools
 import io.dtsoftware.facet.domain.tools.ToolCallRecord
+import io.dtsoftware.facet.domain.tools.ToolContext
 import io.dtsoftware.facet.domain.tools.ToolKind
 import io.dtsoftware.facet.domain.tools.ToolOutcome
 import io.dtsoftware.facet.domain.tools.ToolRegistry
@@ -97,6 +98,8 @@ data class LiveTurn(
     val citations: List<Citation> = emptyList(),
     val notice: String? = null,
     val tools: List<ToolActivity> = emptyList(),
+    /** Media created by tools during this reply. */
+    val attachments: List<io.dtsoftware.facet.data.AttachmentRef> = emptyList(),
     val startedAt: Long = Clock.now(),
 )
 
@@ -290,6 +293,7 @@ class ChatEngine(
         var stop: StopReason? = null
         var error: LlmError? = null
         val citations = LinkedHashMap<String, Citation>()
+        val attachments = ArrayList<io.dtsoftware.facet.data.AttachmentRef>()
         val activities = LinkedHashMap<String, ToolActivity>()
         val steps = ArrayList<ToolStep>()
         var servedModel: String = ""
@@ -310,7 +314,13 @@ class ChatEngine(
             _live.update { map -> map[reply.id]?.let { map + (reply.id to transform(it)) } ?: map }
         }
 
-        fun publishTools() = publish { it.copy(tools = st.activities.values.toList(), citations = st.citations.values.toList()) }
+        fun publishTools() = publish {
+            it.copy(
+                tools = st.activities.values.toList(),
+                citations = st.citations.values.toList(),
+                attachments = synchronized(st.attachments) { st.attachments.toList() },
+            )
+        }
 
         try {
             val base = buildRequest(conversationId, reply, model)
@@ -408,7 +418,7 @@ class ChatEngine(
                 round++
 
                 val records = coroutineScope {
-                    calls.map { call -> async { runTool(call, prepared, st, reply.id) { publishTools() } } }.awaitAll()
+                    calls.map { call -> async { runTool(call, prepared, st, reply) { publishTools() } } }.awaitAll()
                 }
                 st.steps += ToolStep(st.stepText.toString(), records, st.blocks)
                 val assistantParts = buildList<Part> {
@@ -458,7 +468,7 @@ class ChatEngine(
         call: StreamEvent.ToolCallReady,
         prepared: PreparedTools,
         st: ReplyState,
-        replyId: String,
+        reply: MessageEntity,
         onUpdate: () -> Unit,
     ): ToolCallRecord {
         val def = prepared.byName[call.name]
@@ -487,7 +497,8 @@ class ChatEngine(
         update { it.copy(status = ToolStatus.RUNNING) }
         val start = Clock.now()
         val outcome = try {
-            withTimeout(TOOL_TIMEOUT_MS) { tools.execute(def, call.argumentsJson) }
+            val ctx = ToolContext(reply.conversationId) { progress -> update { it.copy(label = progress) } }
+            withTimeout(if (def.kind == ToolKind.MEDIA) MEDIA_TOOL_TIMEOUT_MS else TOOL_TIMEOUT_MS) { tools.execute(def, call.argumentsJson, ctx) }
         } catch (e: CancellationException) {
             if (e is kotlinx.coroutines.TimeoutCancellationException) ToolOutcome("The tool timed out after ${TOOL_TIMEOUT_MS / 1000} s.", true) else throw e
         } catch (e: Exception) {
@@ -495,6 +506,7 @@ class ChatEngine(
         }
         val result = outcome.content.let { if (it.length > ToolRegistry.MAX_RESULT_CHARS) it.take(ToolRegistry.MAX_RESULT_CHARS) + "\n\n[Output truncated.]" else it }
         synchronized(st.citations) { outcome.citations.forEach { c -> st.citations.putIfAbsent(c.url, c) } }
+        synchronized(st.attachments) { st.attachments += outcome.attachments }
         val label = outcome.label ?: runningLabel(def, call.argumentsJson, done = true)
         update { it.copy(status = if (outcome.isError) ToolStatus.ERROR else ToolStatus.DONE, label = label, result = result.take(2_000)) }
         return ToolCallRecord(call.id, call.name, def.kind.name, label, call.argumentsJson, result, outcome.isError, Clock.now() - start, def.serverName)
@@ -515,6 +527,13 @@ class ChatEngine(
             ToolKind.FETCH -> (if (done) "Read " else "Reading ") + (runCatching { java.net.URI(s("url")).host?.removePrefix("www.") }.getOrNull() ?: "a page")
             ToolKind.SKILL -> if (s("name").isNotBlank()) (if (done) "Used skill " else "Using skill ") + s("name") else (if (done) "Read " else "Reading ") + s("path")
             ToolKind.MCP -> "${def.serverName}: ${def.remoteName}"
+            ToolKind.MEDIA -> (if (done) "Created " else "Creating ") + when (def.output) {
+                io.dtsoftware.facet.llm.ModelOutput.IMAGE -> "an image"
+                io.dtsoftware.facet.llm.ModelOutput.VIDEO -> "a video"
+                io.dtsoftware.facet.llm.ModelOutput.SPEECH -> "speech"
+                io.dtsoftware.facet.llm.ModelOutput.MUSIC -> "music"
+                else -> "media"
+            }
             null -> "Tool"
         }
     }
@@ -556,6 +575,8 @@ class ChatEngine(
                 usageJson = usage?.let { AppJson.encodeToString(it) },
                 costUsd = cost,
                 stepsJson = trace?.let { AppJson.encodeToString(it) },
+                attachmentsJson = synchronized(st.attachments) { st.attachments.toList() }.takeIf { it.isNotEmpty() }
+                    ?.let { AppJson.encodeToString(it) } ?: current.attachmentsJson,
             ),
         )
         conversations.update(reply.conversationId, touchActivity = true) { it }
@@ -690,6 +711,8 @@ class ChatEngine(
 
     companion object {
         const val TOOL_TIMEOUT_MS = 130_000L
+        /** Video and long music can take several minutes. */
+        const val MEDIA_TOOL_TIMEOUT_MS = 12 * 60_000L
     }
 }
 

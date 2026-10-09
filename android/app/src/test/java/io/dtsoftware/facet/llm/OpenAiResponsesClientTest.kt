@@ -143,8 +143,15 @@ class OpenAiResponsesClientTest : MockServerTest() {
             {"id":"gpt-4.1","object":"model","created":1744300000,"owned_by":"system"},
             {"id":"gpt-4o-mini","object":"model","created":1721000000,"owned_by":"system"}
         ]}"""))
-        val models = client().listModels()
+        val all = client().listModels()
+        val models = all.filter { it.output == ModelOutput.TEXT }
         assertEquals(listOf("gpt-5.5", "gpt-4.1", "o4-mini", "gpt-4o-mini"), models.map { it.id })
+        // Media models are kept and sorted by what they make; embeddings and realtime models are left out.
+        val media = all.filter { it.output != ModelOutput.TEXT }.associate { it.id to it.output }
+        assertEquals(
+            mapOf("gpt-4o-mini-tts" to ModelOutput.SPEECH, "gpt-image-1" to ModelOutput.IMAGE, "dall-e-3" to ModelOutput.IMAGE, "whisper-1" to ModelOutput.TRANSCRIPTION),
+            media,
+        )
         assertEquals(listOf("GPT-5.5", "GPT-4.1", "o4-mini", "GPT-4o mini"), models.map { it.displayName })
         assertEquals(ReasoningKind.EFFORT, models[0].caps.reasoning.kind)
         assertTrue(models[3].caps.sampling && models[3].caps.vision)

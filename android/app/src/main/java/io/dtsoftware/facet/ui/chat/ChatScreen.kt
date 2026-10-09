@@ -174,18 +174,40 @@ fun ChatScreen(
         if (ok && uri != null) vm.addAttachments(listOf(uri))
     }
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    /** Dictates with the transcription model chosen in Settings, else the phone's recognizer. */
+    fun beginDictation() {
+        scope.launch {
+            when {
+                container.media.dictationAvailable() -> voice.startRecording(
+                    scope,
+                    { audio, mime, name -> container.media.transcribe(audio, mime, name) },
+                    { input = appendText(input, it) },
+                    { toast(it) },
+                )
+                !voice.available -> toast("Speech recognition isn't available on this device.")
+                else -> startVoice(voice, { input = appendText(input, it) }, { toast(it) })
+            }
+        }
+    }
+
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) startVoice(voice, { input = appendText(input, it) }, { toast(it) }) else toast("Allow microphone access to dictate.")
+        if (granted) beginDictation() else toast("Allow microphone access to dictate.")
     }
 
     fun onMic() {
         if (voice.listening) { voice.stop(); return }
-        if (!voice.available) { toast("Speech recognition isn't available on this device."); return }
+        if (voice.transcribing) return
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            startVoice(voice, { input = appendText(input, it) }, { toast(it) })
+            beginDictation()
         } else {
             micPermission.launch(Manifest.permission.RECORD_AUDIO)
         }
+    }
+
+    // Read aloud uses the chosen speech model when there is one.
+    LaunchedEffect(speaker) {
+        speaker.aiVoice = { text -> container.media.speak(text) }
+        speaker.onError = { toast(it) }
     }
 
     // ---- events ----
@@ -297,6 +319,11 @@ fun ChatScreen(
                             onOpenAttachment = onOpenAttachment,
                             thumbnail = { id, px -> vm.thumbnail(id, px) },
                             onApproval = { id, decision -> container.chat.respondToApproval(id, decision) },
+                            mediaFile = { id ->
+                                container.sync.ensureLocal(id)
+                                container.attachments.get(id)?.let { container.attachments.file(it) }
+                            },
+                            mediaDuration = { id -> container.attachments.durationMs(id) },
                         ),
                     )
                     // A pending approval card is where attention belongs; keep the button off it.

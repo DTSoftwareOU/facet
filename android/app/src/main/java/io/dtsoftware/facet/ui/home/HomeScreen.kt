@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -108,6 +109,7 @@ fun HomeScreen(
     var folderMenu by remember { mutableStateOf<FolderEntity?>(null) }
     var deleteFolder by remember { mutableStateOf<FolderEntity?>(null) }
     var viewer by remember { mutableStateOf<AttachmentRef?>(null) }
+    var videoViewer by remember { mutableStateOf<AttachmentRef?>(null) }
 
     val pending by launchRequests.collectAsStateWithLifecycle()
     LaunchedEffect(pending) {
@@ -133,6 +135,8 @@ fun HomeScreen(
             }
             if (ref.kind == "image") {
                 viewer = ref
+            } else if (ref.kind == "video") {
+                videoViewer = ref
             } else {
                 val a = container.attachments.get(ref.id) ?: return@launch
                 val file = container.attachments.file(a) ?: return@launch
@@ -246,6 +250,7 @@ fun HomeScreen(
         )
     }
     viewer?.let { ref -> ImageViewer(container, ref) { viewer = null } }
+    videoViewer?.let { ref -> VideoViewer(container, ref) { videoViewer = null } }
 }
 
 @Composable
@@ -301,11 +306,61 @@ private fun ImageViewer(container: AppContainer, ref: AttachmentRef, onDismiss: 
                     modifier = Modifier.fillMaxSize().graphicsLayer(scaleX = scale, scaleY = scale, translationX = ox, translationY = oy),
                 )
             }
-            FacetIconButton(
-                R.drawable.ic_close, "Close", onDismiss, tint = Color.White,
-                modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp),
-                background = Color(0x66000000),
-            )
+            ViewerButtons(container, ref, onDismiss, Modifier.align(Alignment.TopEnd))
+        }
+    }
+}
+
+/** Close and share, over a full-screen image or video. */
+@Composable
+private fun ViewerButtons(container: AppContainer, ref: AttachmentRef, onDismiss: () -> Unit, modifier: Modifier) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    Row(modifier.statusBarsPadding().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FacetIconButton(
+            R.drawable.ic_share, "Share", {
+                scope.launch {
+                    val a = container.attachments.get(ref.id) ?: return@launch
+                    val file = container.attachments.file(a) ?: return@launch
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = a.mimeType
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    runCatching { context.startActivity(Intent.createChooser(send, a.name)) }
+                }
+            },
+            tint = Color.White, background = Color(0x66000000),
+        )
+        FacetIconButton(R.drawable.ic_close, "Close", onDismiss, tint = Color.White, background = Color(0x66000000))
+    }
+}
+
+/** Full-screen player for a generated or attached video. */
+@Composable
+private fun VideoViewer(container: AppContainer, ref: AttachmentRef, onDismiss: () -> Unit) {
+    val file by produceState<java.io.File?>(null, ref.id) {
+        value = container.attachments.get(ref.id)?.let { container.attachments.file(it) }
+    }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            file?.let { f ->
+                androidx.compose.ui.viewinterop.AndroidView(
+                    factory = { ctx ->
+                        android.widget.VideoView(ctx).apply {
+                            val controller = android.widget.MediaController(ctx)
+                            controller.setAnchorView(this)
+                            setMediaController(controller)
+                            setVideoPath(f.path)
+                            setOnPreparedListener { mp -> mp.isLooping = true; start() }
+                        }
+                    },
+                    onRelease = { it.stopPlayback() },
+                    modifier = Modifier.align(Alignment.Center).fillMaxWidth(),
+                )
+            }
+            ViewerButtons(container, ref, onDismiss, Modifier.align(Alignment.TopEnd))
         }
     }
 }

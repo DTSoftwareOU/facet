@@ -31,6 +31,7 @@ class ToolRegistry(
     private val mcp: McpManager,
     private val skills: SkillRepository,
     private val settings: SettingsStore,
+    private val media: io.dtsoftware.facet.domain.media.MediaService? = null,
 ) {
     /** The configured BYOK search backend, if any. */
     suspend fun searchConfig(): SearchConfig? = providers.all()
@@ -108,6 +109,14 @@ class ToolRegistry(
                 }
             }
         }
+        val svc = media
+        if (params.tools && caps.tools && svc != null && settings.synced.value.media.chatTools) {
+            for (output in MEDIA_TOOLS.keys) {
+                val choice = runCatching { svc.resolve(output) }.getOrNull() ?: continue
+                defs += mediaTool(output, choice.model.displayName)
+            }
+        }
+
         return PreparedTools(
             defs,
             addendum.takeIf { it.isNotEmpty() }?.joinToString("\n\n"),
@@ -115,7 +124,7 @@ class ToolRegistry(
         )
     }
 
-    suspend fun execute(def: ToolDef, argumentsJson: String): ToolOutcome {
+    suspend fun execute(def: ToolDef, argumentsJson: String, ctx: ToolContext = ToolContext()): ToolOutcome {
         val args = runCatching { AppJson.parseToJsonElement(argumentsJson.ifBlank { "{}" }).jsonObject }.getOrNull()
             ?: return ToolOutcome("The tool arguments were not valid JSON. Send a JSON object matching the schema.", isError = true)
         fun str(k: String) = args[k]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
@@ -164,6 +173,29 @@ class ToolRegistry(
                     ToolOutcome(f.content, label = "Read ${f.path} from ${s.name}")
                 }
             }
+            ToolKind.MEDIA -> {
+                val output = def.output ?: return ToolOutcome("Unknown media tool.", true)
+                val svc = media ?: return ToolOutcome("Media models aren't available.", true)
+                val convId = ctx.conversationId ?: return ToolOutcome("Media can only be created in a chat.", true)
+                val prompt = str(if (output == io.dtsoftware.facet.llm.ModelOutput.SPEECH) "text" else "prompt")
+                if (prompt.isBlank()) return ToolOutcome("Describe what to create in \"prompt\".", true)
+                val aspect = when (str("aspect_ratio").lowercase()) {
+                    "portrait" -> io.dtsoftware.facet.llm.media.Aspect.PORTRAIT
+                    "landscape" -> io.dtsoftware.facet.llm.media.Aspect.LANDSCAPE
+                    "square" -> io.dtsoftware.facet.llm.media.Aspect.SQUARE
+                    else -> null
+                }
+                val seconds = args["seconds"]?.jsonPrimitive?.intOrNull
+                val (att, choice) = svc.create(output, prompt, convId, aspect, seconds, ctx.onProgress)
+                val what = MEDIA_TOOLS.getValue(output).noun
+                val size = if (att.width != null && att.height != null) ", ${att.width}×${att.height}" else ""
+                ToolOutcome(
+                    "Created the $what with ${choice.model.displayName} (${att.mimeType}$size). It is already shown to the user " +
+                        "below your message; don't link or describe a file path. Briefly say what you made, and offer changes.",
+                    label = "Created $what with ${choice.model.displayName}",
+                    attachments = listOf(io.dtsoftware.facet.data.repo.AttachmentStore.ref(att)),
+                )
+            }
             ToolKind.MCP -> {
                 val r = mcp.call(def.serverId!!, def.remoteName!!, AppJson.encodeToString(JsonObject.serializer(), args))
                 val text = buildString {
@@ -174,6 +206,13 @@ class ToolRegistry(
             }
         }
     }
+
+    private fun mediaTool(output: io.dtsoftware.facet.llm.ModelOutput, modelName: String): ToolDef {
+        val t = MEDIA_TOOLS.getValue(output)
+        return ToolDef(ToolSpec(t.name, t.description.replace("{model}", modelName), t.schema), ToolKind.MEDIA, output = output)
+    }
+
+    private class MediaToolSpec(val name: String, val noun: String, val description: String, val schema: String)
 
     companion object {
         const val WEB_SEARCH = "web_search"
@@ -186,6 +225,34 @@ class ToolRegistry(
         const val EMPTY_SCHEMA ="""{"type":"object","properties":{}}"""
         /** Cap on tool output kept in history (sent to the model and stored identically). */
         const val MAX_RESULT_CHARS = 30_000
+
+        private val MEDIA_TOOLS = linkedMapOf(
+            io.dtsoftware.facet.llm.ModelOutput.IMAGE to MediaToolSpec(
+                "generate_image", "image",
+                "Create an image with {model} and show it to the user. Use for any request to draw, paint, design, illustrate or " +
+                    "picture something (photos, art, logos, diagrams). Write a rich, specific visual prompt in English; include style, " +
+                    "subject, composition, lighting and any text to render.",
+                """{"type":"object","properties":{"prompt":{"type":"string","description":"Detailed description of the image"},"aspect_ratio":{"type":"string","enum":["square","portrait","landscape"]}},"required":["prompt"],"additionalProperties":false}""",
+            ),
+            io.dtsoftware.facet.llm.ModelOutput.VIDEO to MediaToolSpec(
+                "generate_video", "video",
+                "Create a short video clip (a few seconds, with sound when the model supports it) with {model} and show it to the user. " +
+                    "It takes a minute or more. Describe the scene, motion, camera and audio.",
+                """{"type":"object","properties":{"prompt":{"type":"string","description":"Scene, action, camera movement and sound"},"aspect_ratio":{"type":"string","enum":["landscape","portrait"]}},"required":["prompt"],"additionalProperties":false}""",
+            ),
+            io.dtsoftware.facet.llm.ModelOutput.SPEECH to MediaToolSpec(
+                "generate_speech", "audio clip",
+                "Turn text into natural spoken audio with {model} and give the user the clip. Use when they ask to hear something, " +
+                    "want a voiceover, or want audio of a text.",
+                """{"type":"object","properties":{"text":{"type":"string","description":"Exactly what to say"}},"required":["text"],"additionalProperties":false}""",
+            ),
+            io.dtsoftware.facet.llm.ModelOutput.MUSIC to MediaToolSpec(
+                "generate_music", "track",
+                "Compose music or a sound effect with {model} and give the user the audio. Describe genre, mood, instruments, " +
+                    "tempo and structure (or the sound, for effects).",
+                """{"type":"object","properties":{"prompt":{"type":"string","description":"Genre, mood, instruments, tempo; or the sound to make"},"seconds":{"type":"integer","minimum":3,"maximum":300}},"required":["prompt"],"additionalProperties":false}""",
+            ),
+        )
 
         private const val WEB_SEARCH_DESC =
             "Search the web for current information. Use for recent events, facts you aren't sure about, prices, or anything that may have changed. Returns numbered results with URLs and snippets."

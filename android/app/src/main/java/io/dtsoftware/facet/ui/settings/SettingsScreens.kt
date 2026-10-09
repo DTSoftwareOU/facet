@@ -163,6 +163,8 @@ fun SettingsScreen(container: AppContainer, onBack: () -> Unit, navigate: (Any) 
             GroupDivider()
             SettingsRow("Skills", subtitle = "Reusable instructions models load on demand", icon = R.drawable.ic_wand, onClick = { navigate(Routes.Skills) })
             GroupDivider()
+            SettingsRow("Media models", subtitle = "Images, video, voices, music and transcription", icon = R.drawable.ic_sparkles, onClick = { navigate(Routes.MediaModels) })
+            GroupDivider()
             SwitchRow(
                 "YOLO mode", synced.yoloMode, { on -> container.settings.updateSynced { it.copy(yoloMode = on) } },
                 subtitle = "Run every tool without asking, and allow up to ${ToolRegistry.YOLO_TOOL_ROUNDS} tool rounds per reply.",

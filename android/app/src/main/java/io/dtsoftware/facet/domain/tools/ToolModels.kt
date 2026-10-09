@@ -13,7 +13,7 @@ enum class ToolApproval(val label: String, val blurb: String) {
     NEVER("Never ask", "Run tools without asking."),
 }
 
-enum class ToolKind { SEARCH, FETCH, SKILL, MCP }
+enum class ToolKind { SEARCH, FETCH, SKILL, MCP, MEDIA }
 
 /** A tool offered to the model for one request. */
 data class ToolDef(
@@ -24,7 +24,12 @@ data class ToolDef(
     val serverName: String? = null,
     val remoteName: String? = null,
     val needsApproval: Boolean = false,
+    /** For MEDIA tools: what the tool makes. */
+    val output: io.dtsoftware.facet.llm.ModelOutput? = null,
 )
+
+/** Where a tool runs: the reply's chat, and a way to show progress (e.g. "Creating video · 1:20"). */
+data class ToolContext(val conversationId: String? = null, val onProgress: (String) -> Unit = {})
 
 /** What a tool returned, ready for the model and the UI. */
 data class ToolOutcome(
@@ -33,6 +38,8 @@ data class ToolOutcome(
     val citations: List<Citation> = emptyList(),
     /** Short past-tense line for the UI, e.g. "Searched “rent prices in Porto”". */
     val label: String? = null,
+    /** Media the tool created, shown with the reply. */
+    val attachments: List<io.dtsoftware.facet.data.AttachmentRef> = emptyList(),
 )
 
 @Serializable

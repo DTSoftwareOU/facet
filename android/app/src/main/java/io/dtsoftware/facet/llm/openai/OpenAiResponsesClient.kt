@@ -14,8 +14,10 @@ import io.dtsoftware.facet.llm.LlmClient
 import io.dtsoftware.facet.llm.LlmError
 import io.dtsoftware.facet.llm.LlmErrors
 import io.dtsoftware.facet.llm.LlmException
+import io.dtsoftware.facet.llm.ModelCaps
 import io.dtsoftware.facet.llm.ModelCatalog
 import io.dtsoftware.facet.llm.ModelInfo
+import io.dtsoftware.facet.llm.ModelOutput
 import io.dtsoftware.facet.llm.ParamHealer
 import io.dtsoftware.facet.llm.ParamSpec
 import io.dtsoftware.facet.llm.Part
@@ -90,18 +92,24 @@ internal class OpenAiResponsesClient(
     override suspend fun listModels(): List<ModelInfo> {
         val body = fetch(requestBuilder("models").get().build())
         val data = parseObjectOrNull(body)?.arr("data") ?: return emptyList()
+        // Chat models, plus image, speech and transcription models (sorted into their kind).
         val entries = data.mapNotNull { it as? JsonObject }.mapNotNull { m -> m.str("id")?.let { it to m.long("created") } }
-            .filter { ModelCatalog.isOpenAiChatModel(it.first) }
+            .mapNotNull { (id, created) ->
+                val output = if (ModelCatalog.isOpenAiChatModel(id)) ModelOutput.TEXT
+                else ModelCatalog.mediaOutput(config.kind, id)?.takeIf { ModelCatalog.canRun(config.kind, it) }
+                output?.let { Triple(id, created, it) }
+            }
         val visible = ModelCatalog.hideDatedDuplicates(entries.map { it.first })
         return entries.filter { it.first in visible }
             .sortedByDescending { it.second ?: 0L }
-            .map { (id, created) ->
+            .map { (id, created, output) ->
                 ModelInfo(
                     id = id,
                     displayName = ModelCatalog.displayName(config.kind, id),
-                    caps = ModelCatalog.openAiCaps(id),
+                    caps = if (output == ModelOutput.TEXT) ModelCatalog.openAiCaps(id) else ModelCaps(tools = false),
                     pricing = pricing?.priceFor(config.kind, id),
                     createdAt = created?.times(1000),
+                    output = output,
                 )
             }
     }
