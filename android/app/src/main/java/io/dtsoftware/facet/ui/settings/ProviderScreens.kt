@@ -206,7 +206,7 @@ fun ProviderEditScreen(container: AppContainer, providerId: String?, kindId: Str
                 Modifier.clip(FacetShapes.small).clickable { uri.openUri(url) }.padding(horizontal = 4.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(if (kind.requiresKey) "Get a ${kind.displayName} key" else "About ${kind.displayName}", style = FacetTheme.type.labelM, color = c.primary)
+                Text(if (kind.requiresKey) "Get an API key from ${kind.displayName}" else "About ${kind.displayName}", style = FacetTheme.type.labelM, color = c.primary)
                 Spacer(Modifier.width(4.dp))
                 FacetIcon(R.drawable.ic_external, null, tint = c.primary, size = 14.dp)
             }

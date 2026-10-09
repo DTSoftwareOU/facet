@@ -452,9 +452,9 @@ private fun ChatTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (showMenuButton) FacetIconButton(R.drawable.ic_menu, "Open chats", onMenu) else Spacer(Modifier.width(8.dp))
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
         Row(
             Modifier
-                .weight(1f, fill = false)
                 .clip(RoundedCornerShape(14.dp))
                 .clickable(onClick = onModel)
                 .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -475,7 +475,7 @@ private fun ChatTopBar(
             Spacer(Modifier.width(4.dp))
             FacetIcon(R.drawable.ic_chevron_down, null, tint = c.textSecondary, size = 18.dp)
         }
-        Spacer(Modifier.weight(0.001f))
+        }
         if (state.conversation != null) FacetIconButton(R.drawable.ic_new_chat, "New chat", onNewChat)
         FacetIconButton(R.drawable.ic_sliders, "Chat settings", onSettings)
         if (state.conversation != null) {
