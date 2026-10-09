@@ -219,7 +219,7 @@ class SyncEndToEndTest {
         val now = Clock.now()
         a.conversations.insertMessage(MessageEntity(Ids.new(), conv.id, null, "user", "Hello", createdAt = now, updatedAt = now))
 
-        // A small file fits; a big one (incompressible, like MP3) doesn't and stays on this device.
+        // A small file fits; a big one (incompressible, like MP3) doesn't and waits on this device.
         fun file(bytes: Int, name: String, mime: String): String {
             val id = Ids.new()
             val data = ByteArray(bytes).also { java.util.Random(bytes.toLong()).nextBytes(it) }
@@ -237,7 +237,7 @@ class SyncEndToEndTest {
 
         assertTrue("small file synced", a.db.attachments().get(small)!!.uploaded)
         val bigRow = a.db.attachments().get(big)!!
-        assertTrue("big file kept on this device: $bigRow / ${a.sync.state.value}", bigRow.localOnly && !bigRow.uploaded)
+        assertTrue("big file waits on this device: $bigRow / ${a.sync.state.value}", !bigRow.localOnly && !bigRow.uploaded)
         assertFalse("its record still synced", bigRow.dirty)
         assertTrue(a.sync.state.value.storageFull)
         val usage = a.auth.state.value as AccountState.SignedIn
@@ -258,5 +258,76 @@ class SyncEndToEndTest {
         assertTrue(a.attachments.file(a.db.attachments().get(small)!!) != null)
         a.auth.refreshAccount()
         assertEquals(0L, (a.auth.state.value as AccountState.SignedIn).blobBytes)
+    }
+
+    private fun Device.addFile(conversationId: String, bytes: Int, name: String, createdAt: Long): String = runBlocking {
+        val id = Ids.new()
+        val data = ByteArray(bytes).also { java.util.Random(createdAt + bytes).nextBytes(it) }
+        File(attachments.dir, "$id.mp3").writeBytes(data)
+        db.attachments().upsert(
+            AttachmentEntity(id, conversationId, "audio", "audio/mpeg", name, data.size.toLong(), localFile = "$id.mp3", createdAt = createdAt, updatedAt = Clock.now()),
+        )
+        id
+    }
+
+    @Test
+    fun fullStorageClearsOldestFilesFromTheCloudAndKeepsThemOnDevices() = runBlocking {
+        assumeTrue("Small-quota Facet server not running at $smallServer", serverUp(smallServer))
+        val email = "cleanup-${Ids.new()}@example.com"
+        val password = "correct horse battery staple"
+        val a = Device("ca", smallServer)
+        a.auth.register(email, password, null)
+        val conv = a.conversations.create(null, null, null, GenParams())
+        val t0 = Clock.now() - 60_000
+        val oldest = a.addFile(conv.id, 18_000, "oldest.mp3", t0)
+        val older = a.addFile(conv.id, 18_000, "older.mp3", t0 + 1_000)
+        a.syncOk()
+        assertTrue(a.db.attachments().get(oldest)!!.uploaded && a.db.attachments().get(older)!!.uploaded)
+
+        // Device B downloads the oldest file.
+        val b = Device("cb", smallServer)
+        b.auth.login(email, password)
+        b.syncOk()
+        assertTrue(b.sync.ensureLocal(oldest))
+
+        // A new file doesn't fit in the 64 KiB quota: the oldest file leaves sync storage to make room.
+        val newest = a.addFile(conv.id, 30_000, "newest.mp3", Clock.now())
+        a.syncOk()
+        val o = a.db.attachments().get(oldest)!!
+        assertTrue("oldest is now on this device only: $o", o.localOnly && !o.uploaded)
+        assertNotNull("and its file is still here", a.attachments.file(o))
+        assertTrue("older stays in sync storage", a.db.attachments().get(older)!!.uploaded)
+        assertTrue("newest uploaded", a.db.attachments().get(newest)!!.uploaded)
+        assertFalse(a.sync.state.value.storageFull)
+        assertEquals(1, a.sync.autoFreed.value!!.files)
+        val usage = a.auth.state.value as AccountState.SignedIn
+        assertTrue("${usage.usedBytes} within ${usage.quotaBytes}", usage.usedBytes <= usage.quotaBytes)
+
+        // B had a copy: it keeps it as device-only, and "Remove downloaded copies" leaves it alone.
+        b.syncOk()
+        val bo = b.db.attachments().get(oldest)!!
+        assertTrue("B keeps its copy: $bo", bo.localOnly && !bo.uploaded)
+        b.sync.clearDownloadedCopies()
+        assertNotNull(b.attachments.file(b.db.attachments().get(oldest)!!))
+
+        // A device without a copy can't fetch it any more; newer files still download.
+        val c = Device("cc", smallServer)
+        c.auth.login(email, password)
+        c.syncOk()
+        assertFalse(c.sync.ensureLocal(oldest))
+        assertTrue(c.sync.ensureLocal(newest))
+
+        // With clean-up off, a file that doesn't fit waits on its device and uploads once there's room.
+        a.settings.updateSynced { it.copy(autoFreeSpace = false) }
+        val later = a.addFile(conv.id, 20_000, "later.mp3", Clock.now())
+        a.syncOk()
+        val l = a.db.attachments().get(later)!!
+        assertTrue("later waits, its record synced: $l", !l.uploaded && !l.localOnly && !l.dirty)
+        assertTrue(a.sync.state.value.storageFull)
+        assertTrue("older wasn't cleared", a.db.attachments().get(older)!!.uploaded)
+        a.sync.keepOnDeviceOnly(older)
+        a.syncOk()
+        assertTrue("later uploaded once there was room", a.db.attachments().get(later)!!.uploaded)
+        assertFalse(a.sync.state.value.storageFull)
     }
 }

@@ -97,6 +97,8 @@ data class SyncedPrefs(
     /** YOLO mode: run every tool call without asking, and let the model take more tool rounds. */
     val yoloMode: Boolean = false,
     val media: MediaPrefs = MediaPrefs(),
+    /** When sync storage is full, remove the cloud copies of the oldest files; devices that have them keep them. */
+    val autoFreeSpace: Boolean = true,
     val updatedAt: Long = 0,
 )
 

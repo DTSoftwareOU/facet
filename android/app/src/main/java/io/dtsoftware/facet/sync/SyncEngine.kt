@@ -46,6 +46,9 @@ data class SyncState(
     val storageFull: Boolean = false,
 )
 
+/** An automatic clean-up: [files] old files ([bytes]) left sync storage and stayed on the devices that had them. */
+data class AutoFreed(val at: Long, val files: Int, val bytes: Long)
+
 /**
  * Offline-first, end-to-end encrypted sync (docs/API.md "Sync"). Local rows carry a dirty flag;
  * pushes are last-writer-wins on `updatedAt`; pulls follow the server's change cursor.
@@ -78,6 +81,13 @@ class SyncEngine(
     private var lastAccountRefresh = 0L
     @Volatile private var storageFull = false
     @Volatile private var uploadedBytes = 0L
+    private var roomChecks = 0
+
+    private val _autoFreed = MutableStateFlow(
+        prefs.getLong(K_FREED_AT, 0).takeIf { it > 0 }?.let { AutoFreed(it, prefs.getInt(K_FREED_FILES, 0), prefs.getLong(K_FREED_BYTES, 0)) },
+    )
+    /** The last automatic clean-up this device did, if any. */
+    val autoFreed: StateFlow<AutoFreed?> = _autoFreed.asStateFlow()
 
     private var cursor: Long
         get() = prefs.getLong(K_CURSOR, 0)
@@ -132,6 +142,7 @@ class SyncEngine(
         _state.value = _state.value.copy(phase = SyncPhase.SYNCING, message = null)
         storageFull = false
         uploadedBytes = 0
+        roomChecks = 0
         return try {
             withContext(Dispatchers.IO) {
                 push(codec, key)
@@ -171,9 +182,15 @@ class SyncEngine(
     private class Pending(val record: RecordDto, val onAccepted: suspend () -> Unit)
 
     private suspend fun push(codec: RecordCodec, vaultKey: ByteArray) {
+        // Clean up as storage fills, so devices that hold none of the old files can keep syncing too.
+        if (settings.synced.value.autoFreeSpace) {
+            account()?.takeIf { it.quotaBytes > 0 }?.let { ensureRoom(codec, it.quotaBytes / 50, Long.MAX_VALUE, fresh = false) }
+        }
+        retryWaitingFiles(codec)
         repeat(MAX_ROUNDS) {
             val batch = collectDirty(codec, vaultKey)
             if (batch.isEmpty()) return
+            var refusedForSpace = false
             for (chunk in chunked(batch)) {
                 val res = auth.authed { base, token -> api.push(base, token, chunk.map { it.record }) }
                 val byKey = chunk.associateBy { it.record.type + "/" + it.record.id }
@@ -181,10 +198,17 @@ class SyncEngine(
                     res.accepted.forEach { a -> byKey[a.type + "/" + a.id]?.onAccepted?.invoke() }
                     res.rejected.forEach { r -> r.current?.let { applyRemote(codec, it, force = true) } }
                 }
-                // Refused for space: those changes stay queued here until space is freed.
-                if (res.rejected.any { it.reason == "quota" }) storageFull = true
+                // Refused for space: make room and send them next round, or keep them queued here until there's space.
+                val refused = res.rejected.filter { it.reason == "quota" }
+                if (refused.isNotEmpty()) {
+                    val need = refused.sumOf { r -> (byKey[r.type + "/" + r.id]?.record?.ct?.length ?: 0) * 3L / 4 + RECORD_OVERHEAD }
+                    if (!ensureRoom(codec, need, Long.MAX_VALUE, fresh = true)) {
+                        storageFull = true
+                        refusedForSpace = true
+                    }
+                }
             }
-            if (storageFull) return
+            if (refusedForSpace) return
         }
     }
 
@@ -231,29 +255,26 @@ class SyncEngine(
                 // Files over the server's blob limit stay on this device; only their record syncs.
                 if (file.length() <= MAX_SYNC_BLOB_BYTES) {
                     val blobId = codec.blobId(e.id)
-                    val uploaded = try {
-                        val blob = FacetCrypto.encryptBlob(vaultKey, blobId, file.readBytes(), compressible = compressible(e.mimeType))
-                        auth.authed { base, token -> api.putBlob(base, token, blobId, blob) }
-                        uploadedBytes += blob.size
-                        true
-                    } catch (err: kotlin.coroutines.cancellation.CancellationException) {
-                        throw err
-                    } catch (err: ApiException) {
-                        if (err.code == "quota_exceeded") {
-                            // Sync storage is full: keep the file here and sync just its record.
-                            storageFull = true
-                            atts.markLocalOnly(e.id)
-                            null
-                        } else {
-                            false
-                        }
+                    val blob = try {
+                        FacetCrypto.encryptBlob(vaultKey, blobId, file.readBytes(), compressible = compressible(e.mimeType))
                     } catch (err: Exception) {
-                        false // e.g. a network blip: retry next sync without holding up everything else
+                        return@forEach
                     }
-                    if (uploaded == false) return@forEach
-                    if (uploaded == true) {
-                        atts.markUploaded(e.id)
-                        current = e.copy(uploaded = true)
+                    val size = blob.size.toLong()
+                    // When storage looks full, make room first (by clearing older files) rather than send a doomed upload.
+                    val roomy = ensureRoom(codec, size, e.createdAt, fresh = false)
+                    var result = if (roomy) putBlob(blobId, blob) else Upload.FULL
+                    if (result == Upload.FULL && roomy && ensureRoom(codec, size, e.createdAt, fresh = true)) result = putBlob(blobId, blob)
+                    when (result) {
+                        Upload.DONE -> {
+                            uploadedBytes += size
+                            atts.markUploaded(e.id)
+                            current = e.copy(uploaded = true)
+                        }
+                        // Sync storage is full: the file waits here, its record syncs, and it uploads once there's room.
+                        Upload.FULL -> storageFull = true
+                        // e.g. a network blip: retry next sync without holding up everything else.
+                        Upload.FAILED -> return@forEach
                     }
                 }
             }
@@ -444,6 +465,79 @@ class SyncEngine(
 
     // ---- storage ----
 
+    private enum class Upload { DONE, FULL, FAILED }
+
+    private suspend fun putBlob(blobId: String, blob: ByteArray): Upload = try {
+        auth.authed { base, token -> api.putBlob(base, token, blobId, blob) }
+        Upload.DONE
+    } catch (err: CancellationException) {
+        throw err
+    } catch (err: ApiException) {
+        if (err.code == "quota_exceeded") Upload.FULL else Upload.FAILED
+    } catch (err: Exception) {
+        Upload.FAILED
+    }
+
+    private fun account() = auth.state.value as? AccountState.SignedIn
+
+    /**
+     * Whether [need] more bytes fit in sync storage ([fresh]: check with the server rather than
+     * the last known usage). When they don't and automatic clean-up is on, removes the cloud copies
+     * of the oldest files this device holds (created before [before]), plus some headroom so it
+     * doesn't run on every change. Those files stay on this device, and on any device that
+     * downloaded them. Nothing is removed unless that makes [need] fit.
+     */
+    private suspend fun ensureRoom(codec: RecordCodec, need: Long, before: Long, fresh: Boolean): Boolean {
+        // Bytes past the quota; null when the server sets no quota.
+        fun over(): Long? = account()?.takeIf { it.quotaBytes > 0 }?.let { it.usedBytes + need - it.quotaBytes }
+        if (!fresh && (over() ?: 0) <= 0) return true
+        if (roomChecks++ >= MAX_ROOM_CHECKS) return false
+        runCatching { auth.refreshAccount() }
+        val excess = over() ?: 0
+        if (excess <= 0) return true
+        if (!settings.synced.value.autoFreeSpace) return false
+        val quota = account()?.quotaBytes ?: return false
+        // Only files whose complete copy is here: the cloud copy is the one going away.
+        val candidates = db.attachments().inCloudOldestFirst(before).filter { attachments.file(it)?.length() == it.sizeBytes }
+        if (candidates.sumOf { it.sizeBytes } < excess) return false
+        val goal = excess + quota / 20
+        var freed = 0L
+        var files = 0
+        for (f in candidates) {
+            if (freed >= goal) break
+            try {
+                auth.authed { base, token -> api.deleteBlob(base, token, codec.blobId(f.id)) }
+            } catch (err: CancellationException) {
+                throw err
+            } catch (err: Exception) {
+                break
+            }
+            db.attachments().unsync(f.id, Clock.now())
+            freed += f.sizeBytes
+            files++
+        }
+        if (files == 0) return false
+        val at = Clock.now()
+        prefs.edit().putLong(K_FREED_AT, at).putInt(K_FREED_FILES, files).putLong(K_FREED_BYTES, freed).apply()
+        _autoFreed.value = AutoFreed(at, files, freed)
+        val refreshed = runCatching { auth.refreshAccount() }.isSuccess
+        return (over() ?: 0) - (if (refreshed) 0 else freed) <= 0
+    }
+
+    /** Files that waited because storage was full upload again, oldest first, once there's room for them. */
+    private suspend fun retryWaitingFiles(codec: RecordCodec) {
+        val waiting = db.attachments().waitingForSpace(MAX_SYNC_BLOB_BYTES)
+        var queued = 0L
+        for (f in waiting) {
+            if (!ensureRoom(codec, queued + f.sizeBytes, f.createdAt, fresh = false)) {
+                storageFull = true
+                return
+            }
+            db.attachments().requeue(f.id, Clock.now())
+            queued += f.sizeBytes
+        }
+    }
+
     /** Frees cloud space: deletes a file's encrypted copy from the server and keeps it on this device. */
     suspend fun keepOnDeviceOnly(attachmentId: String) = withContext(Dispatchers.IO) {
         val a = db.attachments().get(attachmentId) ?: return@withContext
@@ -582,6 +676,13 @@ class SyncEngine(
         const val LIMIT = 200
         const val PAGE = 500
         const val MAX_ROUNDS = 25
+        /** Usage checks with the server per sync while storage is tight. */
+        const val MAX_ROOM_CHECKS = 6
+        /** The server counts each record's ciphertext plus this much. */
+        const val RECORD_OVERHEAD = 64L
+        const val K_FREED_AT = "auto_freed_at"
+        const val K_FREED_FILES = "auto_freed_files"
+        const val K_FREED_BYTES = "auto_freed_bytes"
         const val STORAGE_FULL = "Your sync storage is full. New changes and files are kept on this device until you free up space in Settings → Data and storage."
         const val EAGER_DOWNLOAD_MAX = 6L * 1024 * 1024
     }

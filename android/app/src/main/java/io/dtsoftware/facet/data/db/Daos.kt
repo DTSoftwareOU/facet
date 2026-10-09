@@ -178,14 +178,23 @@ interface AttachmentDao {
     @Query("SELECT COUNT(*) FROM attachments WHERE deleted = 0 AND localOnly = 1")
     fun observeLocalOnlyCount(): Flow<Int>
 
-    @Query("UPDATE attachments SET localOnly = 1 WHERE id = :id")
-    suspend fun markLocalOnly(id: String)
+    /** Files in sync storage that this device also holds, oldest first: what automatic clean-up may remove from the cloud. */
+    @Query("SELECT * FROM attachments WHERE deleted = 0 AND uploaded = 1 AND localOnly = 0 AND localFile IS NOT NULL AND conversationId IS NOT NULL AND createdAt < :before ORDER BY createdAt, id")
+    suspend fun inCloudOldestFirst(before: Long): List<AttachmentEntity>
+
+    /** Files that couldn't upload because sync storage was full (their records synced), oldest first. */
+    @Query("SELECT * FROM attachments WHERE deleted = 0 AND uploaded = 0 AND localOnly = 0 AND dirty = 0 AND localFile IS NOT NULL AND conversationId IS NOT NULL AND sizeBytes <= :maxBytes ORDER BY createdAt, id")
+    suspend fun waitingForSpace(maxBytes: Long): List<AttachmentEntity>
+
+    /** Queues a file to upload again; a newer updatedAt so its record wins over the synced "not uploaded" one. */
+    @Query("UPDATE attachments SET dirty = 1, updatedAt = :now WHERE id = :id")
+    suspend fun requeue(id: String, now: Long)
 
     /** Keeps a synced file on this device only: the record syncs again with uploaded = false. */
     @Query("UPDATE attachments SET localOnly = 1, uploaded = 0, dirty = 1, updatedAt = :now WHERE id = :id")
     suspend fun unsync(id: String, now: Long)
 
-    /** Gives files kept on this device another chance to upload (after space was freed). */
+    /** Uploads files kept on this device again (after space was freed). */
     @Query("UPDATE attachments SET localOnly = 0, dirty = 1, updatedAt = :now WHERE localOnly = 1 AND deleted = 0")
     suspend fun retryLocalOnly(now: Long)
 

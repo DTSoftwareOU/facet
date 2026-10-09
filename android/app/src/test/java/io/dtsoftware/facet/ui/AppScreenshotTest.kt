@@ -366,6 +366,42 @@ class AppScreenshotTest {
         shoot("media_models_dark", ThemeMode.DARK) { io.dtsoftware.facet.ui.settings.MediaModelsScreen(c, {}, {}) }
     }
 
+    /** Data and storage for a signed-in account that's nearly full, after an automatic clean-up. */
+    @Test
+    @Config(qualifiers = "w412dp-h1500dp-xxhdpi")
+    fun storageDark() {
+        FakeAndroidKeyStore.install()
+        // Signing in schedules background sync.
+        androidx.work.WorkManager.initialize(app, androidx.work.Configuration.Builder().setExecutor { it.run() }.build())
+        val mb = 1L shl 20
+        app.getSharedPreferences("facet_account", Context.MODE_PRIVATE).edit()
+            .putString("server_url", "http://127.0.0.1:9").putString("user_id", "u").putString("email", "ada@example.com")
+            .putLong("storage_used", 94 * mb).putLong("storage_quota", 100 * mb)
+            .putLong("storage_records", 19 * mb).putLong("storage_blobs", 75 * mb)
+            .putString("access", io.dtsoftware.facet.core.crypto.KeystoreSecretBox().sealString("token"))
+            .putLong("access_exp", Clock.now() + 3_600_000)
+            .commit()
+        app.getSharedPreferences("facet_sync", Context.MODE_PRIVATE).edit()
+            .putLong("auto_freed_at", Clock.now() - 2 * 60 * 60 * 1000L).putInt("auto_freed_files", 3).putLong("auto_freed_bytes", 14 * mb)
+            .commit()
+        val (c, conv) = container()
+        runBlocking {
+            val now = Clock.now()
+            listOf(
+                Triple("lisbon-tram.mp4", 18 * mb, true), Triple("fox-theme-lofi.m4a", 4 * mb, true),
+                Triple("red-fox-poster.webp", 900_000L, false),
+            ).forEachIndexed { i, (name, size, inCloud) ->
+                c.db.attachments().upsert(
+                    io.dtsoftware.facet.data.db.AttachmentEntity(
+                        Ids.new(), conv, if (name.endsWith("mp4")) "video" else if (name.endsWith("m4a")) "audio" else "image",
+                        "application/octet-stream", name, size, uploaded = inCloud, localOnly = !inCloud, createdAt = now - i, updatedAt = now,
+                    ),
+                )
+            }
+        }
+        shoot("storage_dark", ThemeMode.DARK) { io.dtsoftware.facet.ui.settings.DataScreen(c) {} }
+    }
+
     @Test
     fun modelEditDark() {
         val (c, _) = container()

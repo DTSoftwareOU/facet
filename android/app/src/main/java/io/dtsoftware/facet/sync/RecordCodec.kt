@@ -217,7 +217,8 @@ class RecordCodec(private val vaultKey: ByteArray, private val secrets: SecretBo
             r.id, p.conversationId, p.kind, p.mimeType, p.name, p.sizeBytes, p.width, p.height,
             localFile = existing?.localFile, uploaded = p.uploaded,
             // "Kept on this device" is local state; it ends once some device has uploaded the file.
-            localOnly = existing?.localOnly == true && !p.uploaded,
+            // A copy this device downloaded becomes device-only when another device frees the cloud copy.
+            localOnly = !p.uploaded && (existing?.localOnly == true || (existing?.uploaded == true && existing.localFile != null)),
             createdAt = p.createdAt, updatedAt = r.updatedAt,
             deleted = false, dirty = false,
         )

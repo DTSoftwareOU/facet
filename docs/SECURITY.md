@@ -123,8 +123,10 @@ blobId  = base64url-nopad( HMAC-SHA256(recordIdKey, "blob:" + attachmentId)[0..2
 The v2 flags are bound into the AAD, so a server can't flip them. Uploaded as raw
 `application/octet-stream`. Max 32 MiB per blob. One per-user quota covers records and blobs
 (default 100 MiB, `USER_QUOTA_BYTES`). Before upload, clients also shrink generated media:
-large renders are re-encoded as WebP and raw WAV as AAC. When the quota is full, files stay on
-the device ("this device only") and only their records sync.
+large renders are re-encoded as WebP and raw WAV as AAC. When the quota is full, clients delete
+the server copies of the oldest files they hold locally (unless the user turns this off); those
+files stay on every device that has a copy, and their records sync with `uploaded: false`. A file
+that still doesn't fit waits on its device and uploads once there's room.
 
 ## Local storage on Android
 

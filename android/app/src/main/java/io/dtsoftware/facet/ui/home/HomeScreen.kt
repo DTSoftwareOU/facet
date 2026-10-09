@@ -141,7 +141,8 @@ fun HomeScreen(
     fun openAttachment(ref: AttachmentRef) {
         scope.launch {
             if (!container.sync.ensureLocal(ref.id)) {
-                snackbar.showSnackbar("This file isn't on this device yet.")
+                val inSyncStorage = container.attachments.get(ref.id)?.uploaded != false
+                snackbar.showSnackbar(if (inSyncStorage) "This file isn't on this device yet." else "This file is only on another of your devices.")
                 return@launch
             }
             if (ref.kind == "image") {

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dtsoftware.facet.AppContainer
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.util.Dates
 import io.dtsoftware.facet.core.util.Format
 import io.dtsoftware.facet.data.db.AttachmentEntity
 import io.dtsoftware.facet.sync.AccountState
@@ -40,6 +41,7 @@ import io.dtsoftware.facet.ui.components.FacetButton
 import io.dtsoftware.facet.ui.components.GroupDivider
 import io.dtsoftware.facet.ui.components.SettingsGroup
 import io.dtsoftware.facet.ui.components.SettingsRow
+import io.dtsoftware.facet.ui.components.SwitchRow
 import io.dtsoftware.facet.ui.theme.FacetTheme
 import io.dtsoftware.facet.ui.theme.GemPalette
 import java.io.File
@@ -57,6 +59,8 @@ fun StorageSection(container: AppContainer) {
     val sync by container.sync.state.collectAsStateWithLifecycle()
     val largest by container.db.attachments().observeLargest(8).collectAsStateWithLifecycle(emptyList())
     val deviceOnly by container.db.attachments().observeLocalOnlyCount().collectAsStateWithLifecycle(0)
+    val synced by container.settings.synced.collectAsStateWithLifecycle()
+    val autoFreed by container.sync.autoFreed.collectAsStateWithLifecycle()
     var deviceBytes by remember { mutableStateOf<Long?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
     var note by remember { mutableStateOf<String?>(null) }
@@ -92,10 +96,30 @@ fun StorageSection(container: AppContainer) {
                     Legend(GemPalette.Flash, "Files", a.blobBytes)
                 }
                 Text(
-                    if (full) "Storage is full. New changes and files wait on this device until you free up space below or delete old chats."
-                    else "Everything here is end-to-end encrypted. Chats are compressed before upload; files sync until the space is used.",
+                    when {
+                        !full -> "Everything here is end-to-end encrypted. Chats are compressed before upload; files sync until the space is used."
+                        synced.autoFreeSpace -> "Storage is full and this phone has no older files left to clear. New changes wait here until you free up space below or delete old chats."
+                        else -> "Storage is full. New changes and files wait on this device until you free up space below or delete old chats."
+                    },
                     style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal),
                     color = if (full) c.warning else c.textTertiary,
+                )
+            }
+            GroupDivider()
+            SwitchRow(
+                "Free up space automatically",
+                synced.autoFreeSpace,
+                { on -> container.settings.updateSynced { it.copy(autoFreeSpace = on) } },
+                subtitle = "When storage is full, the oldest files leave sync storage. They stay on the devices that have them.",
+                icon = R.drawable.ic_cloud_off,
+            )
+            autoFreed?.let { f ->
+                Text(
+                    "Last clean-up, ${Dates.relative(f.at).let { if (it == "Just now") "just now" else it }}: cleared " +
+                        (if (f.files == 1) "1 old file" else "${f.files} old files") + " (${Format.bytes(f.bytes)}) from sync storage.",
+                    style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal),
+                    color = c.textTertiary,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
                 )
             }
         }
@@ -122,7 +146,7 @@ fun StorageSection(container: AppContainer) {
             GroupDivider()
             SettingsRow(
                 if (deviceOnly == 1) "1 file is only on this device" else "$deviceOnly files are only on this device",
-                subtitle = "Not synced because storage was full, or you freed it up. Tap to try uploading again.",
+                subtitle = "Cleared from sync storage to make room. Tap to upload ${if (deviceOnly == 1) "it" else "them"} again if there's space.",
                 icon = R.drawable.ic_cloud_off,
                 onClick = { scope.launch { container.sync.retryDeviceOnlyFiles(); note = "Trying again. Files upload while there's space." } },
             )
