@@ -1,0 +1,6 @@
+data: {"id":"p1","model":"sonar-pro","created":1760000000,"object":"chat.completion.chunk","citations":["https://a.example.com","https://b.example.com"],"search_results":[{"title":"A site","url":"https://a.example.com","date":"2026-09-01"},{"title":"B site","url":"https://b.example.com"}],"choices":[{"index":0,"delta":{"role":"assistant","content":"Per [1],"},"finish_reason":null}]}
+
+data: {"id":"p1","model":"sonar-pro","created":1760000000,"object":"chat.completion.chunk","citations":["https://a.example.com","https://b.example.com"],"choices":[{"index":0,"delta":{"content":" yes."},"finish_reason":"stop"}],"usage":{"prompt_tokens":8,"completion_tokens":6,"total_tokens":14}}
+
+data: [DONE]
+

@@ -1,0 +1,66 @@
+event: response.created
+data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_1","object":"response","created_at":1760000000,"status":"in_progress","model":"gpt-5.5","output":[],"usage":null}}
+
+event: response.in_progress
+data: {"type":"response.in_progress","sequence_number":1,"response":{"id":"resp_1","object":"response","status":"in_progress","model":"gpt-5.5","output":[]}}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":2,"output_index":0,"item":{"id":"rs_1","type":"reasoning","summary":[]}}
+
+event: response.reasoning_summary_part.added
+data: {"type":"response.reasoning_summary_part.added","sequence_number":3,"item_id":"rs_1","output_index":0,"summary_index":0,"part":{"type":"summary_text","text":""}}
+
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","sequence_number":4,"item_id":"rs_1","output_index":0,"summary_index":0,"delta":"**Planning** the answer"}
+
+event: response.reasoning_summary_text.done
+data: {"type":"response.reasoning_summary_text.done","sequence_number":5,"item_id":"rs_1","output_index":0,"summary_index":0,"text":"**Planning** the answer"}
+
+event: response.reasoning_summary_part.added
+data: {"type":"response.reasoning_summary_part.added","sequence_number":6,"item_id":"rs_1","output_index":0,"summary_index":1,"part":{"type":"summary_text","text":""}}
+
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","sequence_number":7,"item_id":"rs_1","output_index":0,"summary_index":1,"delta":"Checking sources"}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":8,"output_index":0,"item":{"id":"rs_1","type":"reasoning","encrypted_content":"gAAAA_enc","summary":[{"type":"summary_text","text":"**Planning** the answer"},{"type":"summary_text","text":"Checking sources"}]}}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":9,"output_index":1,"item":{"id":"ws_1","type":"web_search_call","status":"in_progress"}}
+
+event: response.web_search_call.in_progress
+data: {"type":"response.web_search_call.in_progress","sequence_number":10,"output_index":1,"item_id":"ws_1"}
+
+event: response.web_search_call.searching
+data: {"type":"response.web_search_call.searching","sequence_number":11,"output_index":1,"item_id":"ws_1"}
+
+event: response.web_search_call.completed
+data: {"type":"response.web_search_call.completed","sequence_number":12,"output_index":1,"item_id":"ws_1"}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":13,"output_index":1,"item":{"id":"ws_1","type":"web_search_call","status":"completed","action":{"type":"search","query":"facet android"}}}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":14,"output_index":2,"item":{"id":"msg_1","type":"message","status":"in_progress","role":"assistant","content":[]}}
+
+event: response.content_part.added
+data: {"type":"response.content_part.added","sequence_number":15,"item_id":"msg_1","output_index":2,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":16,"item_id":"msg_1","output_index":2,"content_index":0,"delta":"Facet is "}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":17,"item_id":"msg_1","output_index":2,"content_index":0,"delta":"great."}
+
+event: response.output_text.annotation.added
+data: {"type":"response.output_text.annotation.added","sequence_number":18,"item_id":"msg_1","output_index":2,"content_index":0,"annotation_index":0,"annotation":{"type":"url_citation","start_index":0,"end_index":14,"url":"https://facet.dtsoftware.io","title":"Facet"}}
+
+event: response.output_text.done
+data: {"type":"response.output_text.done","sequence_number":19,"item_id":"msg_1","output_index":2,"content_index":0,"text":"Facet is great."}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":20,"output_index":2,"item":{"id":"msg_1","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Facet is great.","annotations":[{"type":"url_citation","start_index":0,"end_index":14,"url":"https://facet.dtsoftware.io","title":"Facet"}]}]}}
+
+event: response.completed
+data: {"type":"response.completed","sequence_number":21,"response":{"id":"resp_1","object":"response","status":"completed","model":"gpt-5.5","output":[{"id":"rs_1","type":"reasoning","encrypted_content":"gAAAA_enc","summary":[{"type":"summary_text","text":"**Planning** the answer"},{"type":"summary_text","text":"Checking sources"}]},{"id":"ws_1","type":"web_search_call","status":"completed","action":{"type":"search","query":"facet android"}},{"id":"msg_1","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Facet is great.","annotations":[{"type":"url_citation","start_index":0,"end_index":14,"url":"https://facet.dtsoftware.io","title":"Facet"}]}]}],"usage":{"input_tokens":100,"input_tokens_details":{"cached_tokens":40},"output_tokens":250,"output_tokens_details":{"reasoning_tokens":180},"total_tokens":350}}}
+

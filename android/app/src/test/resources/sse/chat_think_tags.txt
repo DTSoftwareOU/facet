@@ -1,0 +1,12 @@
+data: {"id":"t1","object":"chat.completion.chunk","model":"qwen3-32b","choices":[{"index":0,"delta":{"role":"assistant","content":"<thi"},"finish_reason":null}]}
+
+data: {"id":"t1","object":"chat.completion.chunk","model":"qwen3-32b","choices":[{"index":0,"delta":{"content":"nk>Hmm,"},"finish_reason":null}]}
+
+data: {"id":"t1","object":"chat.completion.chunk","model":"qwen3-32b","choices":[{"index":0,"delta":{"content":" ok</th"},"finish_reason":null}]}
+
+data: {"id":"t1","object":"chat.completion.chunk","model":"qwen3-32b","choices":[{"index":0,"delta":{"content":"ink>\n\nFinal"},"finish_reason":null}]}
+
+data: {"id":"t1","object":"chat.completion.chunk","model":"qwen3-32b","choices":[{"index":0,"delta":{"content":" answer with <think> literal"},"finish_reason":"stop"}]}
+
+data: [DONE]
+

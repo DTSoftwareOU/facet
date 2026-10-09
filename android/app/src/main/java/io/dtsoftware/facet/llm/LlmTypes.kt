@@ -147,11 +147,18 @@ data class ChatRequest(
     val caps: ModelCaps,
     /** Used for short utility calls (titles): no thinking, low effort, small output. */
     val utility: Boolean = false,
+    /** The model's output-token ceiling from [ModelInfo.maxOutput], used to size `max_tokens` when unset. */
+    val modelMaxOutput: Int? = null,
 )
 
 @Serializable
 data class Citation(val url: String, val title: String? = null, val snippet: String? = null)
 
+/**
+ * Token usage for one assistant turn, normalized across providers:
+ * [inputTokens] counts ALL prompt tokens including [cacheReadTokens] and [cacheWriteTokens];
+ * [outputTokens] includes [reasoningTokens].
+ */
 @Serializable
 data class Usage(
     val inputTokens: Long = 0,
@@ -186,7 +193,9 @@ sealed interface StreamEvent {
     data object ThinkingStarted : StreamEvent
     data object ThinkingEnded : StreamEvent
     data class WebSearch(val query: String?, val done: Boolean) : StreamEvent
+    /** Cumulative, de-duplicated list of sources seen so far this turn (replace, don't append). */
     data class Citations(val citations: List<Citation>) : StreamEvent
+    /** Cumulative usage for the turn so far (replace, don't add). */
     data class UsageUpdate(val usage: Usage) : StreamEvent
     /** Informational, e.g. "Answered by claude-opus-4-8 after a refusal fallback." */
     data class Notice(val text: String) : StreamEvent
