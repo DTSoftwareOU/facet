@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Facet for Windows: the end-to-end encrypted, bring-your-own-key AI chat app, with access to your computer.",
   "license": "Apache-2.0",
-  "author": "DT Software",
+  "author": "DT Software OÜ",
   "homepage": "https://facet.dtsoftware.io",
   "private": true,
   "main": "dist/main.js",
@@ -30,7 +30,7 @@
   "build": {
     "appId": "io.dtsoftware.facet",
     "productName": "Facet",
-    "copyright": "Copyright © 2026 DT Software",
+    "copyright": "Copyright © 2026 DT Software OÜ",
     "directories": {
       "output": "release",
       "buildResources": "build"

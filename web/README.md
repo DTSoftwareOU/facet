@@ -18,5 +18,5 @@ requests — fonts are self-hosted under `fonts/` (SIL OFL 1.1, licenses alongsi
 
 - Set the real repository URL in `site.js` (`REPO_URL`). Links marked `data-repo-path`
   are rewritten from it; without JavaScript they fall back to `self-host.html`.
-- Contact addresses used on the legal pages: `privacy@dtsoftware.io`, `support@dtsoftware.io`.
+- Contact address used on the legal pages: `help@dtsoftware.io`. Company details live in `legal.html`.
 - Have the privacy policy and terms reviewed before publishing.

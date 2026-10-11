@@ -738,6 +738,8 @@ code, kbd, pre { font-family: var(--mono); font-variant-ligatures: none; }
 .doc thead th { border-top: 0; background: var(--surface); color: var(--text); font-weight: 600; }
 .doc td { color: var(--text-2); }
 .doc td code { white-space: nowrap; }
+.doc .kv tr:first-child > * { border-top: 0; }
+.doc .kv th { width: 34%; color: var(--text); font-weight: 600; }
 
 .not-found { min-height: 60vh; display: grid; align-content: center; }
 .not-found img { width: 64px; height: 64px; margin-bottom: 32px; opacity: 0.9; }

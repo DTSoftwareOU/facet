@@ -6,7 +6,7 @@ OpenRouter, xAI, DeepSeek, Mistral, Groq, or any OpenAI-compatible endpoint, and
 they offer from one fast app that syncs across all your devices. On Windows, models can also run
 commands and read and edit files on your computer, with your approval.
 
-Made by DT Software · [facet.dtsoftware.io](https://facet.dtsoftware.io) · Apache License 2.0
+Made by DT Software OÜ · [facet.dtsoftware.io](https://facet.dtsoftware.io) · Apache License 2.0
 
 <p>
   <img src="docs/screenshots/chat_dark.png" width="240" alt="A conversation with reasoning, a table, math and citations">

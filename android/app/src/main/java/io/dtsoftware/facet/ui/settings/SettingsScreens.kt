@@ -496,7 +496,7 @@ fun AboutScreen(onBack: () -> Unit) {
             Text("Version ${BuildConfig.VERSION_NAME}", style = FacetTheme.type.labelM, color = c.textTertiary)
             Spacer(Modifier.height(10.dp))
             Text(
-                "Every model, one home. Open source and end-to-end encrypted.\nMade by DT Software.",
+                "Every model, one home. Open source and end-to-end encrypted.\nMade by DT Software OÜ.",
                 style = FacetTheme.type.body, color = c.textSecondary, textAlign = TextAlign.Center,
             )
         }

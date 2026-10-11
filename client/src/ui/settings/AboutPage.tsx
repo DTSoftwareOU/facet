@@ -56,7 +56,7 @@ export function AboutPage(_props: PageProps) {
         <span className="t-label-m c-2">
           Version {p.version} · {p.kind === 'desktop' ? 'Windows app' : 'Web'}
         </span>
-        <span className="t-body c-2" style={{ maxWidth: 420 }}>Every model. One home. Open source and end-to-end encrypted, made by DT Software.</span>
+        <span className="t-body c-2" style={{ maxWidth: 420 }}>Every model. One home. Open source and end-to-end encrypted, made by DT Software OÜ.</span>
       </div>
       <Group>
         <Row icon={<Globe size={20} />} title="Website" subtitle="facet.dtsoftware.io" onClick={() => open('/')} trailing={<ExternalLink size={16} className="c-3" />} />
