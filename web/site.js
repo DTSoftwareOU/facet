@@ -1,4 +1,4 @@
-// Facet site — progressive enhancement only. No tracking, no external requests.
+// Facet AI site: progressive enhancement only. No tracking, no external requests.
 (() => {
   // Source repository.
   const REPO_URL = 'https://github.com/DTSoftwareOU/facet';

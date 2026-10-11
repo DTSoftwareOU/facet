@@ -221,7 +221,7 @@ object HtmlText {
     private val entity = Regex("&(#x?[0-9a-fA-F]+|[a-zA-Z]+);")
     private val named = mapOf(
         "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'", "nbsp" to " ",
-        "mdash" to "—", "ndash" to "–", "hellip" to "…", "rsquo" to "’", "lsquo" to "‘", "rdquo" to "”", "ldquo" to "“",
+        "mdash" to "\u2014", "ndash" to "–", "hellip" to "…", "rsquo" to "’", "lsquo" to "‘", "rdquo" to "”", "ldquo" to "“",
         "copy" to "©", "reg" to "®", "trade" to "™", "euro" to "€", "pound" to "£", "middot" to "·",
     )
 

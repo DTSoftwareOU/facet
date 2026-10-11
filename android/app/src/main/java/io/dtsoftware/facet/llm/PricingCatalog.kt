@@ -18,7 +18,7 @@ import okhttp3.Request
  * USD-per-million-token prices for cost estimates.
  *
  * Sources, in order: a built-in table of first-party prices, then the public OpenRouter model
- * feed (no key needed, cached to [cacheFile], refreshed at most daily). Prices are estimates —
+ * feed (no key needed, cached to [cacheFile], refreshed at most daily). Prices are estimates;
  * tiered/long-context pricing isn't modeled.
  */
 class PricingCatalog(

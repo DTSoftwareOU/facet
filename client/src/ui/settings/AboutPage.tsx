@@ -63,7 +63,7 @@ export function AboutPage(_props: PageProps) {
     <div className="col gap-16">
       <div className="col" style={{ alignItems: 'center', gap: 10, padding: '18px 0 6px', textAlign: 'center' }}>
         <Gem size={56} />
-        <span className="t-headline">Facet</span>
+        <span className="t-headline">Facet AI</span>
         <span className="t-label-m c-2">
           {t('Version {version}', { version: p.version })} · {p.kind === 'desktop' ? t('Windows app') : t('Web')}
         </span>

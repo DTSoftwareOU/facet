@@ -8,7 +8,7 @@ const GEM =
   '<polygon points="96,50 50,96 50,68 68,50" fill="#3A5BD9" stroke="#3A5BD9"/><polygon points="50,96 4,50 32,50 50,68" fill="#49D3C1" stroke="#49D3C1"/>' +
   '<polygon points="50,32 68,50 50,68 32,50" fill="#F4F7FB" stroke="#F4F7FB"/></g></svg>';
 
-const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>Facet</title><style>
+const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>Facet AI</title><style>
 html,body{margin:0;height:100%;background:#11151B;color:#E8ECF2;font:14px/1.4 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;user-select:none;-webkit-app-region:drag}
 main{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:0 28px;box-sizing:border-box;text-align:center}
 svg{animation:turn 2.4s ease-in-out infinite}@keyframes turn{50%{transform:rotate(90deg) scale(.92)}}
@@ -18,10 +18,10 @@ h1{font-size:16px;font-weight:600;margin:8px 0 0}p{margin:0;color:#9AA4B2;font-s
 button{-webkit-app-region:no-drag;margin-top:6px;border:0;background:none;color:#49D3C1;font:inherit;font-size:13px;cursor:pointer;padding:6px 10px;border-radius:8px;visibility:hidden}
 button:hover,button:focus-visible{background:#1C222C;outline:none}
 </style></head><body><main>${GEM}<h1 id="t">Checking for updates…</h1><p id="s"></p><div class="bar" id="b"><i id="f"></i></div>
-<button id="k" onclick="location.hash='skip'">Open Facet now</button></main><script>
+<button id="k" onclick="location.hash='skip'">Open Facet AI now</button></main><script>
 function show(s){var t=document.getElementById('t'),p=document.getElementById('s'),b=document.getElementById('b'),f=document.getElementById('f'),k=document.getElementById('k');
-if(s.status==='available'||s.status==='downloading'){t.textContent='Updating Facet'+(s.version?' to '+s.version:'');p.textContent=s.status==='downloading'?'Downloading… '+(s.progress||0)+'%':'Starting the download…';b.style.visibility='visible';f.style.width=(s.progress||0)+'%';k.style.visibility='visible'}
-else if(s.status==='ready'){t.textContent='Installing the update';p.textContent='Facet will open again in a moment.';b.style.visibility='visible';f.style.width='100%';k.style.visibility='hidden'}}
+if(s.status==='available'||s.status==='downloading'){t.textContent='Updating Facet AI'+(s.version?' to '+s.version:'');p.textContent=s.status==='downloading'?'Downloading… '+(s.progress||0)+'%':'Starting the download…';b.style.visibility='visible';f.style.width=(s.progress||0)+'%';k.style.visibility='visible'}
+else if(s.status==='ready'){t.textContent='Installing the update';p.textContent='Facet AI will open again in a moment.';b.style.visibility='visible';f.style.width='100%';k.style.visibility='hidden'}}
 </script></body></html>`;
 
 export class UpdateSplash {
@@ -38,7 +38,7 @@ export class UpdateSplash {
       fullscreenable: false,
       center: true,
       show: false,
-      title: 'Facet',
+      title: 'Facet AI',
       backgroundColor: '#11151B',
       icon,
       webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: true },

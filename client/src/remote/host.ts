@@ -200,7 +200,7 @@ export class HostService implements HostHandler {
     this.warned.add(from);
     const who = this.hub.deviceName(from);
     platform().notify(
-      'Facet',
+      'Facet AI',
       who
         ? t('{device} tried to use this PC. To allow it, turn on “Let your other devices use this PC” in Settings → Computer access.', { device: who })
         : t('One of your devices tried to use this PC. To allow it, turn on “Let your other devices use this PC” in Settings → Computer access.'),

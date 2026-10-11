@@ -32,7 +32,7 @@ describe('HtmlText', () => {
   });
 
   it('decodes entities and keeps unknown ones', () => {
-    expect(HtmlText.decode('&#8212; &#x1F600; &hellip; &bogus; &#xZZ;')).toBe('— 😀 … &bogus; &#xZZ;');
+    expect(HtmlText.decode('&#8212; &#x1F600; &hellip; &bogus; &#xZZ;')).toBe('\u2014 😀 … &bogus; &#xZZ;');
     expect(HtmlText.stripTags('The <strong>famous</strong> tram')).toBe('The famous tram');
   });
 });

@@ -19,7 +19,7 @@ Principles:
 4. **Radii by hierarchy**, never one radius everywhere.
 5. **Honest numbers.** Tokens and cost are shown quietly and precisely, never hidden.
 
-## Logo — the Facet gem
+## Logo: the Facet gem
 
 A princess-cut gem seen from above, rotated 45°: an outer rhombus, an inner table, and four
 trapezoid facets. ViewBox `0 0 100 100`:
@@ -44,7 +44,7 @@ outline + table only.
 
 ## Color
 
-### Dark — "Basalt" (default when the system is dark)
+### Dark ("Basalt") (default when the system is dark)
 
 | Token | Hex | Use |
 |---|---|---|
@@ -65,7 +65,7 @@ outline + table only.
 | success | `#5BD69B` | |
 | warning | `#F2C66D` | |
 
-### Light — "Quartz"
+### Light ("Quartz")
 
 | Token | Hex |
 |---|---|
@@ -86,7 +86,7 @@ outline + table only.
 | success | `#1F8A55` |
 | warning | `#A87412` |
 
-### Black — "Obsidian" (AMOLED)
+### Black ("Obsidian", AMOLED)
 Dark tokens with background `#000000`, surface `#0A0C10`, surfaceHigh `#13171D`,
 surfaceHighest `#1B2028`, outline `#232A34`, outlineVariant `#171B22`.
 

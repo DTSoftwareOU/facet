@@ -11,7 +11,7 @@ export const Mcp = {
   LATEST_VERSION: '2025-11-25',
   /** Versions that define the MCP-Protocol-Version request header. */
   VERSIONS_WITH_HEADER: new Set(['2025-11-25', '2025-06-18']),
-  CLIENT_NAME: 'Facet',
+  CLIENT_NAME: 'Facet AI',
   CLIENT_VERSION: '1.0.0',
   HEADER_SESSION: 'Mcp-Session-Id',
   HEADER_VERSION: 'MCP-Protocol-Version',

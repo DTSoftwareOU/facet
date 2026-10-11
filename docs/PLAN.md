@@ -1,8 +1,8 @@
-# Facet — Product Plan
+# Facet AI: product plan
 
 **Facet** is an open-source, end-to-end encrypted AI chat app for Android, published by
-DT Software (dtsoftware.io). You bring your own API keys — OpenAI, Anthropic, Google,
-OpenRouter, or any OpenAI-compatible endpoint — and Facet gives every model one fast,
+DT Software (dtsoftware.io). You bring your own API keys (OpenAI, Anthropic, Google,
+OpenRouter, or any OpenAI-compatible endpoint) and Facet gives every model one fast,
 beautiful home that syncs across all your devices.
 
 > One gem, many faces: every model you use is a facet of the same app.

@@ -17,7 +17,7 @@ Every non-2xx response has this body:
 | HTTP | code | Meaning |
 |---|---|---|
 | 400 | `invalid_request` | Validation failed (`message` says which field) |
-| 401 | `unauthorized` | Missing/expired/invalid access token — client should refresh |
+| 401 | `unauthorized` | Missing/expired/invalid access token; the client should refresh |
 | 401 | `invalid_credentials` | Wrong email/password/recovery code |
 | 401 | `invalid_refresh_token` | Refresh token unknown, expired, or reused (session revoked) |
 | 403 | `registration_closed` | Server does not accept new accounts |
@@ -160,7 +160,7 @@ sessions, resets the change cursor to 0. Max 5 wrong codes then the code is inva
   "createdAt": 0, "lastSeenAt": 0, "ip": "203.0.113.4", "current": true } ] }
 ```
 
-### `DELETE /v1/sessions/:id` → `204` (can't be the current session — use logout).
+### `DELETE /v1/sessions/:id` → `204` (can't be the current session; use logout).
 
 ### `DELETE /v1/sessions` → `204` revokes every session except the current one.
 
@@ -173,7 +173,7 @@ strictly increasing `seq`.
 type RecordIn = {
   id: string;          // client-generated, 1..64 chars [A-Za-z0-9_-]
   type: string;        // 1..24 chars [a-z_]: conv, msg, asst, folder, prompt, provider, settings, att
-  updatedAt: number;   // client clock, ms — last-writer-wins key
+  updatedAt: number;   // client clock, ms; last-writer-wins key
   deleted: boolean;    // tombstone (ct may be null when deleted)
   ct: b64 | null;      // envelope, see SECURITY.md
 };
@@ -281,13 +281,13 @@ Errors: `too_large`, `quota_exceeded`.
 | `PORT` | `8787` | HTTP port |
 | `HOST` | `0.0.0.0` | Bind address |
 | `DATA_DIR` | `./data` | SQLite file + blobs directory |
-| `JWT_SECRET` | — (required, ≥ 32 chars) | Access token signing |
-| `SERVER_SECRET` | — (required, ≥ 32 chars) | Fake prelogin salts, misc HMACs |
+| `JWT_SECRET` | none (required, ≥ 32 chars) | Access token signing |
+| `SERVER_SECRET` | none (required, ≥ 32 chars) | Fake prelogin salts, misc HMACs |
 | `PUBLIC_URL` | `http://localhost:8787` | Used in emails |
 | `REGISTRATION_OPEN` | `true` | Allow sign-ups |
 | `USER_QUOTA_BYTES` | `104857600` | Per-user storage quota: encrypted records + blobs (100 MiB) |
 | `TRUST_PROXY` | `true` | Read client IP from `X-Forwarded-For` (`true` = trust one proxy hop, `false` = ignore, or a hop count) |
-| `SMTP_URL` | — | e.g. `smtps://user:pass@smtp.example.com:465`; enables email reset |
+| `SMTP_URL` | none | e.g. `smtps://user:pass@smtp.example.com:465`; enables email reset |
 | `SMTP_FROM` | `Facet <no-reply@dtsoftware.io>` | Sender |
 | `LOG_LEVEL` | `info` | pino level |
 | `AUTH_RATE_LIMIT_PER_IP` | `10` | Sign-in/sign-up/recovery attempts per IP per 15 min (raise for shared NATs or local testing) |

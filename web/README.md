@@ -2,7 +2,7 @@
 
 Static site served by Caddy at `/` (the sync API shares the host under `/v1/*`; release APKs
 are expected at `/download/facet-latest.apk`). No build step, no frameworks, no third-party
-requests — fonts are self-hosted under `fonts/` (SIL OFL 1.1, licenses alongside).
+requests: fonts are self-hosted under `fonts/` (SIL OFL 1.1, licenses alongside).
 
 | File | Purpose |
 |---|---|

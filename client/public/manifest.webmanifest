@@ -1,6 +1,6 @@
 {
-  "name": "Facet",
-  "short_name": "Facet",
+  "name": "Facet AI",
+  "short_name": "Facet AI",
   "description": "Every model, one home. End-to-end encrypted AI chat with your own API keys.",
   "start_url": "./",
   "scope": "./",

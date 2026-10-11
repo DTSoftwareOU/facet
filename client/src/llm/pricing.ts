@@ -3,7 +3,7 @@
  *
  * Sources, in order: a built-in table of first-party prices, then the public OpenRouter model feed
  * (no key needed, cached in localStorage, refreshed at most daily while the user's "Live pricing
- * data" setting is on). Prices are estimates — tiered/long-context pricing isn't modeled.
+ * data" setting is on). Prices are estimates; tiered/long-context pricing isn't modeled.
  */
 import { isObject } from '../core/json';
 import { normalizeId } from './catalog';

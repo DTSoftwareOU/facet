@@ -35,7 +35,7 @@ working directory is loaded automatically.
 ```
 src/
   index.ts          boot, signals, graceful shutdown
-  app.ts            buildApp(config) — Fastify instance, parsers, error envelope, hooks
+  app.ts            buildApp(config): Fastify instance, parsers, error envelope, hooks
   config.ts         env → Config
   db.ts             node:sqlite, WAL, migrations, transaction helper
   store.ts          users, sessions, reset tokens, housekeeping (tombstone purge)
@@ -47,7 +47,7 @@ src/
   mail.ts           optional SMTP + reset email
   auth/tokens.ts    access/refresh tokens, request authentication
   routes/           meta, auth, account (+ sessions), sync (+ stream), blobs
-  backup.ts         `node dist/backup.js <file>` — consistent snapshot via VACUUM INTO
+  backup.ts         `node dist/backup.js <file>`: consistent snapshot via VACUUM INTO
 test/
   client-crypto.ts  reference client implementation of SECURITY.md
   vectors.ts        deterministic vectors shared with the Android app

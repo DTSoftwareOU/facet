@@ -69,7 +69,7 @@ export function Sidebar({ narrow }: { narrow: boolean }) {
         <div className="sidebar-head">
           <div className="wordmark">
             <Gem size={26} />
-            <span>facet</span>
+            <span>facet<span className="wordmark-ai">AI</span></span>
           </div>
           <IconButton label={t('New chat (Ctrl+Shift+O)')} onClick={() => navigate({ name: 'home', folderId: folderFilter })}>
             <SquarePen size={20} />
@@ -308,7 +308,7 @@ function AccountFooter() {
   const account = useAccount();
   const sync = useSyncState();
   const synced = useSyncedPrefs();
-  let name = synced.profileName || 'Facet';
+  let name = synced.profileName || 'Facet AI';
   let status: { cls: string; text: string };
   if (account.kind === 'signedIn') {
     name = shownName(account, synced.profileName);

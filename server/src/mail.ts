@@ -41,7 +41,7 @@ export function resetCodeEmail(to: string, code: string, publicUrl: string): Mai
     '',
     "If you didn't ask for this, ignore this email. Your account is unchanged.",
     '',
-    `Facet — ${publicUrl}`,
+    `Facet AI: ${publicUrl}`,
   ].join('\n');
   const html = `<!doctype html><html><body style="margin:0;background:#F5F6F8;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#12161C">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">

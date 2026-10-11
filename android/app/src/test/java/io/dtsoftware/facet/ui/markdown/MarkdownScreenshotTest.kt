@@ -66,7 +66,7 @@ class MarkdownScreenshotTest {
         val SAMPLE = """
             # Shipping a release build
 
-            Facet streams answers from **any model** you choose. Here's what *matters* when you cut a release — with `R8`, ~~ProGuard~~ and a few [docs](https://developer.android.com) links.
+            Facet streams answers from **any model** you choose. Here's what *matters* when you cut a release, with `R8`, ~~ProGuard~~ and a few [docs](https://developer.android.com) links.
 
             ## Checklist
 
@@ -121,7 +121,7 @@ class MarkdownScreenshotTest {
 
             ---
 
-            That's it — happy shipping.
+            That's it. Happy shipping.
         """.trimIndent()
 
         val STREAMING = """

@@ -409,7 +409,7 @@ export const HtmlText = {
 
 const NAMED_ENTITIES: Record<string, string> = {
   amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
-  mdash: '—', ndash: '–', hellip: '…', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“',
+  mdash: '\u2014', ndash: '–', hellip: '…', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“',
   copy: '©', reg: '®', trade: '™', euro: '€', pound: '£', middot: '·',
 };
 

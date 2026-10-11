@@ -54,7 +54,7 @@ export function mediaHeaders(config: ProviderConfig): Record<string, string> {
   }
   if (config.kind.id === ProviderKinds.OPENROUTER.id) {
     h['HTTP-Referer'] = 'https://facet.dtsoftware.io';
-    h['X-Title'] = 'Facet';
+    h['X-Title'] = 'Facet AI';
   }
   return { ...h, ...config.headers };
 }

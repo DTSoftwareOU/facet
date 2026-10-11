@@ -48,7 +48,7 @@ object DeviceAuth {
     fun authenticate(context: Context, title: String, onResult: (Boolean) -> Unit) {
         val activity = context.findActivity() ?: return onResult(false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val builder = BiometricPrompt.Builder(activity).setTitle(title).setSubtitle("Facet")
+            val builder = BiometricPrompt.Builder(activity).setTitle(title).setSubtitle("Facet AI")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 builder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
             } else {
@@ -67,7 +67,7 @@ object DeviceAuth {
             // Android 8.x: confirm the device credential through the keyguard.
             val km = activity.getSystemService(KeyguardManager::class.java)
             @Suppress("DEPRECATION")
-            val intent = km?.createConfirmDeviceCredentialIntent(title, "Facet") ?: return onResult(true)
+            val intent = km?.createConfirmDeviceCredentialIntent(title, "Facet AI") ?: return onResult(true)
             pendingLegacyCallback = onResult
             @Suppress("DEPRECATION") activity.startActivityForResult(intent, LEGACY_REQUEST)
         }

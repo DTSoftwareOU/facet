@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 export type Db = DatabaseSync;
 
 const MIGRATIONS: string[] = [
-  // v1 — initial schema
+  // v1: initial schema
   `
   CREATE TABLE users (
     id TEXT PRIMARY KEY,
@@ -86,7 +86,7 @@ const MIGRATIONS: string[] = [
     attempts INTEGER NOT NULL DEFAULT 0
   );
   `,
-  // v2 — one storage quota per user: chat records count alongside attachment blobs.
+  // v2: one storage quota per user; chat records count alongside attachment blobs.
   `
   ALTER TABLE users ADD COLUMN record_bytes INTEGER NOT NULL DEFAULT 0;
   UPDATE users SET record_bytes = (

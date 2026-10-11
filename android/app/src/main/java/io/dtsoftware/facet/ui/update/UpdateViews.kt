@@ -406,6 +406,6 @@ private fun StatusRow(
     }
 }
 
-/** The Settings list's "About Facet" subtitle: the version, or the update waiting. */
+/** The Settings list's "About Facet AI" subtitle: the version, or the update waiting. */
 fun aboutSubtitle(state: UpdateState): String =
     state.available?.takeIf { state.enabled }?.let { "Version ${it.versionName} is available" } ?: "Version ${state.installedVersionName}"

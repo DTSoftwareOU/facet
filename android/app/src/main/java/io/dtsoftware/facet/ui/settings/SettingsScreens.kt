@@ -184,7 +184,7 @@ fun SettingsScreen(container: AppContainer, onBack: () -> Unit, navigate: (Any) 
         }
         SettingsGroup {
             val update by container.updates.state.collectAsStateWithLifecycle()
-            SettingsRow("About Facet", subtitle = io.dtsoftware.facet.ui.update.aboutSubtitle(update), icon = R.drawable.ic_info, onClick = { navigate(Routes.About) })
+            SettingsRow("About Facet AI", subtitle = io.dtsoftware.facet.ui.update.aboutSubtitle(update), icon = R.drawable.ic_info, onClick = { navigate(Routes.About) })
         }
     }
 }
@@ -497,7 +497,7 @@ fun AboutScreen(container: AppContainer, onBack: () -> Unit) {
         Column(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             io.dtsoftware.facet.ui.components.AssemblingGem(size = 72.dp)
             Spacer(Modifier.height(16.dp))
-            Text("Facet", style = FacetTheme.type.headline, color = c.text)
+            Text("Facet AI", style = FacetTheme.type.headline, color = c.text)
             Text("Version ${BuildConfig.VERSION_NAME}", style = FacetTheme.type.labelM, color = c.textTertiary)
             Spacer(Modifier.height(10.dp))
             Text(

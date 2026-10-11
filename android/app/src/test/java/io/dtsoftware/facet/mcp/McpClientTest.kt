@@ -150,7 +150,7 @@ class McpClientTest {
         assertNull(init.headers["Mcp-Session-Id"])
         val initParams = init.json().obj("params")!!
         assertEquals("2025-11-25", initParams.str("protocolVersion"))
-        assertEquals("Facet", initParams.obj("clientInfo")!!.str("name"))
+        assertEquals("Facet AI", initParams.obj("clientInfo")!!.str("name"))
 
         val list = requests.first { it.rpcMethod() == "tools/list" }
         assertEquals("s1", list.headers["Mcp-Session-Id"])

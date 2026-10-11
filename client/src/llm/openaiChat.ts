@@ -126,7 +126,7 @@ export class OpenAiChatClient implements LlmClient {
     return headersOf(
       isBlank(this.config.apiKey) ? null : { Authorization: `Bearer ${this.config.apiKey}` },
       // OpenRouter app attribution; both headers are allowed by its CORS policy.
-      this.is(ProviderKinds.OPENROUTER) ? { 'HTTP-Referer': 'https://facet.dtsoftware.io', 'X-Title': 'Facet' } : null,
+      this.is(ProviderKinds.OPENROUTER) ? { 'HTTP-Referer': 'https://facet.dtsoftware.io', 'X-Title': 'Facet AI' } : null,
       this.config.headers,
       extra,
     );

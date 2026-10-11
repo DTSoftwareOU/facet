@@ -73,7 +73,7 @@ describe('images', () => {
     const req = server.take();
     expect(req.json().modalities).toContain('image');
     expect(req.json().image_config).toEqual({ aspect_ratio: '1:1' });
-    expect(req.headers.get('X-Title')).toBe('Facet');
+    expect(req.headers.get('X-Title')).toBe('Facet AI');
   });
 
   it('OpenRouter: says what the model wrote when it returns no image', async () => {

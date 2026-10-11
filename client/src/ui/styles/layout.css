@@ -38,6 +38,14 @@
   flex: 1;
   user-select: none;
 }
+.wordmark-ai {
+  margin-inline-start: 6px;
+  font-size: 0.62em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  vertical-align: 0.38em;
+}
 .sidebar-search {
   display: flex;
   align-items: center;

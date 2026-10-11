@@ -93,7 +93,7 @@ internal class OpenAiChatClient(
             if (config.apiKey.isNotBlank()) header("Authorization", "Bearer ${config.apiKey}")
             if (kind == ProviderKind.OPENROUTER) {
                 header("HTTP-Referer", "https://facet.dtsoftware.io")
-                header("X-Title", "Facet")
+                header("X-Title", "Facet AI")
             }
             config.headers.forEach { (k, v) -> header(k, v) }
         }

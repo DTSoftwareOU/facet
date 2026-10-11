@@ -70,7 +70,7 @@ class SlashCommandsTest {
         assertEquals(SlashCommand.RESUME_CODEX, SlashCommands.exact(" /Resume-From-Codex ", all))
         assertNull(SlashCommands.exact("/folder", setOf(SlashCommand.NEW)))
         assertNull(SlashCommands.exact("/new please", all))
-        assertEquals("q3-plan-v2", SlashCommands.kebab("  Q3 plan — v2!  "))
+        assertEquals("q3-plan-v2", SlashCommands.kebab("  Q3 plan: v2!  "))
         assertEquals("prompt", SlashCommands.kebab("!!!"))
     }
 }

@@ -209,7 +209,7 @@ function openExternalSafe(url: string): void {
 
 function deviceName(): string {
   const kind = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'Mac' : 'Linux';
-  return `Facet for ${kind} · ${os.hostname()}`.slice(0, 80);
+  return `Facet AI for ${kind} · ${os.hostname()}`.slice(0, 80);
 }
 
 function sanitizeFileName(name: string): string {
@@ -430,7 +430,7 @@ function createWindow(autoShow: boolean): BrowserWindow {
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
     show: false,
-    title: 'Facet',
+    title: 'Facet AI',
     backgroundColor: BACKGROUND,
     titleBarStyle: 'default',
     autoHideMenuBar: true,

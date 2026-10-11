@@ -79,7 +79,7 @@ describe('Streamable HTTP', () => {
     expect(init.headers.get('Mcp-Session-Id')).toBeNull();
     expect(init.headers.get('User-Agent')).toBe('Facet/1.0.0');
     expect(bodyOf(init).params.protocolVersion).toBe('2025-11-25');
-    expect(bodyOf(init).params.clientInfo.name).toBe('Facet');
+    expect(bodyOf(init).params.clientInfo.name).toBe('Facet AI');
 
     const list = net.requests.find((r) => rpcMethod(r) === 'tools/list')!;
     expect(list.headers.get('Mcp-Session-Id')).toBe('s1');

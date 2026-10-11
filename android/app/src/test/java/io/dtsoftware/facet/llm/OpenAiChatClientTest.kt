@@ -54,7 +54,7 @@ class OpenAiChatClientTest : MockServerTest() {
 
         val recorded = server.takeRequest()
         assertEquals("https://facet.dtsoftware.io", recorded.headers["HTTP-Referer"])
-        assertEquals("Facet", recorded.headers["X-Title"])
+        assertEquals("Facet AI", recorded.headers["X-Title"])
         val body = recorded.json()
         assertEquals("high", body["reasoning"]!!.jsonObject["effort"]!!.jsonPrimitive.content)
         assertEquals("web", body["plugins"]!!.jsonArray[0].jsonObject["id"]!!.jsonPrimitive.content)

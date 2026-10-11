@@ -40,7 +40,7 @@ describe('stdio transport', () => {
     const proc = stdio.processes[0];
     expect(proc.spec).toEqual({ command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', 'C:\\Users\\me'], env: { TOKEN: 'abc' }, cwd: 'C:\\work' });
     expect(proc.received.map((m) => m.method)).toEqual(['initialize', 'notifications/initialized']);
-    expect(proc.received[0].params.clientInfo.name).toBe('Facet');
+    expect(proc.received[0].params.clientInfo.name).toBe('Facet AI');
 
     const tools = await client.listTools();
     expect(tools.map((t) => t.name)).toEqual(['read_file', 'write_file']);

@@ -187,7 +187,7 @@ object MediaGen {
         }
         if (config.kind == ProviderKind.OPENROUTER) {
             header("HTTP-Referer", "https://facet.dtsoftware.io")
-            header("X-Title", "Facet")
+            header("X-Title", "Facet AI")
         }
         config.headers.forEach { (k, v) -> header(k, v) }
     }

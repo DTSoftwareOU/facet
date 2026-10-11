@@ -8,8 +8,8 @@ these files implement that spec exactly.
 |---|---|
 | `facet-gem.svg` | The mark in full color. Works on dark and light backgrounds. |
 | `facet-gem-mono.svg` | Single color (`currentColor`): outline, facet edges and solid table. For one-color print, notification icons, watermarks. |
-| `facet-wordmark-dark.svg` | Gem + `facet` wordmark with light text (`#E8ECF2`) — **for dark backgrounds**. Text is outlined to paths. |
-| `facet-wordmark-light.svg` | Gem + `facet` wordmark with ink text (`#12161C`) — **for light backgrounds**. Text is outlined to paths. |
+| `facet-wordmark-dark.svg` | Gem + `facet` wordmark with light text (`#E8ECF2`), **for dark backgrounds**. Text is outlined to paths. |
+| `facet-wordmark-light.svg` | Gem + `facet` wordmark with ink text (`#12161C`), **for light backgrounds**. Text is outlined to paths. |
 | `facet-icon.svg` | App icon preview: gem on Basalt `#11151B` with a faint radial glow, rounded square. The canvas represents the 72 dp visible area of a 108 dp Android adaptive icon; the gem is 58% of the 66 dp safe zone. |
 | `favicon.svg` | Browser tab icon (gem with slightly heavier seam strokes for small sizes). |
 | `facet-og.svg` | Social card source (1200×630). Uses live `<text>` set in Instrument Serif / Instrument Sans, so render it with those fonts installed; the PNG export is in `png/`. |
@@ -37,7 +37,7 @@ these files implement that spec exactly.
 
 The four facet colors appear **only** in the gem (and the send-button gradient, Flash blue →
 Glint teal). Don't use them as general UI colors, don't recolor individual facets, don't add
-outlines, shadows or bevels, and don't rotate the gem — the 45° orientation is the mark.
+outlines, shadows or bevels, and don't rotate the gem: the 45° orientation is the mark.
 
 ## Motion
 

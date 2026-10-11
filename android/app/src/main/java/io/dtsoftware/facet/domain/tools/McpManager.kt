@@ -204,7 +204,7 @@ class McpManager(
         val e = dao.get(id) ?: throw McpException("Server not found.")
         val previous = load(id)
         val wwwAuth = probeWwwAuthenticate(e)
-        val pending = McpOAuth.begin(id, e.url, wwwAuth, redirectUri, "Facet", http, previous)
+        val pending = McpOAuth.begin(id, e.url, wwwAuth, redirectUri, "Facet AI", http, previous)
         prefs.edit().putString("pending_" + pending.state, secrets.sealString(AppJson.encodeToString(pending))).apply()
         return pending.authorizationUrl
     }

@@ -32,7 +32,7 @@ export class AppTray {
     const s = this.actions.settings();
     this.tray.setContextMenu(
       Menu.buildFromTemplate([
-        { label: 'Open Facet', click: () => this.actions.open() },
+        { label: 'Open Facet AI', click: () => this.actions.open() },
         { type: 'separator' },
         {
           label: 'Let other devices use this PC',
@@ -47,10 +47,10 @@ export class AppTray {
           click: (item) => this.actions.setSettings({ startWithWindows: item.checked }),
         },
         { type: 'separator' },
-        { label: 'Quit Facet', click: () => this.actions.quit() },
+        { label: 'Quit Facet AI', click: () => this.actions.quit() },
       ]),
     );
-    const lines = ['Facet', s.remoteAccess ? 'Your other devices can use this PC' : null, this.activity].filter(Boolean);
+    const lines = ['Facet AI', s.remoteAccess ? 'Your other devices can use this PC' : null, this.activity].filter(Boolean);
     // Windows cuts tooltips at 127 characters.
     this.tray.setToolTip(lines.join('\n').slice(0, 127));
   }

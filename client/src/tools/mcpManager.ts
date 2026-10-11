@@ -487,7 +487,7 @@ export class McpManager implements McpTokenStore {
     const previous = await this.load(id);
     const wwwAuth = await this.probeWwwAuthenticate(e);
     try {
-      return await McpOAuth.begin(id, e.url, wwwAuth, redirectUri, 'Facet', previous);
+      return await McpOAuth.begin(id, e.url, wwwAuth, redirectUri, 'Facet AI', previous);
     } catch (ex) {
       throw this.signInProblem(ex);
     }

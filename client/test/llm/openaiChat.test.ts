@@ -69,7 +69,7 @@ describe('OpenAiChatClient', () => {
 
     const recorded = server.takeRequest();
     expect(recorded.headers.get('HTTP-Referer')).toBe('https://facet.dtsoftware.io');
-    expect(recorded.headers.get('X-Title')).toBe('Facet');
+    expect(recorded.headers.get('X-Title')).toBe('Facet AI');
     expect(recorded.headers.get('User-Agent')).toBeNull();
     const body = recorded.json();
     expect(body.reasoning.effort).toBe('high');

@@ -23,7 +23,7 @@ internal object Mcp {
     /** Versions that define the MCP-Protocol-Version request header. */
     val VERSIONS_WITH_HEADER = setOf("2025-11-25", "2025-06-18")
 
-    const val CLIENT_NAME = "Facet"
+    const val CLIENT_NAME = "Facet AI"
     const val CLIENT_VERSION = "1.0.0"
 
     const val HEADER_SESSION = "Mcp-Session-Id"

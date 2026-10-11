@@ -1,4 +1,4 @@
-# Facet
+# Facet AI
 
 **Every model. One home.** Facet is an open-source, end-to-end encrypted AI chat app for
 Android, Windows and the web. Bring your own API keys for OpenAI, Anthropic, Google Gemini,

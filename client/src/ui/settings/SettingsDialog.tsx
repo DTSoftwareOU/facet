@@ -59,7 +59,7 @@ const PAGES: PageDef[] = [
   { id: 'appearance', title: msg('Appearance'), icon: <Palette size={19} />, component: AppearancePage, separatorBefore: true },
   { id: 'privacy', title: msg('Privacy and security'), icon: <ShieldCheck size={19} />, component: PrivacyPage },
   { id: 'data', title: msg('Data and storage'), icon: <Database size={19} />, component: DataPage },
-  { id: 'about', title: msg('About Facet'), icon: <Info size={19} />, component: AboutPage, separatorBefore: true },
+  { id: 'about', title: msg('About Facet AI'), icon: <Info size={19} />, component: AboutPage, separatorBefore: true },
 ];
 
 export default function SettingsDialog({ page, detail }: { page: SettingsPage; detail: string | null }) {

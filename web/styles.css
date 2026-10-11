@@ -1,4 +1,4 @@
-/* Facet — facet.dtsoftware.io
+/* Facet AI: facet.dtsoftware.io
    Tokens follow docs/DESIGN.md. Dark "Basalt" by default, light "Quartz" on request. */
 
 @font-face {
@@ -177,6 +177,7 @@ code, kbd, pre { font-family: var(--mono); font-variant-ligatures: none; }
 }
 .brand-link { display: inline-flex; align-items: center; text-decoration: none; }
 .brand-link img { height: 26px; width: auto; }
+.brand-ai { margin-inline-start: 7px; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: var(--text-3); align-self: flex-start; margin-top: 1px; }
 .brand-link .on-light { display: none; }
 @media (prefers-color-scheme: light) {
   .brand-link .on-dark { display: none; }

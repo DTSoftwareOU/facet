@@ -460,7 +460,7 @@ internal class MdParser(private val colors: InlineColors, private val links: Lin
     companion object {
         private val ENTITIES = mapOf(
             "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'", "nbsp" to " ",
-            "copy" to "©", "reg" to "®", "trade" to "™", "mdash" to "—", "ndash" to "–", "hellip" to "…",
+            "copy" to "©", "reg" to "®", "trade" to "™", "mdash" to "\u2014", "ndash" to "–", "hellip" to "…",
             "rarr" to "→", "larr" to "←", "uarr" to "↑", "darr" to "↓", "harr" to "↔", "rArr" to "⇒", "lArr" to "⇐",
             "times" to "×", "divide" to "÷", "deg" to "°", "plusmn" to "±", "middot" to "·", "bull" to "•",
             "laquo" to "«", "raquo" to "»", "lsquo" to "‘", "rsquo" to "’", "ldquo" to "“", "rdquo" to "”",

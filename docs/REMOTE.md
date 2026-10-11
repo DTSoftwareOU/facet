@@ -20,7 +20,7 @@ other devices use this PC** (off by default), so a stolen password alone can't r
 | `presence` | `{"sessionId":"…","online":true}` | Another session of this account opened its first stream (`true`) or closed its last (`false`). |
 | `relay` | `{"from":"<sessionId>","msg":"<base64>"}` | An encrypted message for this session. |
 
-`GET /v1/relay/peers` → `{"peers":[{"sessionId":"…","deviceName":"…","platform":"android|web|windows|other"}]}` —
+`GET /v1/relay/peers` → `{"peers":[{"sessionId":"…","deviceName":"…","platform":"android|web|windows|other"}]}`:
 the account's other sessions that have an open stream right now.
 
 `POST /v1/relay` with `{"to":"<sessionId>","msg":"<base64 envelope>"}` → `{"delivered":n}` (n ≥ 1).
@@ -60,13 +60,13 @@ clock, ms since the epoch) and `type`.
 
 **Controller → host**
 
-- `{"type":"hello"}` — the host answers with `host`.
-- `{"type":"call","method":"…","params":{…}}` — the host answers with `result` (`re` = the call's id).
-- `{"type":"cancel","re":"<call id>"}` — best effort: stops a running `computer.call`.
+- `{"type":"hello"}`: the host answers with `host`.
+- `{"type":"call","method":"…","params":{…}}`: the host answers with `result` (`re` = the call's id).
+- `{"type":"cancel","re":"<call id>"}`: best effort, stops a running `computer.call`.
 
 **Host → controller**
 
-- `host` — answers `hello` (with `re`), and is also sent unsolicited to every online peer when the
+- `host`: answers `hello` (with `re`), and is also sent unsolicited to every online peer when the
   app starts or remote access is switched on or off:
 
   ```json
@@ -85,9 +85,9 @@ clock, ms since the epoch) and `type`.
 
 | Method | Params | Value |
 |---|---|---|
-| `computer.info` | — | `{"os","shell","home","user","hostname"}` |
-| `computer.tools` | — | `[{"name","description","inputSchemaJson","readOnly"}]` (`inputSchemaJson` is a JSON string) |
-| `computer.call` | `{"name","argumentsJson","cwd","callId"}` | `{"content","isError","label"?}` — the tool result as the model sees it |
+| `computer.info` | none | `{"os","shell","home","user","hostname"}` |
+| `computer.tools` | none | `[{"name","description","inputSchemaJson","readOnly"}]` (`inputSchemaJson` is a JSON string) |
+| `computer.call` | `{"name","argumentsJson","cwd","callId"}` | `{"content","isError","label"?}`, the tool result as the model sees it |
 | `computer.cancel` | `{"callId"}` | `{}` |
 | `files.list` | `{"path":null\|"…"}` | `{"path","parent","folders":[{"name","path"}],"places":[{"name","path"}]}` |
 | `agents.list` | `{"agent":"claude"\|"codex","cwd":"…"}` | `{"sessions":[{"id","title","updatedAt","messageCount"}]}` newest first, at most 50 |
@@ -123,8 +123,8 @@ Controllers keep their stream open while they wait for a result, even in the bac
 
 Conversation records gain two optional, synced fields:
 
-- `computerHost` — the `hostId` of the PC the chat works on, or absent.
-- `computerFolder` — the folder on that PC (an absolute path).
+- `computerHost`: the `hostId` of the PC the chat works on, or absent.
+- `computerFolder`: the folder on that PC (an absolute path).
 
 On that PC the chat's working folder is `computerFolder`. On other devices the chat offers the
 PC's computer tools while that host is online with remote use on, and works without them

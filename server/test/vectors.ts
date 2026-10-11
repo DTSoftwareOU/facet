@@ -42,7 +42,7 @@ function longJson(): string {
     { length: 12 },
     (_, i) =>
       `Paragraph ${i + 1}: Facet keeps every conversation end-to-end encrypted, so the sync server only ever sees ciphertext. ` +
-      `Unicode check — café, naïve, 日本語, emoji 💎.`,
+      `Unicode check: café, naïve, 日本語, emoji 💎.`,
   );
   return JSON.stringify({ role: 'assistant', conversationId: 'conv_test_1', text: paragraphs.join('\n\n') });
 }

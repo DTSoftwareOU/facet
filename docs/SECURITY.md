@@ -226,13 +226,13 @@ Client re-derives with a new salt, re-wraps the same `vaultKey`, sends
 `currentAuthHash, kdf, authHash, wrappedVaultKey`. Data is untouched. Other sessions are
 revoked.
 
-### Forgot password — recovery code (keeps data)
+### Forgot password: recovery code (keeps data)
 1. `POST /v1/auth/recover/start {email, recoveryAuthHash}` → `resetToken`,
    `recoveryWrappedVaultKey`.
 2. Client unwraps with `recoveryWrapKey`, picks a new password, re-wraps, generates a new
    recovery code, `POST /v1/auth/recover/finish`.
 
-### Forgot password — email (wipes data)
+### Forgot password: email (wipes data)
 Only when SMTP is configured. `POST /v1/auth/reset/request {email}` emails a one-time link
 code; `POST /v1/auth/reset/confirm` with a fresh `vaultKey` wrapping deletes every record and
 blob for that account, then sets the new credentials.
