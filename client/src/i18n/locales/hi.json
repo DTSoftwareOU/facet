@@ -1556,5 +1556,15 @@
   "Selected": "चुना गया",
   "Clear": "साफ़ करें",
   "Hide key": "कुंजी छिपाएं",
-  "Show key": "कुंजी दिखाएं"
+  "Show key": "कुंजी दिखाएं",
+  "Open Facet AI": "Facet AI खोलें",
+  "Quit Facet AI": "Facet AI बंद करें",
+  "Your other devices can use this PC": "आपके दूसरे डिवाइस इस पीसी का इस्तेमाल कर सकते हैं",
+  "Updating Facet AI": "Facet AI अपडेट हो रहा है",
+  "Starting the download…": "डाउनलोड शुरू हो रहा है…",
+  "Installing the update": "अपडेट इंस्टॉल हो रहा है",
+  "Facet AI will open again in a moment.": "Facet AI थोड़ी देर में फिर से खुलेगा।",
+  "Open Facet AI now": "Facet AI अभी खोलें",
+  "{ext} file": "{ext} फ़ाइल",
+  "All files": "सभी फ़ाइलें"
 }

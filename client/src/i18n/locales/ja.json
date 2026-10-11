@@ -1532,5 +1532,15 @@
   "Selected": "選択済み",
   "Clear": "クリア",
   "Hide key": "キーを非表示",
-  "Show key": "キーを表示"
+  "Show key": "キーを表示",
+  "Open Facet AI": "Facet AIを開く",
+  "Quit Facet AI": "Facet AIを終了",
+  "Your other devices can use this PC": "他のデバイスからこのPCを使用できます",
+  "Updating Facet AI": "Facet AIをアップデート中",
+  "Starting the download…": "ダウンロードを開始しています…",
+  "Installing the update": "アップデートをインストール中",
+  "Facet AI will open again in a moment.": "Facet AIはまもなく再び開きます。",
+  "Open Facet AI now": "今すぐFacet AIを開く",
+  "{ext} file": "{ext}ファイル",
+  "All files": "すべてのファイル"
 }

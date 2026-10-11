@@ -1556,5 +1556,15 @@
   "Selected": "ఎంచుకోబడింది",
   "Clear": "క్లియర్ చేయి",
   "Hide key": "కీని దాచు",
-  "Show key": "కీని చూపు"
+  "Show key": "కీని చూపు",
+  "Open Facet AI": "Facet AIని తెరవండి",
+  "Quit Facet AI": "Facet AIని మూసివేయండి",
+  "Your other devices can use this PC": "మీ ఇతర పరికరాలు ఈ PCని ఉపయోగించవచ్చు",
+  "Updating Facet AI": "Facet AI అప్‌డేట్ అవుతోంది",
+  "Starting the download…": "డౌన్‌లోడ్ ప్రారంభమవుతోంది…",
+  "Installing the update": "అప్‌డేట్ ఇన్‌స్టాల్ అవుతోంది",
+  "Facet AI will open again in a moment.": "Facet AI కొద్దిసేపట్లో మళ్లీ తెరుచుకుంటుంది.",
+  "Open Facet AI now": "Facet AIని ఇప్పుడే తెరవండి",
+  "{ext} file": "{ext} ఫైల్",
+  "All files": "అన్ని ఫైల్‌లు"
 }

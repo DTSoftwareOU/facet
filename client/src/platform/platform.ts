@@ -133,6 +133,8 @@ export interface HostBridge {
   setBusy(busy: boolean): void;
   /** A short line for the notification-area tooltip, e.g. "Used from Pixel 9 at 14:02". */
   activity(text: string | null): void;
+  /** The shell's own texts (menu, update window, dialogs) in the interface language. */
+  setShellStrings(strings: Record<string, string>): void;
 }
 
 export interface UpdateState {

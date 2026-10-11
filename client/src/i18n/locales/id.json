@@ -1532,5 +1532,15 @@
   "Selected": "Dipilih",
   "Clear": "Hapus",
   "Hide key": "Sembunyikan kunci",
-  "Show key": "Tampilkan kunci"
+  "Show key": "Tampilkan kunci",
+  "Open Facet AI": "Buka Facet AI",
+  "Quit Facet AI": "Keluar dari Facet AI",
+  "Your other devices can use this PC": "Perangkat Anda yang lain dapat menggunakan PC ini",
+  "Updating Facet AI": "Memperbarui Facet AI",
+  "Starting the download…": "Memulai unduhan…",
+  "Installing the update": "Memasang pembaruan",
+  "Facet AI will open again in a moment.": "Facet AI akan terbuka lagi sebentar lagi.",
+  "Open Facet AI now": "Buka Facet AI sekarang",
+  "{ext} file": "File {ext}",
+  "All files": "Semua file"
 }

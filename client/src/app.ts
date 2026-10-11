@@ -14,6 +14,7 @@ import { MediaService } from './domain/media/service';
 import { PricingCatalog } from './llm/pricing';
 import { LocalQuirkStore } from './llm/quirks';
 import { platform } from './platform';
+import { shellStrings } from './platform/shellStrings';
 import { Computers, type ChatComputer, type ComputerFields, type ComputerState } from './remote/computers';
 import { HostService } from './remote/host';
 import { RemoteHub, type RelayTransport } from './remote/hub';
@@ -104,6 +105,7 @@ export class App {
   async start(): Promise<void> {
     await Promise.all([this.settings.load(), this.auth.load()]);
     await this.recoverInterrupted();
+    platform().host?.setShellStrings(shellStrings());
     await this.computers.start();
     await this.host?.start().catch(() => {});
     this.remote.start();

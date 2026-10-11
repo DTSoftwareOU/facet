@@ -1556,5 +1556,15 @@
   "Selected": "Seçili",
   "Clear": "Temizle",
   "Hide key": "Anahtarı gizle",
-  "Show key": "Anahtarı göster"
+  "Show key": "Anahtarı göster",
+  "Open Facet AI": "Facet AI’ı aç",
+  "Quit Facet AI": "Facet AI’dan çık",
+  "Your other devices can use this PC": "Diğer cihazlarınız bu bilgisayarı kullanabilir",
+  "Updating Facet AI": "Facet AI güncelleniyor",
+  "Starting the download…": "İndirme başlatılıyor…",
+  "Installing the update": "Güncelleme yükleniyor",
+  "Facet AI will open again in a moment.": "Facet AI birazdan yeniden açılacak.",
+  "Open Facet AI now": "Facet AI’ı şimdi aç",
+  "{ext} file": "{ext} dosyası",
+  "All files": "Tüm dosyalar"
 }

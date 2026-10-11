@@ -1556,5 +1556,15 @@
   "Selected": "தேர்ந்தெடுக்கப்பட்டது",
   "Clear": "அழி",
   "Hide key": "கீயை மறை",
-  "Show key": "கீயைக் காட்டு"
+  "Show key": "கீயைக் காட்டு",
+  "Open Facet AI": "Facet AI-ஐத் திற",
+  "Quit Facet AI": "Facet AI-இலிருந்து வெளியேறு",
+  "Your other devices can use this PC": "உங்கள் மற்ற சாதனங்கள் இந்த கணினியைப் பயன்படுத்தலாம்",
+  "Updating Facet AI": "Facet AI புதுப்பிக்கப்படுகிறது",
+  "Starting the download…": "பதிவிறக்கம் தொடங்குகிறது…",
+  "Installing the update": "புதுப்பிப்பு நிறுவப்படுகிறது",
+  "Facet AI will open again in a moment.": "Facet AI சிறிது நேரத்தில் மீண்டும் திறக்கும்.",
+  "Open Facet AI now": "Facet AI-ஐ இப்போதே திற",
+  "{ext} file": "{ext} கோப்பு",
+  "All files": "எல்லா கோப்புகளும்"
 }

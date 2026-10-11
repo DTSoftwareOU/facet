@@ -1532,5 +1532,15 @@
   "Selected": "Đã chọn",
   "Clear": "Xóa",
   "Hide key": "Ẩn khóa",
-  "Show key": "Hiện khóa"
+  "Show key": "Hiện khóa",
+  "Open Facet AI": "Mở Facet AI",
+  "Quit Facet AI": "Thoát Facet AI",
+  "Your other devices can use this PC": "Các thiết bị khác của bạn có thể dùng máy tính này",
+  "Updating Facet AI": "Đang cập nhật Facet AI",
+  "Starting the download…": "Đang bắt đầu tải xuống…",
+  "Installing the update": "Đang cài đặt bản cập nhật",
+  "Facet AI will open again in a moment.": "Facet AI sẽ mở lại sau giây lát.",
+  "Open Facet AI now": "Mở Facet AI ngay",
+  "{ext} file": "Tệp {ext}",
+  "All files": "Tất cả tệp"
 }

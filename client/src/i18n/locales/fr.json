@@ -1580,5 +1580,15 @@
   "Selected": "Sélectionné",
   "Clear": "Effacer",
   "Hide key": "Masquer la clé",
-  "Show key": "Afficher la clé"
+  "Show key": "Afficher la clé",
+  "Open Facet AI": "Ouvrir Facet AI",
+  "Quit Facet AI": "Quitter Facet AI",
+  "Your other devices can use this PC": "Vos autres appareils peuvent utiliser ce PC",
+  "Updating Facet AI": "Mise à jour de Facet AI",
+  "Starting the download…": "Démarrage du téléchargement…",
+  "Installing the update": "Installation de la mise à jour",
+  "Facet AI will open again in a moment.": "Facet AI va se rouvrir dans un instant.",
+  "Open Facet AI now": "Ouvrir Facet AI maintenant",
+  "{ext} file": "Fichier {ext}",
+  "All files": "Tous les fichiers"
 }

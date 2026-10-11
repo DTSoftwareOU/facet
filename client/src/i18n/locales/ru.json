@@ -1604,5 +1604,15 @@
   "Selected": "Выбрано",
   "Clear": "Очистить",
   "Hide key": "Скрыть ключ",
-  "Show key": "Показать ключ"
+  "Show key": "Показать ключ",
+  "Open Facet AI": "Открыть Facet AI",
+  "Quit Facet AI": "Выйти из Facet AI",
+  "Your other devices can use this PC": "Ваши другие устройства могут использовать этот компьютер",
+  "Updating Facet AI": "Обновление Facet AI",
+  "Starting the download…": "Начинается загрузка…",
+  "Installing the update": "Устанавливается обновление",
+  "Facet AI will open again in a moment.": "Facet AI скоро откроется снова.",
+  "Open Facet AI now": "Открыть Facet AI сейчас",
+  "{ext} file": "Файл {ext}",
+  "All files": "Все файлы"
 }

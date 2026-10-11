@@ -44,4 +44,5 @@ export const Ch = {
   hostReadAgentSession: 'facet:host:read-agent-session',
   hostSetBusy: 'facet:host:set-busy',
   hostActivity: 'facet:host:activity',
+  hostShellStrings: 'facet:host:shell-strings',
 } as const;

@@ -29,6 +29,7 @@ import { Ch } from './channels';
 import { ComputerService } from './computer';
 import { listFolders } from './folders';
 import { HostSettings } from './host-settings';
+import { ShellTexts } from './shell-text';
 import { OAuthLoopback } from './oauth';
 import { APP_ORIGIN, APP_URL, createHandler, SCHEME } from './protocol';
 import { Secrets } from './secrets';
@@ -91,6 +92,7 @@ let pendingMaximize = false;
 /** True while the app writes replies (the renderer tells us), so updates wait. */
 let busy = false;
 let hostSettings: HostSettings | null = null;
+let shellText: ShellTexts | null = null;
 let tray: AppTray | null = null;
 
 /** Left by an update that installed while Facet was in the background: start hidden again. */
@@ -232,7 +234,12 @@ function registerIpc(): void {
     const ext = path.extname(fileName).slice(1);
     const opts = {
       defaultPath: path.join(app.getPath('downloads'), fileName),
-      filters: ext ? [{ name: `${ext.toUpperCase()} file`, extensions: [ext] }, { name: 'All files', extensions: ['*'] }] : [],
+      filters: ext
+        ? [
+            { name: text().fileOfType.replace('{ext}', ext.toUpperCase()), extensions: [ext] },
+            { name: text().allFiles, extensions: ['*'] },
+          ]
+        : [],
     };
     const r = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
     if (r.canceled || !r.filePath) return false;
@@ -270,7 +277,7 @@ function registerIpc(): void {
   handle(Ch.computerPickFolder, async (e, current?: string) => {
     const win = BrowserWindow.fromWebContents(e.sender) ?? undefined;
     const opts = {
-      title: 'Choose a working folder',
+      title: text().chooseFolder,
       defaultPath: current && existsSync(current) ? current : computer.defaultWorkspace(),
       properties: ['openDirectory', 'createDirectory'] as ('openDirectory' | 'createDirectory')[],
     };
@@ -312,6 +319,14 @@ function registerIpc(): void {
     if (!busy) updates.installIfIdle();
   });
   handle(Ch.hostActivity, (_e, text: string | null) => tray?.setActivity(text == null ? null : String(text)));
+  handle(Ch.hostShellStrings, (_e, strings: unknown) => {
+    if (shellText?.set(strings)) tray?.refresh();
+  });
+}
+
+/** The shell's texts in the interface language (English until the interface sends them). */
+function text() {
+  return shellText ? shellText.get() : new ShellTexts(app.getPath('userData')).get();
 }
 
 function agentKind(v: unknown): AgentKind {
@@ -618,6 +633,7 @@ if (!SELFTEST && !SCRIPT && !app.requestSingleInstanceLock()) {
 
   app.whenReady().then(async () => {
     secrets = new Secrets(safeStorage, app.getPath('userData'));
+    shellText = new ShellTexts(app.getPath('userData'));
     hostSettings = new HostSettings(app.getPath('userData'), (s) => {
       broadcast(Ch.hostSettingsChanged, s);
       applyHostSettings(s);
@@ -640,6 +656,7 @@ if (!SELFTEST && !SCRIPT && !app.requestSingleInstanceLock()) {
       },
       settings: () => hostSettings!.get(),
       setSettings: (patch) => hostSettings!.set(patch),
+      text: () => text(),
     });
     tray.create();
     applyHostSettings(hostSettings.get());
@@ -694,7 +711,7 @@ async function openAfterUpdateCheck(): Promise<void> {
     }
   };
   const makeSplash = () =>
-    (splash ??= new UpdateSplash(windowIcon(), () => {
+    (splash ??= new UpdateSplash(windowIcon(), text(), () => {
       skipped = true;
       open();
     }));

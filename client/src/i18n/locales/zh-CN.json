@@ -1532,5 +1532,15 @@
   "Selected": "已选择",
   "Clear": "清除",
   "Hide key": "隐藏密钥",
-  "Show key": "显示密钥"
+  "Show key": "显示密钥",
+  "Open Facet AI": "打开 Facet AI",
+  "Quit Facet AI": "退出 Facet AI",
+  "Your other devices can use this PC": "你的其他设备可以使用这台电脑",
+  "Updating Facet AI": "正在更新 Facet AI",
+  "Starting the download…": "正在开始下载…",
+  "Installing the update": "正在安装更新",
+  "Facet AI will open again in a moment.": "Facet AI 稍后会重新打开。",
+  "Open Facet AI now": "立即打开 Facet AI",
+  "{ext} file": "{ext} 文件",
+  "All files": "所有文件"
 }

@@ -1556,5 +1556,15 @@
   "Selected": "বেছে নেওয়া হয়েছে",
   "Clear": "সাফ করুন",
   "Hide key": "কী লুকান",
-  "Show key": "কী দেখান"
+  "Show key": "কী দেখান",
+  "Open Facet AI": "Facet AI খুলুন",
+  "Quit Facet AI": "Facet AI বন্ধ করুন",
+  "Your other devices can use this PC": "আপনার অন্য ডিভাইসগুলো এই পিসি ব্যবহার করতে পারে",
+  "Updating Facet AI": "Facet AI আপডেট হচ্ছে",
+  "Starting the download…": "ডাউনলোড শুরু হচ্ছে…",
+  "Installing the update": "আপডেট ইনস্টল হচ্ছে",
+  "Facet AI will open again in a moment.": "Facet AI একটু পরেই আবার খুলবে।",
+  "Open Facet AI now": "এখনই Facet AI খুলুন",
+  "{ext} file": "{ext} ফাইল",
+  "All files": "সব ফাইল"
 }

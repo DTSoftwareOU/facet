@@ -1532,5 +1532,15 @@
   "Selected": "선택됨",
   "Clear": "지우기",
   "Hide key": "키 숨기기",
-  "Show key": "키 표시"
+  "Show key": "키 표시",
+  "Open Facet AI": "Facet AI 열기",
+  "Quit Facet AI": "Facet AI 종료",
+  "Your other devices can use this PC": "다른 기기에서 이 PC를 사용할 수 있어요",
+  "Updating Facet AI": "Facet AI 업데이트 중",
+  "Starting the download…": "다운로드를 시작하는 중…",
+  "Installing the update": "업데이트를 설치하는 중",
+  "Facet AI will open again in a moment.": "Facet AI가 곧 다시 열려요.",
+  "Open Facet AI now": "지금 Facet AI 열기",
+  "{ext} file": "{ext} 파일",
+  "All files": "모든 파일"
 }

@@ -187,6 +187,11 @@ const api: DesktopApi = {
     activity: (text) => {
       void invoke(Ch.hostActivity, text == null ? null : String(text)).catch(() => {});
     },
+    setShellStrings: (strings) => {
+      const clean: Record<string, string> = {};
+      for (const [k, v] of Object.entries(strings ?? {})) if (typeof v === 'string') clean[String(k)] = v;
+      void invoke(Ch.hostShellStrings, clean).catch(() => {});
+    },
   },
 };
 
