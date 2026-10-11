@@ -86,7 +86,7 @@ curl https://your.domain/v1/health   # → {"ok":true}</code></pre>
           <tr><td><code>SERVER_SECRET</code></td><td>required</td><td>Used for internal hashing. At least 32 characters.</td></tr>
           <tr><td><code>PUBLIC_URL</code></td><td><code>http://localhost:8787</code></td><td>Your server’s public address, used in emails.</td></tr>
           <tr><td><code>REGISTRATION_OPEN</code></td><td><code>true</code></td><td>Set to <code>false</code> once everyone has an account.</td></tr>
-          <tr><td><code>BLOB_QUOTA_BYTES</code></td><td>2 GiB</td><td>Attachment storage per account.</td></tr>
+          <tr><td><code>USER_QUOTA_BYTES</code></td><td>100 MiB</td><td>Encrypted storage per account: chats, settings and files.</td></tr>
           <tr><td><code>DATA_DIR</code></td><td><code>./data</code></td><td>Where the database and attachments are stored.</td></tr>
           <tr><td><code>SMTP_URL</code></td><td>unset</td><td>Enables password reset by email (see below).</td></tr>
           <tr><td><code>SMTP_FROM</code></td><td><code>Facet &lt;no-reply@…&gt;</code></td><td>Sender for those emails.</td></tr>
