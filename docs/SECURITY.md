@@ -184,6 +184,29 @@ through the sync server.
 - Local MCP servers (stdio) are started the same way and stay on that computer: their rows are
   never synced.
 
+## Using a PC from other devices
+
+The account's other devices can use a PC running the Windows app (docs/REMOTE.md). Requests and
+results travel through the sync server's relay as envelopes sealed with
+`HKDF(vaultKey, "facet:relay:v1")` (AES-256-GCM, fresh random nonce). The AAD binds the sender's
+and recipient's session ids, so the server can't relabel or redirect a message; messages carry an
+id and a timestamp, and receivers drop replays (same id within 20 minutes) and stale messages
+(more than 10 minutes off).
+
+- **What the server learns:** which of the account's sessions are online, which session sends to
+  which, when, and how large each envelope is. It never sees commands, file contents, folder
+  names or results, and it keeps nothing: envelopes are forwarded to open streams and dropped.
+- **Who can use a PC:** only sessions of the same account (the server routes nothing across
+  accounts), and only after the PC's owner switches on "Let your other devices use this PC" (off
+  by default, stored in the PC's own settings, never synced). A stolen password alone therefore
+  can't run commands on a PC whose owner hasn't allowed it; someone who has the password *and*
+  finds remote use on can, like the owner could. The PC answers `hello` while remote use is off
+  so controllers can explain how to turn it on, and notifies its owner when a device is refused.
+- **Approvals** happen on the device that drives the chat, with its own "Ask before" setting;
+  YOLO mode skips them, as for local tools. The PC shows the last remote use in its tray tooltip.
+- Folder browsing returns folder names only, and Claude Code / Codex imports read only the
+  session files of the requested folder (ids are validated; no arbitrary paths).
+
 ## Flows
 
 ### Sign up

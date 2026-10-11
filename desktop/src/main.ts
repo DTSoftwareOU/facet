@@ -1,7 +1,8 @@
 /**
  * Facet for Windows: the Electron shell around the shared web app (client/, built into renderer/).
  * It adds what a browser can't do: local computer access for models, local MCP servers, DPAPI
- * secrets, OAuth loopback redirects, notifications, file saving and auto-updates.
+ * secrets, OAuth loopback redirects, notifications, file saving and auto-updates. It can keep
+ * running in the notification area so the account's other devices can use this PC (docs/REMOTE.md).
  */
 import {
   app,
@@ -19,16 +20,21 @@ import {
   type MenuItemConstructorOptions,
   type WebContents,
 } from 'electron';
-import { promises as fsp, existsSync, readdirSync, rmSync } from 'node:fs';
+import { promises as fsp, existsSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { UpdateState } from '../../client/src/platform/platform';
+import type { AgentKind, DesktopSettings, UpdateState } from '../../client/src/platform/platform';
+import { listAgentSessions, readAgentSession } from './agents';
 import { Ch } from './channels';
 import { ComputerService } from './computer';
+import { listFolders } from './folders';
+import { HostSettings } from './host-settings';
 import { OAuthLoopback } from './oauth';
 import { APP_ORIGIN, APP_URL, createHandler, SCHEME } from './protocol';
 import { Secrets } from './secrets';
 import { StdioServers, type StdioSpec } from './stdio';
+import { AppTray } from './tray';
+import { UpdateSplash } from './update-splash';
 import { Updates } from './updates';
 import { loadWindowState, MIN_HEIGHT, MIN_WIDTH, trackWindowState } from './window-state';
 
@@ -80,6 +86,29 @@ if (SCRIPT) {
 
 let mainWindow: BrowserWindow | null = null;
 let quitting = false;
+/** The window's first show applies the remembered maximized state. */
+let pendingMaximize = false;
+/** True while the app writes replies (the renderer tells us), so updates wait. */
+let busy = false;
+let hostSettings: HostSettings | null = null;
+let tray: AppTray | null = null;
+
+/** Left by an update that installed while Facet was in the background: start hidden again. */
+const RELAUNCH_HIDDEN = 'relaunch-hidden';
+const startHidden = (() => {
+  if (SELFTEST || SCRIPT) return false;
+  let flagged = false;
+  try {
+    const flag = path.join(app.getPath('userData'), RELAUNCH_HIDDEN);
+    if (existsSync(flag)) {
+      unlinkSync(flag);
+      flagged = true;
+    }
+  } catch {
+    /* unreadable: start normally */
+  }
+  return flagged || process.argv.includes('--hidden');
+})();
 
 // --------------------------------------------------------------------------------------------
 // Services
@@ -96,9 +125,18 @@ function broadcast(channel: string, ...args: unknown[]): void {
 function showMainWindow(): void {
   const w = mainWindow;
   if (!w || w.isDestroyed()) return;
+  if (pendingMaximize) {
+    pendingMaximize = false;
+    w.maximize();
+  }
   if (w.isMinimized()) w.restore();
   if (!w.isVisible()) w.show();
   w.focus();
+}
+
+function windowHidden(): boolean {
+  const w = mainWindow;
+  return !w || w.isDestroyed() || !w.isVisible() || w.isMinimized();
 }
 
 const computer = new ComputerService({
@@ -117,13 +155,22 @@ const oauth = new OAuthLoopback(
   () => showMainWindow(),
 );
 
-const updates = new Updates(
-  (state: UpdateState) => broadcast(Ch.updatesChanged, state),
-  () => {
+const updates = new Updates((state: UpdateState) => broadcast(Ch.updatesChanged, state), {
+  beforeInstall: () => {
     quitting = true;
     shutdownChildren();
   },
-);
+  idle: () => windowHidden() && !busy,
+  relaunchHidden: (hidden) => {
+    try {
+      const flag = path.join(app.getPath('userData'), RELAUNCH_HIDDEN);
+      if (hidden) writeFileSync(flag, '1');
+      else if (existsSync(flag)) unlinkSync(flag);
+    } catch {
+      /* best effort */
+    }
+  },
+});
 
 let secrets: Secrets | null = null;
 
@@ -247,6 +294,37 @@ function registerIpc(): void {
   handle(Ch.updatesState, () => updates.state());
   handle(Ch.updatesCheck, () => updates.check());
   handle(Ch.updatesInstall, () => updates.install());
+
+  handle(Ch.hostSettings, () => hostSettings!.get());
+  handle(Ch.hostSetSettings, (_e, patch: Partial<Omit<DesktopSettings, 'hostId'>>) => hostSettings!.set(patch ?? {}));
+  handle(Ch.hostListFolders, (_e, target: string | null, recent: string[]) =>
+    listFolders(target == null ? null : String(target), Array.isArray(recent) ? recent.map(String).slice(0, 20) : [], {
+      home: os.homedir(),
+      desktop: app.getPath('desktop'),
+      documents: app.getPath('documents'),
+      downloads: app.getPath('downloads'),
+    }),
+  );
+  handle(Ch.hostAgentSessions, (_e, agent: AgentKind, cwd: string) => listAgentSessions(agentKind(agent), String(cwd)));
+  handle(Ch.hostReadAgentSession, (_e, agent: AgentKind, cwd: string, id: string) => readAgentSession(agentKind(agent), String(cwd), String(id)));
+  handle(Ch.hostSetBusy, (_e, value: boolean) => {
+    busy = !!value;
+    if (!busy) updates.installIfIdle();
+  });
+  handle(Ch.hostActivity, (_e, text: string | null) => tray?.setActivity(text == null ? null : String(text)));
+}
+
+function agentKind(v: unknown): AgentKind {
+  if (v === 'claude' || v === 'codex') return v;
+  throw new Error('Unknown agent.');
+}
+
+/** Applies settings that live outside the app: starting with Windows, the tray menu. */
+function applyHostSettings(s: DesktopSettings): void {
+  if (app.isPackaged && process.platform === 'win32') {
+    app.setLoginItemSettings({ openAtLogin: s.startWithWindows, path: process.execPath, args: ['--hidden'] });
+  }
+  tray?.refresh();
 }
 
 // --------------------------------------------------------------------------------------------
@@ -336,7 +414,12 @@ function windowIcon(): string | undefined {
   return existsSync(p) ? p : undefined;
 }
 
-function createWindow(): BrowserWindow {
+function trayIcon(): string {
+  const ico = path.join(app.getAppPath(), 'build', 'icon.ico');
+  return existsSync(ico) ? ico : windowIcon() ?? ico;
+}
+
+function createWindow(autoShow: boolean): BrowserWindow {
   const userData = app.getPath('userData');
   const state = loadWindowState(userData);
   const win = new BrowserWindow({
@@ -370,10 +453,17 @@ function createWindow(): BrowserWindow {
   hardenWebContents(win.webContents);
   trackWindowState(win, userData);
   win.on('page-title-updated', (e) => e.preventDefault());
+  pendingMaximize = state.maximized;
   win.once('ready-to-show', () => {
-    if (state.maximized) win.maximize();
-    if (!SELFTEST) win.show();
+    if (autoShow) showMainWindow();
   });
+  win.on('close', (e) => {
+    // Closing keeps Facet in the notification area, so other devices can still reach this PC.
+    if (quitting || !tray || !hostSettings?.get().keepRunning) return;
+    e.preventDefault();
+    win.hide();
+  });
+  win.on('hide', () => updates.installIfIdle());
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null;
   });
@@ -526,16 +616,40 @@ if (!SELFTEST && !SCRIPT && !app.requestSingleInstanceLock()) {
   app.on('second-instance', () => showMainWindow());
   if (process.platform === 'win32') app.setAppUserModelId(APP_ID);
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     secrets = new Secrets(safeStorage, app.getPath('userData'));
+    hostSettings = new HostSettings(app.getPath('userData'), (s) => {
+      broadcast(Ch.hostSettingsChanged, s);
+      applyHostSettings(s);
+    });
     protocol.handle(SCHEME, createHandler(RENDERER_DIR));
     hardenSession();
     registerIpc();
     buildMenu();
-    mainWindow = createWindow();
-    if (SELFTEST) void runSelfTest(mainWindow);
-    else if (SCRIPT) void runScript(mainWindow, SCRIPT);
-    else updates.start();
+    if (SELFTEST || SCRIPT) {
+      mainWindow = createWindow(!SELFTEST);
+      if (SELFTEST) void runSelfTest(mainWindow);
+      else void runScript(mainWindow, SCRIPT!);
+      return;
+    }
+    tray = new AppTray(trayIcon(), {
+      open: () => showMainWindow(),
+      quit: () => {
+        quitting = true;
+        app.quit();
+      },
+      settings: () => hostSettings!.get(),
+      setSettings: (patch) => hostSettings!.set(patch),
+    });
+    tray.create();
+    applyHostSettings(hostSettings.get());
+    if (startHidden || !app.isPackaged) {
+      mainWindow = createWindow(!startHidden);
+      updates.start();
+    } else {
+      mainWindow = createWindow(false);
+      await openAfterUpdateCheck();
+    }
   });
 
   app.on('web-contents-created', (_e, wc) => {
@@ -548,16 +662,65 @@ if (!SELFTEST && !SCRIPT && !app.requestSingleInstanceLock()) {
   });
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow(true);
   });
 
   app.on('before-quit', () => {
     quitting = true;
     updates.stop();
     shutdownChildren();
+    tray?.destroy();
   });
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
   });
+}
+
+/**
+ * Opening Facet checks for an update first (docs/UPDATES.md). Usually there's none and the window
+ * opens as soon as it's ready; a slow check shows a small "Checking for updates…" window, and a
+ * new version downloads and installs before Facet opens, unless you choose to open it now.
+ */
+async function openAfterUpdateCheck(): Promise<void> {
+  let splash = null as UpdateSplash | null;
+  let skipped = false;
+  const open = () => {
+    splash?.close();
+    splash = null;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.webContents.isLoading()) mainWindow.once('ready-to-show', () => showMainWindow());
+      else showMainWindow();
+    }
+  };
+  const makeSplash = () =>
+    (splash ??= new UpdateSplash(windowIcon(), () => {
+      skipped = true;
+      open();
+    }));
+  const slow = setTimeout(makeSplash, 700);
+  const found = await updates.launchCheck(4000);
+  clearTimeout(slow);
+  if (found === 'none') {
+    open();
+    updates.start(true);
+    return;
+  }
+  const s = makeSplash();
+  s.update(updates.state());
+  // The splash follows the download (it has no IPC of its own).
+  const poll = setInterval(() => splash?.update(updates.state()), 300);
+  const ok = await updates.whenReady();
+  clearInterval(poll);
+  if (skipped) {
+    updates.start(true);
+    return;
+  }
+  if (ok) {
+    splash?.update(updates.state());
+    updates.install(false);
+    return;
+  }
+  open();
+  updates.start(true);
 }

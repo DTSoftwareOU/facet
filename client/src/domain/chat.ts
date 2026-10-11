@@ -10,7 +10,7 @@ import { newId } from '../core/ids';
 import { parseJson, toJson } from '../core/json';
 import type { AttachmentStore } from '../data/attachments';
 import { MessageTree, messageAttachments, type ConversationRepository } from '../data/conversations';
-import { attachmentRef, type AttachmentRef, type ConversationEntity, type MessageEntity, type MessageStatus, type ProviderEntity } from '../data/entities';
+import { attachmentRef, type AttachmentRef, type ComputerBinding, type ConversationEntity, type MessageEntity, type MessageStatus, type ProviderEntity } from '../data/entities';
 import type { Assistant, AssistantRepository } from '../data/library';
 import type { ModelRef, SettingsStore } from '../data/prefs';
 import type { ProviderRepository } from '../data/providers';
@@ -225,10 +225,10 @@ export class ChatEngine {
   // ---- public actions ----
 
   /** Sends a user message. Creates the conversation when [conversationId] is null. Returns the conversation id. */
-  async send(conversationId: string | null, text: string, attachmentIds: string[], newChat: NewChatSpec | null, workspace: string | null = null): Promise<string> {
+  async send(conversationId: string | null, text: string, attachmentIds: string[], newChat: NewChatSpec | null, computer: ComputerBinding | null = null): Promise<string> {
     let conv = conversationId ? await this.conversations.get(conversationId) : undefined;
     if (!conv && newChat) {
-      conv = await this.conversations.create(newChat.assistantId, newChat.model.providerId, newChat.model.modelId, newChat.params, newChat.folderId ?? null, workspace);
+      conv = await this.conversations.create(newChat.assistantId, newChat.model.providerId, newChat.model.modelId, newChat.params, newChat.folderId ?? null, computer);
     }
     if (!conv) throw new ChatError('Choose a model to start chatting.');
     if (this.isGenerating(conv.id)) throw new ChatError('Wait for the current reply to finish, or stop it.');

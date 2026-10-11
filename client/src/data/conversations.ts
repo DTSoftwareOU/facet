@@ -3,7 +3,7 @@ import { newId } from '../core/ids';
 import { parseJson, toJson } from '../core/json';
 import type { Citation, GenParams, Usage } from '../llm/types';
 import { db } from './db';
-import type { AttachmentRef, ConversationEntity, MessageEntity, MessageError } from './entities';
+import type { AttachmentRef, ComputerBinding, ConversationEntity, MessageEntity, MessageError } from './entities';
 
 export function messageAttachments(m: MessageEntity): AttachmentRef[] {
   return parseJson<AttachmentRef[]>(m.attachmentsJson, []);
@@ -111,12 +111,13 @@ export class ConversationRepository {
     return db().messages.get(id);
   }
 
-  async create(assistantId: string | null, providerId: string | null, modelId: string | null, params: GenParams, folderId: string | null = null, workspace: string | null = null): Promise<ConversationEntity> {
+  async create(assistantId: string | null, providerId: string | null, modelId: string | null, params: GenParams, folderId: string | null = null, computer: ComputerBinding | null = null): Promise<ConversationEntity> {
     const now = Date.now();
     const c: ConversationEntity = {
       id: newId(now), title: 'New chat', titleSet: false, assistantId, folderId, providerId, modelId,
       paramsJson: toJson(params), systemPrompt: null, currentLeafId: null, pinned: false, archived: 0,
-      createdAt: now, lastActivityAt: now, updatedAt: now, deleted: 0, dirty: 1, workspace,
+      createdAt: now, lastActivityAt: now, updatedAt: now, deleted: 0, dirty: 1,
+      computerHost: computer?.host ?? null, computerFolder: computer?.folder ?? null,
     };
     await db().conversations.put(c);
     return c;
@@ -158,9 +159,9 @@ export class ConversationRepository {
     return this.update(id, (c) => ({ ...c, currentLeafId: leafId }));
   }
 
-  /** The working folder for computer tools (Windows app). Local only: no sync, no dirty flag. */
-  async setWorkspace(id: string, workspace: string | null): Promise<void> {
-    await db().conversations.update(id, { workspace });
+  /** The PC and folder the chat's computer tools work in (synced), or none. */
+  setComputer(id: string, computer: ComputerBinding | null) {
+    return this.update(id, (c) => ({ ...c, computerHost: computer?.host ?? null, computerFolder: computer?.folder ?? null, workspace: null }));
   }
 
   /** Soft-deletes a conversation with its messages and attachments (tombstones sync to other devices). */

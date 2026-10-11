@@ -104,6 +104,7 @@ export class RecordCodec {
       title: e.title, titleSet: e.titleSet, assistantId: e.assistantId ?? null, folderId: e.folderId ?? null,
       providerId: e.providerId ?? null, modelId: e.modelId ?? null, paramsJson: e.paramsJson, systemPrompt: e.systemPrompt ?? null,
       currentLeafId: e.currentLeafId ?? null, pinned: e.pinned, archived: !!e.archived, createdAt: e.createdAt, lastActivityAt: e.lastActivityAt,
+      computerHost: e.computerHost ?? null, computerFolder: e.computerFolder ?? null,
     }));
   }
 
@@ -188,6 +189,7 @@ export class RecordCodec {
       providerId: ns(p.providerId), modelId: ns(p.modelId), paramsJson: s(p.paramsJson, '{}'), systemPrompt: ns(p.systemPrompt),
       currentLeafId: ns(p.currentLeafId), pinned: b(p.pinned), archived: b(p.archived) ? 1 : 0, createdAt: n(p.createdAt),
       lastActivityAt: n(p.lastActivityAt), updatedAt: r.updatedAt, deleted: 0, dirty: 0,
+      computerHost: ns(p.computerHost), computerFolder: ns(p.computerFolder),
       workspace: existing?.workspace ?? null,
     };
   }

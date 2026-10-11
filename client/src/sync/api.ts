@@ -56,6 +56,12 @@ export interface SessionDto {
   current: boolean;
 }
 
+export interface PeerDto {
+  sessionId: string;
+  deviceName: string;
+  platform: string;
+}
+
 export interface RecordDto {
   id: string;
   type: string;
@@ -249,6 +255,17 @@ export class SyncApi {
 
   async deleteBlob(base: string, token: string, id: string): Promise<void> {
     await this.request(base, 'DELETE', `/v1/blobs/${id}`, token);
+  }
+
+  /** The account's other sessions that are online now (docs/REMOTE.md). */
+  async relayPeers(base: string, token: string): Promise<PeerDto[]> {
+    const r = await this.json<{ peers?: PeerDto[] }>(base, 'GET', '/v1/relay/peers', token);
+    return r.peers ?? [];
+  }
+
+  /** Forwards an encrypted envelope (base64) to another session of the account. */
+  async relay(base: string, token: string, to: string, msg: string): Promise<void> {
+    await this.json(base, 'POST', '/v1/relay', token, { to, msg });
   }
 
   /** Opens the change stream (Server-Sent Events). The caller reads `body` and aborts via [signal]. */

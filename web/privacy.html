@@ -51,7 +51,8 @@
 
     <h2>Using Facet without an account</h2>
     <p>You can use Facet without signing up. In that case your conversations, settings and API keys are stored only on your device and we receive none of it.</p>
-    <p>To estimate what each reply costs, the app downloads a public price list of AI models from OpenRouter about once a day. That request contains no account information or content. You can turn it off in Settings.</p>
+    <p>To estimate what each reply costs, the app downloads a public price list of AI models from OpenRouter about once a day. That request contains no account information or content, though OpenRouter sees your IP address like any website you visit. You can turn it off in Settings.</p>
+    <p>When a model reads a web page in the web app and the site doesn’t let browsers load it directly, Facet asks Jina Reader (<code>r.jina.ai</code>, run by Jina AI) to load it instead. Jina then sees the page’s address and your IP address, under its own privacy policy. The Windows and Android apps load pages directly.</p>
 
     <h2>AI providers</h2>
     <p>When you send a message, the app sends it — together with the conversation so far, any attachments, and your API key — directly to the provider you selected, such as OpenAI, Anthropic, Google, OpenRouter or an endpoint you configured yourself. Facet’s servers don’t relay or see these requests.</p>
@@ -68,10 +69,22 @@
     </ul>
     <p>We can’t read your encrypted content or API keys. They’re encrypted with AES-256-GCM using a key that is created on your device and is itself protected by your password; the server only ever holds it in encrypted form.</p>
 
+    <h2>Using your PC from your other devices</h2>
+    <p>If you switch on “Let your other devices use this PC” in the Windows app, your phone or browser can ask that PC to run commands and read or edit files in a folder you choose. These requests and their results travel through the sync service end-to-end encrypted, with a key only your devices have. The sync service forwards them between your own devices without storing them. To do that it sees which of your devices are online, which one talks to which, when, and how much data each message carries — never what’s in it.</p>
+    <p>What a model reads on your PC, such as file contents or command output, becomes part of that chat and is sent to the AI provider you chose, like any message.</p>
+
+    <h2>Claude Code and Codex sessions</h2>
+    <p>When you use <code>/resume-from-claude</code> or <code>/resume-from-codex</code>, Facet on your PC reads the session files that those tools saved for the chosen folder, only then and only for that folder, and turns the session you pick into a Facet chat. That chat is stored and synced like your other chats (end-to-end encrypted), and when you continue it, its messages go to the AI provider you chose.</p>
+
+    <h2>App updates</h2>
+    <p>The Windows and Android apps check <code>facet.dtsoftware.io</code> for updates when they start and every few hours while they run, and download new versions from there. These requests carry no account information; like any request, they appear in our server logs (IP address, time, file requested) for up to 14 days. You can turn automatic checks off on Android in Settings → About.</p>
+
     <h2>How we use information</h2>
     <ul>
       <li>To provide sync: storing your encrypted data and delivering it to your signed-in devices.</li>
       <li>To sign you in, keep your account secure, and limit abuse (for example, rate-limiting repeated sign-in attempts).</li>
+      <li>To forward encrypted messages between your own devices when you use your PC from another device.</li>
+      <li>To deliver app updates.</li>
       <li>To send emails you ask for, such as a password-reset code, when email is enabled on the server.</li>
       <li>To answer you when you contact us.</li>
     </ul>
@@ -111,7 +124,7 @@
     <p>You have the right to access, correct, export or delete your personal data, and to object to or restrict how we process it. You can export everything and delete your account from the app. For anything else, email us and we’ll respond within 30 days. You can also complain to the Estonian Data Protection Inspectorate (Andmekaitse Inspektsioon, <a href="https://www.aki.ee/en">aki.ee</a>) or to the data protection authority where you live.</p>
 
     <h2>Children</h2>
-    <p>Facet isn’t intended for children under 13, or under the age of digital consent where you live, and we don’t knowingly collect their data.</p>
+    <p>Facet is for people aged 18 and over, and we don’t knowingly collect data from anyone younger.</p>
 
     <h2>International transfers</h2>
     <p>The sync service is hosted in the European Union. Your content reaches it already encrypted. The AI providers you choose may process your requests in other countries under their own terms.</p>
@@ -134,6 +147,7 @@
       <a href="/self-host.html">Self-host</a>
       <a href="/self-host.html" data-repo-path="">Source</a>
     </nav>
+    <p class="footer-note">Facet is an independent app and isn’t affiliated with or endorsed by any AI provider. Product and model names are trademarks of their owners.</p>
   </div>
 </footer>
 </body>

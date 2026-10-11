@@ -57,6 +57,9 @@ export function AboutPage(_props: PageProps) {
           Version {p.version} · {p.kind === 'desktop' ? 'Windows app' : 'Web'}
         </span>
         <span className="t-body c-2" style={{ maxWidth: 420 }}>Every model. One home. Open source and end-to-end encrypted, made by DT Software OÜ.</span>
+        <span className="t-label-s c-3" style={{ maxWidth: 420, fontWeight: 400 }}>
+          Facet is independent and isn’t affiliated with or endorsed by any AI provider. Product and model names are trademarks of their owners.
+        </span>
       </div>
       <Group>
         <Row icon={<Globe size={20} />} title="Website" subtitle="facet.dtsoftware.io" onClick={() => open('/')} trailing={<ExternalLink size={16} className="c-3" />} />

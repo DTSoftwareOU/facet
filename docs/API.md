@@ -22,6 +22,7 @@ Every non-2xx response has this body:
 | 401 | `invalid_refresh_token` | Refresh token unknown, expired, or reused (session revoked) |
 | 403 | `registration_closed` | Server does not accept new accounts |
 | 404 | `not_found` | Resource missing |
+| 404 | `peer_offline` | The relay target has no open stream |
 | 409 | `email_taken` | Register with an existing email |
 | 413 | `too_large` | Record/blob/batch over limit |
 | 413 | `quota_exceeded` | The user's storage quota (records + blobs) is full |
@@ -54,7 +55,7 @@ type Tokens = {
   sessionId: string;
 };
 
-type Device = { name: string /* ≤ 80 chars, e.g. "Pixel 9 Pro" */; platform: "android" | "web" | "other" };
+type Device = { name: string /* ≤ 80 chars, e.g. "Pixel 9 Pro" */; platform: "android" | "web" | "windows" | "other" };
 ```
 
 Validation: `email` ≤ 254 chars, contains `@`, lowercased and trimmed by the server.
@@ -234,13 +235,33 @@ event: changed
 data: {"cursor": 58}
 ```
 
-plus `: ping` comments every 25 s. Fired after any push for that user (from any session).
+plus `: ping` comments every 25 s. `changed` fires after any push for that user (from any
+session). Two more events serve the device relay (below and docs/REMOTE.md):
+`presence` `{"sessionId","online"}` when another session of the account opens its first stream
+or closes its last, and `relay` `{"from","msg"}` for an encrypted message to this session.
 
 Only `event:` and `data:` fields and `:` comments are sent (no `id:`/`retry:`). An invalid
 token gets a normal `401` JSON error before any stream starts. The server ends the stream
 when the session is revoked (logout, password change, revoke) or the server shuts down;
 clients reconnect with backoff, refreshing the access token first on `401`, and pull from
 their cursor after each `ready`.
+
+## Relay (auth)
+
+End-to-end encrypted messages between the account's own sessions, used to reach a PC from the
+phone or the web (docs/REMOTE.md). The server forwards envelopes to the target's open streams and
+stores nothing.
+
+### `GET /v1/relay/peers`
+→ `200 { "peers": [{ "sessionId", "deviceName", "platform" }] }`: the account's other sessions
+with an open stream.
+
+### `POST /v1/relay`
+`{ "to": "<sessionId>", "msg": "<base64 envelope>" }` → `200 { "delivered": n }`. The envelope
+must be a version 1 relay envelope (first byte `0x01`, at least 30 bytes, at most 4 MiB).
+Errors: `peer_offline` (404, no open stream for that session in this account), `too_large`,
+`invalid_request` (not an envelope, or `to` is the caller), `rate_limited` (over 1,200 a minute
+per session).
 
 ## Blobs (auth)
 

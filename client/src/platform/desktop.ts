@@ -5,7 +5,7 @@
  * The window loads with web security relaxed for provider requests, so `fetch` isn't limited by CORS.
  */
 import { b64, unb64 } from '../core/bytes';
-import type { ComputerBridge, OAuthBridge, Platform, StdioBridge, UpdateBridge } from './platform';
+import type { ComputerBridge, HostBridge, OAuthBridge, Platform, StdioBridge, UpdateBridge } from './platform';
 
 /** The API the preload script exposes. Keep in sync with desktop/src/preload.ts. */
 export interface DesktopApi {
@@ -24,6 +24,7 @@ export interface DesktopApi {
   computer: ComputerBridge;
   stdio: StdioBridge;
   updates: UpdateBridge;
+  host: HostBridge;
 }
 
 declare global {
@@ -37,7 +38,7 @@ export function createDesktopPlatform(api: DesktopApi): Platform {
   api.onNotificationClick(() => clickHandler?.());
   return {
     kind: 'desktop',
-    apiPlatform: 'other',
+    apiPlatform: 'windows',
     defaultServerUrl: 'https://facet.dtsoftware.io',
     deviceName: () => api.deviceName(),
     fetch: (input, init) => fetch(input, init),
@@ -69,6 +70,7 @@ export function createDesktopPlatform(api: DesktopApi): Platform {
     computer: api.computer,
     stdio: api.stdio,
     updates: api.updates,
+    host: api.host,
     version: api.version,
   };
 }

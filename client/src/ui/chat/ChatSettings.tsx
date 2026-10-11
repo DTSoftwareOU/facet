@@ -45,14 +45,16 @@ export function effortHint(e: Effort | null | undefined): string {
 }
 
 /** Per-chat model parameters, tools and instructions (the chat settings sheet on Android). */
-export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPrompt, workspace, onWorkspace, onChangeModel, onClose }: {
+export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPrompt, computerLabel, onComputer, onChangeModel, onClose }: {
   model: ResolvedModel | null;
   params: GenParams;
   onParams: (p: GenParams) => void;
   systemPrompt: string | null;
   onSystemPrompt: ((s: string | null) => void) | null;
-  workspace: string | null;
-  onWorkspace: ((path: string) => void) | null;
+  /** Where the chat's computer tools work, e.g. "Documents" or "OFFICE-PC · app"; null for none. */
+  computerLabel: string | null;
+  /** Opens the folder or PC chooser; null when no computer is reachable. */
+  onComputer: (() => void) | null;
   onChangeModel: () => void;
   onClose: () => void;
 }) {
@@ -165,12 +167,12 @@ export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPr
                 ))}
             </>
           )}
-          {computer && caps?.tools && (
+          {(computer || onComputer) && caps?.tools && (
             <>
               <Divider />
               <SwitchRow
                 icon={<Monitor size={20} />}
-                title="Use this computer"
+                title={computer ? 'Use this computer' : 'Use your PC'}
                 subtitle={local.computerTools ? 'The model can run commands and read and edit files in the working folder.' : 'Off for every chat. Turn it on to let models run commands and edit files.'}
                 checked={local.computerTools && params.tools}
                 onChange={(v) => {
@@ -179,17 +181,14 @@ export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPr
                   if (!v) app.settings.updateLocal((l) => ({ ...l, computerTools: false }));
                 }}
               />
-              {local.computerTools && onWorkspace && (
+              {local.computerTools && onComputer && (
                 <>
                   <Divider />
                   <Row
                     icon={<FolderOpen size={20} />}
                     title="Working folder"
-                    subtitle={<span className="mono" style={{ fontSize: 12.5 }}>{workspace || 'Not set'}</span>}
-                    onClick={async () => {
-                      const picked = await computer.pickFolder(workspace ?? undefined);
-                      if (picked) onWorkspace(picked);
-                    }}
+                    subtitle={<span className="mono" style={{ fontSize: 12.5 }}>{computerLabel || 'Not set'}</span>}
+                    onClick={onComputer}
                   />
                 </>
               )}

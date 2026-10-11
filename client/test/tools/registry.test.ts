@@ -3,7 +3,7 @@ import { db, FacetDb, setDb } from '../../src/data/db';
 import type { AttachmentEntity, McpServerEntity } from '../../src/data/entities';
 import { DEFAULT_LOCAL, defaultSynced, type LocalPrefs, type SettingsStore, type SyncedPrefs } from '../../src/data/prefs';
 import { defaultCaps, defaultParams, type ModelCaps, type GenParams } from '../../src/llm/types';
-import type { ComputerBridge } from '../../src/platform';
+import { platform, type ComputerBridge } from '../../src/platform';
 import { McpManager } from '../../src/tools/mcpManager';
 import { MAX_RESULT_CHARS, MAX_TOOL_ROUNDS, READER_NOTE, ToolRegistry, YOLO_TOOL_ROUNDS, type MediaToolService } from '../../src/tools/registry';
 import { SkillRepository } from '../../src/tools/skills';
@@ -20,8 +20,28 @@ let search: SearchConfig | null;
 
 const settings = { get synced() { return synced; }, get local() { return local; } } as unknown as SettingsStore;
 
+/** The app resolves a chat's computer (remote/computers.ts); here: this PC's bridge in the chat's folder. */
 function registry(extra: { media?: MediaToolService; workspaceFor?: (id: string | null | undefined) => Promise<string> } = {}) {
-  return new ToolRegistry({ search: new WebSearch(), searchConfig: async () => search, mcp, skills, settings, ...extra });
+  const { workspaceFor, ...rest } = extra;
+  return new ToolRegistry({
+    search: new WebSearch(),
+    searchConfig: async () => search,
+    mcp,
+    skills,
+    settings,
+    ...rest,
+    computerFor: async (id) => {
+      const bridge = platform().computer;
+      if (!bridge) return null;
+      const folder = (await workspaceFor?.(id)) || local.defaultWorkspace || (await bridge.defaultWorkspace());
+      return {
+        local: true, hostId: 'me', name: 'DESK', folder, bridge,
+        listFolders: async () => ({ path: null, parent: null, folders: [], places: [] }),
+        agentSessions: async () => [],
+        readAgentSession: async () => null,
+      };
+    },
+  });
 }
 
 const params = (over: Partial<GenParams> = {}) => defaultParams({ tools: true, ...over });

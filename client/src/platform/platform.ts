@@ -70,6 +70,71 @@ export interface OAuthBridge {
   authorize(authUrl: string, redirectUri: string, signal?: AbortSignal): Promise<string>;
 }
 
+/** The Windows app's own settings, kept by its main process (they apply before any window opens). */
+export interface DesktopSettings {
+  /** Identifies this Windows install to the account's other devices (docs/REMOTE.md). */
+  hostId: string;
+  /** Let the account's other devices use this PC. Off until the owner switches it on. */
+  remoteAccess: boolean;
+  /** Start hidden in the notification area when the user signs in to Windows. */
+  startWithWindows: boolean;
+  /** Closing the window keeps Facet running in the notification area. */
+  keepRunning: boolean;
+}
+
+export interface FolderEntry {
+  name: string;
+  path: string;
+}
+
+/** One level of a folder browser: the folders in [path], or the starting places when [path] is null. */
+export interface FolderListing {
+  path: string | null;
+  parent: string | null;
+  folders: FolderEntry[];
+  places: FolderEntry[];
+}
+
+export type AgentKind = 'claude' | 'codex';
+
+export interface AgentSessionSummary {
+  id: string;
+  title: string;
+  updatedAt: number;
+  messageCount: number;
+}
+
+export interface ImportedMessage {
+  role: 'user' | 'assistant';
+  text: string;
+  at?: number;
+}
+
+/** A Claude Code or Codex session converted for Facet (docs/REMOTE.md). */
+export interface ImportedSession {
+  id: string;
+  title: string;
+  cwd: string;
+  updatedAt: number;
+  messages: ImportedMessage[];
+  truncated: boolean;
+}
+
+/** What the Windows app adds as a host for the account's other devices (docs/REMOTE.md). */
+export interface HostBridge {
+  settings(): Promise<DesktopSettings>;
+  setSettings(patch: Partial<Omit<DesktopSettings, 'hostId'>>): Promise<DesktopSettings>;
+  onSettings(listener: (settings: DesktopSettings) => void): () => void;
+  /** Folders in [path] (or the starting places, with [recent] chat folders among them). */
+  listFolders(path: string | null, recent: string[]): Promise<FolderListing>;
+  agentSessions(agent: AgentKind, cwd: string): Promise<AgentSessionSummary[]>;
+  readAgentSession(agent: AgentKind, cwd: string, id: string): Promise<ImportedSession | null>;
+  /** True while replies are being written, so updates don't restart the app mid-reply. */
+  setBusy(busy: boolean): void;
+  /** A short line for the notification-area tooltip, e.g. "Used from Pixel 9 at 14:02". */
+  activity(text: string | null): void;
+}
+
 export interface UpdateState {
   status: 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error';
   version?: string;
@@ -88,8 +153,8 @@ export interface UpdateBridge {
 
 export interface Platform {
   kind: 'web' | 'desktop';
-  /** Sent to the sync server as the session's platform (the server knows android, web and other). */
-  apiPlatform: 'web' | 'other';
+  /** Sent to the sync server as the session's platform (older servers store windows as other). */
+  apiPlatform: 'web' | 'windows' | 'other';
   /** Sync server used until the user picks another. */
   defaultServerUrl: string;
   /** Short name for this device in the signed-in devices list. */
@@ -108,5 +173,6 @@ export interface Platform {
   computer?: ComputerBridge;
   stdio?: StdioBridge;
   updates?: UpdateBridge;
+  host?: HostBridge;
   version: string;
 }

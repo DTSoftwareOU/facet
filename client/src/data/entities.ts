@@ -31,8 +31,18 @@ export interface ConversationEntity extends SyncFields {
   pinned: boolean;
   archived: Flag;
   lastActivityAt: number;
-  /** Desktop only, never synced: the folder computer tools work in for this chat. */
+  /** The PC (its host id, docs/REMOTE.md) whose computer tools this chat uses. Synced. */
+  computerHost?: string | null;
+  /** The folder on [computerHost] the chat works in. Synced. */
+  computerFolder?: string | null;
+  /** Windows app, never synced: the working folder chosen before chats were bound to a PC. */
   workspace?: string | null;
+}
+
+/** Where a chat's computer tools run: a PC (host id) and a folder on it. */
+export interface ComputerBinding {
+  host: string;
+  folder: string;
 }
 
 export type MessageStatus = 'DONE' | 'STREAMING' | 'STOPPED' | 'ERROR' | 'REFUSED' | 'TRUNCATED';

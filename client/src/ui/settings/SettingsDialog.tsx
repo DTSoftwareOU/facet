@@ -53,7 +53,7 @@ const PAGES: PageDef[] = [
   { id: 'prompts', title: 'Prompt library', icon: <Library size={19} />, component: PromptsPage },
   { id: 'chat', title: 'Chat', icon: <MessageSquare size={19} />, component: ChatPrefsPage },
   { id: 'tools', title: 'Tools', icon: <Wrench size={19} />, component: ToolsPage },
-  { id: 'computer', title: 'Computer access', icon: <Monitor size={19} />, component: ComputerPage, desktopOnly: true },
+  { id: 'computer', title: 'Computer access', icon: <Monitor size={19} />, component: ComputerPage },
   { id: 'media', title: 'Media models', icon: <ImageIcon size={19} />, component: MediaPage },
   { id: 'appearance', title: 'Appearance', icon: <Palette size={19} />, component: AppearancePage, separatorBefore: true },
   { id: 'privacy', title: 'Privacy and security', icon: <ShieldCheck size={19} />, component: PrivacyPage },
@@ -63,7 +63,10 @@ const PAGES: PageDef[] = [
 
 export default function SettingsDialog({ page, detail }: { page: SettingsPage; detail: string | null }) {
   const narrow = useNarrow(760);
-  const pages = PAGES.filter((p) => !p.desktopOnly || platform().computer);
+  const pages = PAGES.filter((p) => !p.desktopOnly || platform().computer).map((p) =>
+    // Away from the Windows app, this page is about using a PC of the account.
+    p.id === 'computer' && !platform().computer ? { ...p, title: 'Your PC' } : p,
+  );
   // On wide windows there's no separate "home": show the first page beside the menu.
   const current = page === 'home' && !narrow ? 'account' : page;
   const def = pages.find((p) => p.id === current);

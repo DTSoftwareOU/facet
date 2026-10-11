@@ -5,6 +5,8 @@ import { getApp } from '../app';
 import { db } from '../data/db';
 import type { LocalPrefs, SyncedPrefs } from '../data/prefs';
 import type { LiveTurn } from '../domain/chat';
+import type { ComputerFields, ComputerState } from '../remote/computers';
+import type { HostInfo } from '../remote/protocol';
 import type { AccountState } from '../sync/auth';
 import type { AutoFreed, SyncState } from '../sync/engine';
 
@@ -41,6 +43,33 @@ export function useLiveTurns(): ReadonlyMap<string, LiveTurn> {
 export function useActiveChats(): ReadonlySet<string> {
   const c = getApp().chat;
   return useSyncExternalStore(c.subscribe, () => c.active);
+}
+
+/** The account's PCs that are online now (docs/REMOTE.md). */
+export function useHosts(): HostInfo[] {
+  const r = getApp().remote;
+  return useSyncExternalStore(r.subscribe, () => r.hosts);
+}
+
+/** The computer a chat (or a new chat's choice) uses, kept current as PCs come and go. */
+export function useComputerState(fields: ComputerFields | null | undefined): ComputerState | null {
+  const hosts = useHosts();
+  const [state, setState] = useState<ComputerState | null>(null);
+  const host = fields?.computerHost ?? null;
+  const folder = fields?.computerFolder ?? null;
+  const workspace = fields?.workspace ?? null;
+  const defaultWorkspace = useLocalPrefs().defaultWorkspace;
+  useEffect(() => {
+    let live = true;
+    void getApp()
+      .computerState({ computerHost: host, computerFolder: folder, workspace })
+      .then((s) => live && setState(s))
+      .catch(() => live && setState({ kind: 'none' }));
+    return () => {
+      live = false;
+    };
+  }, [host, folder, workspace, hosts, defaultWorkspace]);
+  return state;
 }
 
 /** Providers (not deleted), live. */

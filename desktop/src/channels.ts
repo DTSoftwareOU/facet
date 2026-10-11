@@ -34,4 +34,14 @@ export const Ch = {
   updatesInstall: 'facet:updates:install',
   /** main → renderer: (state) */
   updatesChanged: 'facet:updates:changed',
+
+  hostSettings: 'facet:host:settings',
+  hostSetSettings: 'facet:host:set-settings',
+  /** main → renderer: (settings) */
+  hostSettingsChanged: 'facet:host:settings-changed',
+  hostListFolders: 'facet:host:list-folders',
+  hostAgentSessions: 'facet:host:agent-sessions',
+  hostReadAgentSession: 'facet:host:read-agent-session',
+  hostSetBusy: 'facet:host:set-busy',
+  hostActivity: 'facet:host:activity',
 } as const;

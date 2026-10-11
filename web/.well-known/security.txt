@@ -1,0 +1,5 @@
+Contact: mailto:help@dtsoftware.io
+Expires: 2027-10-11T00:00:00.000Z
+Preferred-Languages: en, et
+Canonical: https://facet.dtsoftware.io/.well-known/security.txt
+Policy: https://facet.dtsoftware.io/legal.html#security

@@ -5,6 +5,7 @@ export type ErrorCode =
   | 'invalid_refresh_token'
   | 'registration_closed'
   | 'not_found'
+  | 'peer_offline'
   | 'email_taken'
   | 'too_large'
   | 'quota_exceeded'
@@ -31,6 +32,7 @@ export const errors = {
   invalidRefresh: () => new ApiError(401, 'invalid_refresh_token', 'This session has ended. Sign in again.'),
   registrationClosed: () => new ApiError(403, 'registration_closed', 'This server is not accepting new accounts.'),
   notFound: (message = 'Not found.') => new ApiError(404, 'not_found', message),
+  peerOffline: () => new ApiError(404, 'peer_offline', 'That device is offline.'),
   emailTaken: () => new ApiError(409, 'email_taken', 'An account with this email already exists.'),
   tooLarge: (message = 'Request is too large.') => new ApiError(413, 'too_large', message),
   quotaExceeded: () => new ApiError(413, 'quota_exceeded', 'Storage quota exceeded.'),

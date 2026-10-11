@@ -1,7 +1,12 @@
 /**
  * App updates through electron-updater's generic provider (latest.yml + installer on
- * facet.dtsoftware.io). The app isn't code-signed, so no publisherName is configured and
- * electron-updater skips the signature check (the installer's sha512 from latest.yml is still verified).
+ * facet.dtsoftware.io), as described in docs/UPDATES.md. The app isn't code-signed, so no
+ * publisherName is configured and electron-updater skips the signature check (the installer's
+ * sha512 from latest.yml is still verified).
+ *
+ * When you open Facet it checks first and, if there's a new version, installs it before you start.
+ * While it runs (often hidden in the notification area) it checks every 6 hours and installs a
+ * downloaded update as soon as the window is hidden and no reply is being written.
  */
 import { app } from 'electron';
 import type { UpdateState } from '../../client/src/platform/platform';
@@ -11,14 +16,24 @@ const FIRST_CHECK_DELAY_MS = 15 * 1000;
 
 type Updater = typeof import('electron-updater').autoUpdater;
 
+export interface UpdateHooks {
+  /** Everything to stop before the installer runs (local servers, commands…). */
+  beforeInstall(): void;
+  /** True when an update may install without asking: the window is hidden and nothing is running. */
+  idle(): boolean;
+  /** Remembers to start hidden again after the installer restarts the app. */
+  relaunchHidden(hidden: boolean): void;
+}
+
 export class Updates {
   private current: UpdateState = { status: 'idle' };
   private updater: Updater | null = null;
   private timer: NodeJS.Timeout | null = null;
+  private readonly waiters = new Set<(state: UpdateState) => void>();
 
   constructor(
     private readonly broadcast: (state: UpdateState) => void,
-    private readonly beforeInstall: () => void,
+    private readonly hooks: UpdateHooks,
   ) {}
 
   state(): UpdateState {
@@ -28,6 +43,8 @@ export class Updates {
   private set(state: UpdateState): void {
     this.current = state;
     this.broadcast(state);
+    for (const w of [...this.waiters]) w(state);
+    if (state.status === 'ready') this.installIfIdle();
   }
 
   private get(): Updater | null {
@@ -57,16 +74,53 @@ export class Updates {
     return autoUpdater;
   }
 
-  /** Checks shortly after start and every 6 hours (installed app only). */
-  start(): void {
+  /** Checks every 6 hours (installed app only); [checkedAtLaunch] skips the first, early check. */
+  start(checkedAtLaunch = false): void {
     if (!app.isPackaged) return;
-    setTimeout(() => void this.check(), FIRST_CHECK_DELAY_MS);
+    if (!checkedAtLaunch) setTimeout(() => void this.check(), FIRST_CHECK_DELAY_MS);
     this.timer = setInterval(() => void this.check(), CHECK_EVERY_MS);
   }
 
   stop(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+  }
+
+  /**
+   * The check when Facet opens: resolves "available" as soon as a newer version is found (it then
+   * downloads), or "none" when there's none, it failed, or it took longer than [timeoutMs].
+   */
+  async launchCheck(timeoutMs: number): Promise<'available' | 'none'> {
+    if (!this.get()) return 'none';
+    const found = new Promise<'available' | 'none'>((resolve) => {
+      const timer = setTimeout(() => done('none'), timeoutMs);
+      const done = (r: 'available' | 'none') => {
+        clearTimeout(timer);
+        this.waiters.delete(waiter);
+        resolve(r);
+      };
+      const waiter = (s: UpdateState) => {
+        if (s.status === 'available' || s.status === 'downloading' || s.status === 'ready') done('available');
+        else if (s.status === 'idle' || s.status === 'error') done('none');
+      };
+      this.waiters.add(waiter);
+    });
+    void this.check();
+    return found;
+  }
+
+  /** Resolves when the download finishes (true) or fails (false). */
+  whenReady(): Promise<boolean> {
+    if (this.current.status === 'ready') return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const waiter = (s: UpdateState) => {
+        if (s.status === 'ready' || s.status === 'error' || s.status === 'idle') {
+          this.waiters.delete(waiter);
+          resolve(s.status === 'ready');
+        }
+      };
+      this.waiters.add(waiter);
+    });
   }
 
   async check(): Promise<void> {
@@ -84,12 +138,19 @@ export class Updates {
     }
   }
 
-  install(): void {
+  /** Restarts into the downloaded update. [hidden]: start in the notification area afterwards. */
+  install(hidden = false): void {
     const u = this.get();
     if (!u || this.current.status !== 'ready') return;
-    this.beforeInstall();
+    this.hooks.relaunchHidden(hidden);
+    this.hooks.beforeInstall();
     // Silent install, then start the new version.
     setImmediate(() => u.quitAndInstall(true, true));
+  }
+
+  /** Installs a ready update when nobody would notice (window hidden, no reply running). */
+  installIfIdle(): void {
+    if (this.current.status === 'ready' && this.hooks.idle()) this.install(true);
   }
 }
 

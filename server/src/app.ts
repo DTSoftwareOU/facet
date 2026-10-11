@@ -11,6 +11,7 @@ import { RecordStore } from './records.js';
 import { accountRoutes } from './routes/account.js';
 import { authRoutes } from './routes/auth.js';
 import { blobRoutes } from './routes/blobs.js';
+import { relayRoutes } from './routes/relay.js';
 import { metaRoutes } from './routes/meta.js';
 import { syncRoutes } from './routes/sync.js';
 import { Store } from './store.js';
@@ -106,6 +107,7 @@ export function buildApp(config: Config, options: BuildOptions = {}): { app: Fas
   accountRoutes(app, ctx);
   syncRoutes(app, ctx);
   blobRoutes(app, ctx);
+  relayRoutes(app, ctx);
 
   const runHousekeeping = () => {
     try {

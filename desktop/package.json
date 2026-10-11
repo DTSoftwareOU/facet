@@ -41,6 +41,7 @@
       "dist/grep-worker.js",
       "renderer/**/*",
       "build/icon.png",
+      "build/icon.ico",
       "package.json"
     ],
     "extraMetadata": {

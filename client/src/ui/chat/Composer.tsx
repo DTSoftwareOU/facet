@@ -1,18 +1,37 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowUp, Brain, FolderOpen, Globe, Library, Mic, Paperclip, Plus, Rocket, Square, X } from 'lucide-react';
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
+import { ArrowUp, Brain, FolderOpen, Globe, Library, Mic, Monitor, MonitorOff, Paperclip, Plus, Rocket, Square, X } from 'lucide-react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { getApp } from '../../app';
 import type { AttachmentEntity } from '../../data/entities';
 import { EFFORT_INFO, type GenParams } from '../../llm/types';
-import { platform } from '../../platform';
+import type { ComputerState } from '../../remote/computers';
 import { isSearchKind } from '../../tools/types';
 import { db } from '../../data/db';
 import { IconButton, Menu, Spinner, useMenu, useToast } from '../components/primitives';
 import { useLocalPrefs, usePrompts, useSyncedPrefs } from '../hooks';
 import { ui } from '../nav';
 import { FileChip } from './Attachments';
+import { folderName } from './ComputerDialog';
 import type { ResolvedModel } from './ModelPicker';
 import { useDictation } from './speech';
+
+/** A slash command in the message box (docs/REMOTE.md). */
+export interface SlashCommand {
+  /** Without the slash, e.g. "resume-from-claude". */
+  name: string;
+  description: string;
+  icon: ReactNode;
+  run: () => void;
+}
+
+/** "Code review" → "code-review", for saved prompts as commands. */
+export function commandName(title: string): string {
+  return title.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'prompt';
+}
+
+type SlashItem =
+  | { kind: 'command'; key: string; name: string; description: string; icon: ReactNode; run: () => void }
+  | { kind: 'prompt'; key: string; name: string; description: string; body: string };
 
 export interface ComposerHandle {
   focus(): void;
@@ -41,11 +60,6 @@ function writeDraft(conversationId: string | null, text: string) {
   }
 }
 
-function folderName(path: string): string {
-  const parts = path.replace(/[\\/]+$/, '').split(/[\\/]/);
-  return parts[parts.length - 1] || path;
-}
-
 function DraftThumb({ a, onRemove }: { a: AttachmentEntity; onRemove: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -69,9 +83,14 @@ export const Composer = forwardRef<ComposerHandle, {
   busy: boolean;
   onSend: (text: string, attachmentIds: string[]) => Promise<boolean>;
   onStop: () => void;
-  workspace: string | null;
-  onPickWorkspace: (() => void) | null;
-}>(function Composer({ conversationId, model, params, onParams, busy, onSend, onStop, workspace, onPickWorkspace }, ref) {
+  /** The chat's computer, for the PC chip; null while loading. */
+  computer: ComputerState | null;
+  /** Some PC of the account is online (shows "Use a PC" on chats without one). */
+  pcsOnline: boolean;
+  /** Opens the folder or PC chooser. */
+  onComputer: (() => void) | null;
+  commands: SlashCommand[];
+}>(function Composer({ conversationId, model, params, onParams, busy, onSend, onStop, computer, pcsOnline, onComputer, commands }, ref) {
   const app = getApp();
   const toast = useToast();
   const local = useLocalPrefs();
@@ -89,7 +108,6 @@ export const Composer = forwardRef<ComposerHandle, {
   const caps = model?.model.caps;
   const searchAvailable = useLiveQuery(async () => (await db().providers.filter((p) => p.deleted === 0 && p.enabled && isSearchKind(p.kind)).count()) > 0, []) ?? false;
   const canSearch = !!caps && (caps.webSearch || (caps.tools && searchAvailable));
-  const computer = platform().computer;
 
   useEffect(() => {
     setText(readDraft(conversationId));
@@ -133,12 +151,29 @@ export const Composer = forwardRef<ComposerHandle, {
     useCallback((m: string) => toast(m), [toast]),
   );
 
-  const slash = useMemo(() => {
+  const slash = useMemo((): SlashItem[] | null => {
     const m = /^\/(\S*)$/.exec(text);
     if (!m) return null;
     const q = m[1].toLowerCase();
-    return prompts.filter((p) => p.title.toLowerCase().includes(q) || p.body.toLowerCase().includes(q)).slice(0, 8);
-  }, [text, prompts]);
+    const cmds: SlashItem[] = commands
+      .filter((c) => c.name.includes(q))
+      .sort((a, b) => Number(!a.name.startsWith(q)) - Number(!b.name.startsWith(q)))
+      .map((c) => ({ kind: 'command', key: 'c:' + c.name, name: c.name, description: c.description, icon: c.icon, run: c.run }));
+    const saved: SlashItem[] = prompts
+      .map((p) => ({ p, name: commandName(p.title) }))
+      .filter(({ p, name }) => name.includes(q) || p.title.toLowerCase().includes(q) || p.body.toLowerCase().includes(q))
+      .map(({ p, name }) => ({ kind: 'prompt', key: 'p:' + p.id, name, description: p.title, body: p.body }));
+    return [...cmds, ...saved].slice(0, 10);
+  }, [text, prompts, commands]);
+
+  const pick = (item: SlashItem) => {
+    if (item.kind === 'prompt') {
+      setText(item.body);
+      return;
+    }
+    setText('');
+    item.run();
+  };
 
   const canSend = !busy && importing === 0 && (text.trim().length > 0 || atts.length > 0);
 
@@ -161,7 +196,12 @@ export const Composer = forwardRef<ComposerHandle, {
       }
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
-        setText(slash[Math.min(slashIndex, slash.length - 1)].body);
+        pick(slash[Math.min(slashIndex, slash.length - 1)]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setText('');
         return;
       }
     }
@@ -202,24 +242,25 @@ export const Composer = forwardRef<ComposerHandle, {
         onDrop={onDrop}
       >
         {slash && slash.length > 0 && (
-          <div className="slash-menu" role="listbox" aria-label="Saved prompts">
-            {slash.map((p, i) => (
+          <div className="slash-menu" role="listbox" aria-label="Commands and saved prompts">
+            {slash.map((item, i) => (
               <button
-                key={p.id}
+                key={item.key}
                 type="button"
                 role="option"
                 aria-selected={i === slashIndex}
                 className="menu-item"
                 style={i === slashIndex ? { background: 'var(--surface-high)' } : undefined}
+                onMouseEnter={() => setSlashIndex(i)}
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  setText(p.body);
+                  pick(item);
                 }}
               >
-                <Library size={16} />
+                {item.kind === 'command' ? item.icon : <Library size={16} />}
                 <span className="col" style={{ minWidth: 0 }}>
-                  <span className="t-label-l ellipsis">{p.title}</span>
-                  <span className="t-label-s c-3 ellipsis" style={{ fontWeight: 400 }}>{p.body}</span>
+                  <span className="t-label-l ellipsis">/{item.name}</span>
+                  <span className="t-label-s c-3 ellipsis" style={{ fontWeight: 400 }}>{item.kind === 'command' ? item.description : item.body}</span>
                 </span>
               </button>
             ))}
@@ -260,11 +301,7 @@ export const Composer = forwardRef<ComposerHandle, {
               <Brain size={17} /> {effortLabel}
             </button>
           )}
-          {computer && local.computerTools && caps?.tools && params.tools && workspace && onPickWorkspace && (
-            <button type="button" className="chip" onClick={onPickWorkspace} title={`Working folder: ${workspace}`}>
-              <FolderOpen size={16} /> <span className="ellipsis" style={{ maxWidth: 140 }}>{folderName(workspace)}</span>
-            </button>
-          )}
+          {local.computerTools && caps?.tools && params.tools && computer && <ComputerChip state={computer} pcsOnline={pcsOnline} onClick={onComputer} />}
           {synced.yoloMode && caps?.tools && (
             <button type="button" className="yolo-badge" title="YOLO mode is on: tools run without asking. Click to turn it off." onClick={() => app.settings.updateSynced((s) => ({ ...s, yoloMode: false }))}>
               <Rocket size={15} /> YOLO
@@ -319,11 +356,49 @@ export const Composer = forwardRef<ComposerHandle, {
           onClose={plusMenu.close}
           items={[
             { label: 'Attach files', icon: <Paperclip size={17} />, onSelect: () => fileInput.current?.click() },
-            { label: 'Insert a saved prompt', icon: <Library size={17} />, onSelect: () => (prompts.length ? setText('/') : ui.openSettings('prompts')) },
-            ...(computer && onPickWorkspace && local.computerTools ? [{ label: 'Choose working folder', icon: <FolderOpen size={17} />, onSelect: onPickWorkspace }] : []),
+            { label: 'Commands and saved prompts', icon: <Library size={17} />, onSelect: () => setText('/') },
+            ...(onComputer && local.computerTools ? [{ label: computer?.kind === 'ready' ? 'Choose working folder' : 'Work on a PC', icon: <FolderOpen size={17} />, onSelect: onComputer }] : []),
           ]}
         />
       )}
     </div>
   );
 });
+
+/** Where the chat's tools run: a folder on this PC, a folder on another PC, or why it can't. */
+function ComputerChip({ state, pcsOnline, onClick }: { state: ComputerState; pcsOnline: boolean; onClick: (() => void) | null }) {
+  let icon: ReactNode;
+  let label: string;
+  let title: string;
+  let muted = false;
+  switch (state.kind) {
+    case 'ready':
+      icon = state.computer.local ? <FolderOpen size={16} /> : <Monitor size={16} />;
+      label = state.computer.local ? folderName(state.computer.folder) : `${state.computer.name} · ${folderName(state.computer.folder)}`;
+      title = `Working folder: ${state.computer.folder}${state.computer.local ? '' : ` on ${state.computer.name}`}`;
+      break;
+    case 'disabled':
+      icon = <MonitorOff size={16} />;
+      label = `${state.host.name}: remote use is off`;
+      title = `Turn on “Let your other devices use this PC” in Facet on ${state.host.name}: Settings → Computer access.`;
+      muted = true;
+      break;
+    case 'offline':
+      icon = <MonitorOff size={16} />;
+      label = 'PC offline';
+      title = 'The PC this chat works on isn’t online. Open Facet on it to use its files and commands again.';
+      muted = true;
+      break;
+    case 'none':
+      if (!pcsOnline) return null;
+      icon = <Monitor size={16} />;
+      label = 'Use a PC';
+      title = 'Let the model work in a folder on one of your PCs.';
+      break;
+  }
+  return (
+    <button type="button" className={'chip' + (muted ? ' muted' : '')} onClick={onClick ?? undefined} disabled={!onClick} title={title}>
+      {icon} <span className="ellipsis" style={{ maxWidth: 180 }}>{label}</span>
+    </button>
+  );
+}

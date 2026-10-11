@@ -35,7 +35,7 @@ export async function makeApp(overrides: Partial<Config> = {}, options: BuildOpt
     serverSecret: 'test-server-secret-0123456789abcdefghijklm',
     logger: false,
     refreshReuseGraceMs: 0,
-    rateLimits: { prelogin: RELAXED, authIp: RELAXED, authEmail: RELAXED },
+    rateLimits: { prelogin: RELAXED, authIp: RELAXED, authEmail: RELAXED, relay: RELAXED },
     ...overrides,
   };
   const { app, ctx } = buildApp(config, options);

@@ -9,6 +9,7 @@ import { attachmentRef, type AttachmentEntity } from '../data/entities';
 import type { Aspect, SettingsStore } from '../data/prefs';
 import type { GenParams, ModelCaps, ModelOutput } from '../llm/types';
 import { platform, type ComputerInfo } from '../platform';
+import type { ChatComputer } from '../remote/computers';
 import type { McpManager } from './mcpManager';
 import type { SkillRepository } from './skills';
 import type { ToolContext, ToolDef, ToolOutcome } from './types';
@@ -47,8 +48,8 @@ export interface ToolRegistryDeps {
   skills: SkillRepository;
   settings: SettingsStore;
   media?: MediaToolService;
-  /** Windows app: the folder computer tools work in for a chat. */
-  workspaceFor?: (conversationId: string | null | undefined) => Promise<string>;
+  /** The computer a chat's tools run on (this PC, or a PC reached through the relay), if any. */
+  computerFor?: (conversationId: string | null | undefined) => Promise<ChatComputer | null>;
 }
 
 export const WEB_SEARCH = 'web_search';
@@ -249,19 +250,20 @@ export class ToolRegistry {
     return preparedTools(defs, addendum.length > 0 ? addendum.join('\n\n') : null);
   }
 
-  /** Windows app: one tool per computer tool the bridge offers, with approvals from Settings. */
+  /** One tool per computer tool the chat's PC offers (docs/REMOTE.md), with approvals from Settings. */
   private async addComputerTools(defs: ToolDef[], addendum: string[], conversationId: string | null | undefined): Promise<void> {
-    const computer = platform().computer;
     const local = this.deps.settings.local;
-    if (!computer || !local.computerTools) return;
+    if (!local.computerTools) return;
+    const target = await this.computer(conversationId);
+    if (!target) return;
     let tools;
     let info: ComputerInfo | null;
-    let cwd: string;
     try {
-      [tools, info, cwd] = await Promise.all([computer.tools(), computer.info().catch(() => null), this.workspace(conversationId)]);
+      [tools, info] = await Promise.all([target.bridge.tools(), target.bridge.info().catch(() => null)]);
     } catch {
-      return; // The bridge isn't answering: offer no computer tools rather than fail the reply.
+      return; // The PC isn't answering: offer no computer tools rather than fail the reply.
     }
+    const cwd = target.folder;
     if (tools.length === 0) return;
     const used = new Set(defs.map((d) => d.spec.name));
     for (const t of tools) {
@@ -287,17 +289,13 @@ export class ToolRegistry {
     addendum.push(computerAddendum(info, cwd));
   }
 
-  /** The chat's working folder: the app's choice for the chat, else the default from Settings or the bridge. */
-  private async workspace(conversationId: string | null | undefined): Promise<string> {
-    if (this.deps.workspaceFor) {
-      try {
-        const folder = await this.deps.workspaceFor(conversationId);
-        if (folder) return folder;
-      } catch {
-        // Fall back to the default folder.
-      }
+  /** The chat's computer and folder, if it has one right now. */
+  private async computer(conversationId: string | null | undefined): Promise<ChatComputer | null> {
+    try {
+      return (await this.deps.computerFor?.(conversationId)) ?? null;
+    } catch {
+      return null;
     }
-    return this.deps.settings.local.defaultWorkspace || (await platform().computer!.defaultWorkspace());
   }
 
   /**
@@ -390,10 +388,11 @@ export class ToolRegistry {
   }
 
   private async runComputerTool(def: ToolDef, argumentsJson: string, ctx: ToolContext): Promise<ToolOutcome> {
-    const computer = platform().computer;
-    if (!computer) return { content: 'Computer tools work only in the Facet app for Windows.', isError: true };
+    const target = await this.computer(ctx.conversationId);
+    if (!target) return { content: 'The computer for this chat isn’t available right now (the PC may be offline).', isError: true };
+    const computer = target.bridge;
     const remote = def.remoteName ?? def.spec.name;
-    const cwd = await this.workspace(ctx.conversationId);
+    const cwd = target.folder;
     const callId = ctx.callId ?? newId();
     const onAbort = () => {
       computer.cancel(callId).catch(() => {});

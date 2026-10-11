@@ -26,6 +26,7 @@ describe('Android compatibility fixture', () => {
         ...base, id: 'c1', title: 'Web chat', titleSet: true, assistantId: 'builtin.code', folderId: null, providerId: 'p1', modelId: 'claude-opus-5-5',
         paramsJson: JSON.stringify(defaultParams({ effort: 'HIGH', webSearch: true, temperature: 0.7 })), systemPrompt: null, currentLeafId: 'm2',
         pinned: true, archived: 0, lastActivityAt: 1767225650000, workspace: 'C:\\never\\synced',
+        computerHost: 'host-1', computerFolder: 'C:\\Users\\alex\\app',
       }),
       await codec.encodeMessage({
         ...base, id: 'm2', conversationId: 'c1', parentId: 'm1', role: 'assistant', content: 'Hello from the web', thinking: 'Thinking…', thinkingMs: 1200,

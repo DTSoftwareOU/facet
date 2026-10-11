@@ -50,6 +50,22 @@ function baseName(name: string): string {
   return dot > 0 ? name.slice(0, dot) : name;
 }
 
+/**
+ * True when a file carries C2PA content credentials: a JUMBF box labelled "c2pa" (JPEG APP11,
+ * WebP, AVIF, MP4) or a PNG "caBX" chunk. Generated media with credentials is stored as received.
+ */
+export function hasContentCredentials(bytes: Uint8Array): boolean {
+  const n = bytes.length - 3;
+  for (let i = 0; i < n; i++) {
+    const b = bytes[i];
+    if (b === 0x63 /* c */) {
+      if (bytes[i + 1] === 0x32 && bytes[i + 2] === 0x70 && bytes[i + 3] === 0x61) return true; // "c2pa"
+      if (bytes[i + 1] === 0x61 && bytes[i + 2] === 0x42 && bytes[i + 3] === 0x58) return true; // "caBX"
+    }
+  }
+  return false;
+}
+
 async function canvasFor(width: number, height: number): Promise<OffscreenCanvas | HTMLCanvasElement> {
   if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(width, height);
   const c = document.createElement('canvas');
@@ -222,7 +238,9 @@ export class AttachmentStore {
         try {
           width = bitmap.width;
           height = bitmap.height;
-          if (mimeType !== 'image/gif' && data.size > COMPACT_IMAGE_BYTES) {
+          // Images that carry content credentials (C2PA) stay untouched: re-encoding would strip the
+          // provider's machine-readable "made by AI" marking (EU AI Act Art. 50(2)).
+          if (mimeType !== 'image/gif' && data.size > COMPACT_IMAGE_BYTES && !hasContentCredentials(original)) {
             const { canvas, w, h } = await draw(bitmap, MAX_GENERATED_EDGE, false);
             const webp = await encode(canvas, 'image/webp', 0.9);
             // Browsers without a WebP encoder return PNG; keep the original then.

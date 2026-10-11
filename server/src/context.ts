@@ -10,6 +10,8 @@ import type { Store } from './store.js';
 export interface OpenStream {
   userId: string;
   sessionId: string;
+  /** Writes one SSE event to this stream. */
+  send(event: string, data: unknown): void;
   close(): void;
 }
 

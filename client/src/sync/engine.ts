@@ -78,6 +78,8 @@ export class SyncEngine {
   private lastAccountRefresh = 0;
   private autoFreedValue: AutoFreed | null = null;
   private started = false;
+  /** Gets every change-stream event (ready, presence, relay…) of the window that holds the stream. */
+  onStreamEvent: ((event: string, data: string) => void) | null = null;
 
   constructor(
     private readonly auth: AuthManager,
@@ -759,6 +761,11 @@ export class SyncEngine {
           const cursor = await db().getKv<number>(K_CURSOR, 0);
           let known = cursor;
           for await (const ev of readSse(res.body, signal)) {
+            try {
+              this.onStreamEvent?.(ev.event, ev.data);
+            } catch {
+              // A listener's failure must not end the stream.
+            }
             if (ev.event !== 'ready' && ev.event !== 'changed') continue;
             try {
               const remote = Number(JSON.parse(ev.data).cursor);

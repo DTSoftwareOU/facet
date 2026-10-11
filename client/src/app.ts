@@ -14,8 +14,14 @@ import { MediaService } from './domain/media/service';
 import { PricingCatalog } from './llm/pricing';
 import { LocalQuirkStore } from './llm/quirks';
 import { platform } from './platform';
+import { Computers, type ChatComputer, type ComputerFields, type ComputerState } from './remote/computers';
+import { HostService } from './remote/host';
+import { RemoteHub, type RelayTransport } from './remote/hub';
+import { RemoteError } from './remote/protocol';
+import { ApiError, SyncApi } from './sync/api';
 import { AuthManager } from './sync/auth';
 import { SyncEngine } from './sync/engine';
+import { relayKey } from './sync/relay';
 import { McpManager } from './tools/mcpManager';
 import { ToolRegistry } from './tools/registry';
 import { SkillRepository } from './tools/skills';
@@ -40,6 +46,11 @@ export class App {
   readonly media: MediaService;
   readonly tools: ToolRegistry;
   readonly chat: ChatEngine;
+  /** The account's other devices: online PCs and encrypted calls to them (docs/REMOTE.md). */
+  readonly remote: RemoteHub;
+  readonly computers: Computers;
+  /** The Windows app's side of remote use. */
+  readonly host: HostService | null;
 
   constructor() {
     const changed = () => this.sync.requestSync();
@@ -60,12 +71,23 @@ export class App {
       skills: this.skills,
       settings: this.settings,
       media: this.media,
-      workspaceFor: (id) => this.workspaceFor(id),
+      computerFor: (id) => this.computerFor(id),
     });
     this.chat = new ChatEngine(
       this.conversations, this.providers, this.assistants, this.attachments, this.settings, this.pricing, this.sync, this.tools,
       (serverId, tool) => this.mcp.autoApprove(serverId, tool),
     );
+    this.remote = new RemoteHub(this.relayTransport());
+    this.computers = new Computers(this.remote, () => this.defaultFolder(), () => this.recentFolders());
+    this.host = platform().host
+      ? new HostService(this.remote, {
+          defaultFolder: () => this.defaultFolder(),
+          recentFolders: () => this.recentFolders(),
+          openSettings: () => void import('./ui/nav').then(({ ui }) => ui.openSettings('computer')),
+        })
+      : null;
+    this.sync.onStreamEvent = (event, data) => this.remote.streamEvent(event, data);
+    this.chat.subscribe(() => platform().host?.setBusy(this.chat.active.size > 0));
     this.settings.onSyncedChanged = changed;
     this.auth.onProfileName = (name) => void this.settings.updateSynced((s) => ({ ...s, profileName: name }));
     this.auth.onSignedIn = (fresh) => {
@@ -81,6 +103,19 @@ export class App {
   async start(): Promise<void> {
     await Promise.all([this.settings.load(), this.auth.load()]);
     await this.recoverInterrupted();
+    await this.computers.start();
+    await this.host?.start().catch(() => {});
+    this.remote.start();
+    let signedIn = false;
+    this.auth.subscribe(() => {
+      if (this.auth.isSignedIn === signedIn) return;
+      signedIn = this.auth.isSignedIn;
+      this.relayKeyCache = null;
+      if (signedIn) void this.remote.discover();
+      else this.remote.reset();
+    });
+    signedIn = this.auth.isSignedIn;
+    if (signedIn) void this.remote.discover();
     await this.sync.start();
     void this.pricing.refreshIfStale({ enabled: this.settings.local.pricingFeed });
     this.keepListsFresh();
@@ -120,13 +155,61 @@ export class App {
     return null;
   }
 
-  /** The folder computer tools work in for a chat (Windows app). */
-  async workspaceFor(conversationId: string | null | undefined): Promise<string> {
-    const conv = conversationId ? await db().conversations.get(conversationId) : undefined;
-    if (conv?.workspace) return conv.workspace;
+  /** The Windows app's default working folder (Settings, else the bridge's default). */
+  async defaultFolder(): Promise<string> {
     const configured = this.settings.local.defaultWorkspace;
     if (configured) return configured;
     return (await platform().computer?.defaultWorkspace()) ?? '';
+  }
+
+  /** Folders of this PC's most recent chats, newest first. */
+  async recentFolders(): Promise<string[]> {
+    const me = this.computers.hostId;
+    const chats = await db().conversations.filter((c) => c.deleted === 0 && (!!c.workspace || (!!me && c.computerHost === me && !!c.computerFolder))).toArray();
+    chats.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+    const out: string[] = [];
+    for (const c of chats) {
+      const f = (me && c.computerHost === me ? c.computerFolder : null) || c.workspace;
+      if (f && !out.includes(f)) out.push(f);
+      if (out.length >= 8) break;
+    }
+    return out;
+  }
+
+  /** The computer for a chat's fields (or a new chat's choice). */
+  computerState(fields: ComputerFields | null | undefined): Promise<ComputerState> {
+    return this.computers.resolve(fields);
+  }
+
+  /** The computer a chat's tools run on right now, if any. */
+  async computerFor(conversationId: string | null | undefined): Promise<ChatComputer | null> {
+    const conv = conversationId ? await db().conversations.get(conversationId) : undefined;
+    const state = await this.computers.resolve(conv ?? null);
+    return state.kind === 'ready' ? state.computer : null;
+  }
+
+  private relayKeyCache: Promise<CryptoKey | null> | null = null;
+
+  private relayTransport(): RelayTransport {
+    const api = new SyncApi((i, init) => platform().fetch(i, init));
+    return {
+      me: () => this.auth.sessionId(),
+      key: () => {
+        if (!this.relayKeyCache) {
+          this.relayKeyCache = this.auth.vault().then((v) => (v ? relayKey(v.raw) : null)).catch(() => null);
+        }
+        return this.relayKeyCache;
+      },
+      send: async (to, msg) => {
+        try {
+          await this.auth.authed((base, token) => api.relay(base, token, to, msg));
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 404) throw new RemoteError('offline', 'That device is offline.');
+          throw e;
+        }
+      },
+      peers: () => this.auth.authed((base, token) => api.relayPeers(base, token)),
+    };
   }
 
   /** Replies left "streaming" by a closed window become "stopped", unless another window is still writing them. */

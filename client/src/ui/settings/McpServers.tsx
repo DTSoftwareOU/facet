@@ -192,7 +192,8 @@ export function McpAddPage({ local }: { local?: boolean }) {
           Open servers work right away, Sign in servers ask you to sign in with your account, and Token servers need a key from the service.
           {platform().corsLimited
             ? ' On the website, a server also has to accept connections from web browsers; the rest work in the Windows and Android apps.'
-            : ' Tools that change things ask before they run unless you allow them.'}
+            : ' Tools that change things ask before they run unless you allow them.'}{' '}
+          Servers are run by their owners, not by Facet; a listing doesn’t mean the owner endorses Facet.
         </p>
       </section>
 

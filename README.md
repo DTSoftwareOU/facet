@@ -104,4 +104,8 @@ reference implementation byte-for-byte compatible.
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE). Third-party notices are listed in the app under
-**Settings → About → Open-source licenses**.
+**Settings → About → Open-source licenses**. The Facet name and logo aren't covered by the license:
+see [TRADEMARKS.md](TRADEMARKS.md).
+
+Facet is an independent app and isn't affiliated with or endorsed by any AI provider. Product and
+model names are trademarks of their respective owners.

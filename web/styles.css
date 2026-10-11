@@ -679,6 +679,7 @@ code, kbd, pre { font-family: var(--mono); font-variant-ligatures: none; }
 .site-footer a:hover { color: var(--text); text-decoration: underline; }
 .footer-brand { display: flex; align-items: center; gap: 10px; }
 .footer-brand img { width: 18px; height: 18px; }
+.footer-note { flex-basis: 100%; margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-3); max-width: none; }
 
 /* ---------- Document pages (privacy, terms, self-host, 404) ---------- */
 

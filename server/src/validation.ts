@@ -62,7 +62,7 @@ export const recoverySchema = z.object({
   wrappedVaultKey: wrappedKeySchema,
 });
 
-const PLATFORMS = ['android', 'web', 'other'] as const;
+const PLATFORMS = ['android', 'web', 'windows', 'other'] as const;
 export type Platform = (typeof PLATFORMS)[number];
 
 export const deviceSchema = z

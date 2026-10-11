@@ -149,6 +149,11 @@ export class AuthManager {
     this.broadcast();
   }
 
+  /** This device's session id on the sync server, while signed in. */
+  async sessionId(): Promise<string | null> {
+    return this.isSignedIn ? db().getKv<string | null>(K_SESSION, null) : null;
+  }
+
   /** The vault key, unsealed once per session. */
   vault(): Promise<Vault | null> {
     if (!this.vaultCache) {

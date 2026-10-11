@@ -38,11 +38,15 @@ export interface Config {
     maxBlobBytes: number;
     maxPullLimit: number;
     defaultPullLimit: number;
+    /** Largest relayed message between devices (decoded envelope). */
+    maxRelayBytes: number;
   };
   rateLimits: {
     prelogin: RateLimitRule;
     authIp: RateLimitRule;
     authEmail: RateLimitRule;
+    /** Relayed messages per session. */
+    relay: RateLimitRule;
   };
   ssePingMs: number;
 }
@@ -85,11 +89,13 @@ export function defaultConfig(): Omit<Config, 'jwtSecret' | 'serverSecret'> {
       maxBlobBytes: 32 * MiB,
       maxPullLimit: 1000,
       defaultPullLimit: 500,
+      maxRelayBytes: 4 * MiB,
     },
     rateLimits: {
       prelogin: { max: 30, windowMs: 60 * 1000 },
       authIp: { max: 10, windowMs: 15 * 60 * 1000 },
       authEmail: { max: 5, windowMs: 15 * 60 * 1000 },
+      relay: { max: 1200, windowMs: 60 * 1000 },
     },
     ssePingMs: 25 * 1000,
   };

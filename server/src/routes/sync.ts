@@ -21,6 +21,19 @@ const pullQuery = z.object({
   limit: z.coerce.number().int().min(1).optional(),
 });
 
+/** True when [sessionId] has at least one open stream. */
+export function sessionOnline(ctx: AppContext, userId: string, sessionId: string): boolean {
+  for (const s of ctx.streams) if (s.userId === userId && s.sessionId === sessionId) return true;
+  return false;
+}
+
+/** Tells the account's other sessions that [sessionId] came online or went away (docs/REMOTE.md). */
+function announcePresence(ctx: AppContext, userId: string, sessionId: string, online: boolean): void {
+  for (const s of [...ctx.streams]) {
+    if (s.userId === userId && s.sessionId !== sessionId) s.send('presence', { sessionId, online });
+  }
+}
+
 export function syncRoutes(app: FastifyInstance, ctx: AppContext): void {
   const { limits } = ctx.config;
 
@@ -102,18 +115,24 @@ export function syncRoutes(app: FastifyInstance, ctx: AppContext): void {
       clearInterval(ping);
       unsubscribe();
       ctx.streams.delete(stream);
+      if (!sessionOnline(ctx, userId, sessionId)) announcePresence(ctx, userId, sessionId, false);
     };
     const stream: OpenStream = {
       userId,
       sessionId,
+      send(event, data) {
+        write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      },
       close() {
         cleanup();
         if (!res.writableEnded) res.end();
       },
     };
+    const firstForSession = !sessionOnline(ctx, userId, sessionId);
     ctx.streams.add(stream);
     req.raw.on('close', cleanup);
     res.on('close', cleanup);
+    if (firstForSession) announcePresence(ctx, userId, sessionId, true);
 
     write(`event: ready\ndata: ${JSON.stringify({ cursor: ctx.records.cursor(userId) })}\n\n`);
   });

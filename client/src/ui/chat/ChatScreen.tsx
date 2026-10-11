@@ -1,25 +1,30 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowDown, ArrowUp, ChevronDown, Download, Menu as MenuIcon, MoreVertical, PanelLeftOpen, Pencil, Pin, PinOff, SlidersHorizontal, SquarePen, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, Cpu, Download, FolderOpen, History, Menu as MenuIcon, Monitor, MoreVertical, PanelLeftOpen, Pencil, Pin, PinOff, SlidersHorizontal, SquarePen, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getApp } from '../../app';
 import { parseJson, toJson } from '../../core/json';
 import { MessageTree } from '../../data/conversations';
 import { db } from '../../data/db';
-import type { ConversationEntity, MessageEntity } from '../../data/entities';
+import type { ComputerBinding, ConversationEntity, MessageEntity } from '../../data/entities';
 import { DEFAULT_ASSISTANT_ID, builtinAssistant, type Assistant } from '../../data/library';
 import type { ModelRef } from '../../data/prefs';
 import { ChatError } from '../../domain/chat';
+import { AGENT_NAMES, importAgentSession } from '../../domain/resume';
 import { defaultParams, parseParams, type GenParams } from '../../llm/types';
 import { platform } from '../../platform';
+import type { AgentKind } from '../../platform/platform';
+import type { ChatComputer } from '../../remote/computers';
 import { AssistantAvatar } from '../components/Avatars';
 import { Gem } from '../components/Gem';
 import { Confirm, IconButton, Menu, TextPrompt, useMenu, useToast } from '../components/primitives';
-import { useActiveChats, useAssistants, useCatalog, useLiveTurns, useLocalPrefs, useNarrow, useSyncedPrefs } from '../hooks';
+import { useActiveChats, useAssistants, useCatalog, useComputerState, useHosts, useLiveTurns, useLocalPrefs, useNarrow, useSyncedPrefs } from '../hooks';
 import { navigate, ui, type Route } from '../nav';
 import { ChatSettings } from './ChatSettings';
-import { Composer, type ComposerHandle } from './Composer';
+import { Composer, type ComposerHandle, type SlashCommand } from './Composer';
+import { ComputerDialog, folderName } from './ComputerDialog';
 import { AssistantMessage, UserMessage, type MessageActions, type ThreadItem } from './Messages';
 import { ModelPicker, firstModel, resolveModel } from './ModelPicker';
+import { ResumeDialog } from './ResumeDialog';
 
 function useNewChatDefaults(route: Route, assistants: Assistant[] | undefined) {
   const synced = useSyncedPrefs();
@@ -61,7 +66,10 @@ export function ChatScreen({ route }: { route: Route }) {
   const [draftModel, setDraftModel] = useState<ModelRef | null>(null);
   const [draftParams, setDraftParams] = useState<GenParams | null>(null);
   const [draftAssistant, setDraftAssistant] = useState<string | null>(null);
-  const [draftWorkspace, setDraftWorkspace] = useState<string | null>(null);
+  /** A new chat's PC and folder: undefined until the user picks (then the Windows app uses this PC). */
+  const [draftComputer, setDraftComputer] = useState<ComputerBinding | null | undefined>(undefined);
+  const [computerDialog, setComputerDialog] = useState(false);
+  const [resume, setResume] = useState<{ agent: AgentKind; computer: ChatComputer } | null>(null);
   const [picker, setPicker] = useState<null | { regenerate?: string }>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -74,6 +82,7 @@ export function ChatScreen({ route }: { route: Route }) {
     setDraftModel(null);
     setDraftParams(null);
     setDraftAssistant(route.name === 'home' ? route.assistantId ?? null : null);
+    setDraftComputer(undefined);
     composer.current?.focus();
   }, [route.name, route.name === 'home' ? route.assistantId : route.name === 'chat' ? route.id : '']);
 
@@ -94,19 +103,59 @@ export function ChatScreen({ route }: { route: Route }) {
   const model = resolveModel(catalog, modelRef);
   const params: GenParams = conv ? parseParams(conv.paramsJson) : draftParams ?? (draftAssistant ? assistant.params : null) ?? defaults.params;
 
-  const [workspace, setWorkspace] = useState<string | null>(null);
-  useEffect(() => {
-    if (!platform().computer) return;
-    void app.workspaceFor(conversationId).then((w) => setWorkspace(conv?.workspace ?? draftWorkspace ?? w));
-  }, [conversationId, conv?.workspace, draftWorkspace, local.defaultWorkspace]);
+  // ---- the chat's computer: this PC, another PC of the account, or none (docs/REMOTE.md) ----
+  const hosts = useHosts();
+  const otherPcs = hosts.filter((h) => h.hostId !== app.computers.hostId);
+  const computerFields = conv
+    ? conv
+    : draftComputer
+      ? { computerHost: draftComputer.host, computerFolder: draftComputer.folder, workspace: null }
+      : null;
+  const computerState = useComputerState(computerFields);
+  const readyComputer = computerState?.kind === 'ready' ? computerState.computer : null;
+  const binding: ComputerBinding | null = conv
+    ? conv.computerHost && conv.computerFolder ? { host: conv.computerHost, folder: conv.computerFolder } : null
+    : draftComputer ?? null;
 
-  const pickWorkspace = useCallback(async () => {
-    const picked = await platform().computer?.pickFolder(workspace ?? undefined);
-    if (!picked) return;
-    if (conversationId) await app.conversations.setWorkspace(conversationId, picked);
-    else setDraftWorkspace(picked);
-    setWorkspace(picked);
-  }, [workspace, conversationId]);
+  const setComputer = useCallback((b: ComputerBinding | null) => {
+    if (conversationId) void app.conversations.setComputer(conversationId, b);
+    else setDraftComputer(b);
+  }, [conversationId]);
+
+  /** The chip and /folder: this PC's folder picker in the Windows app, otherwise the PC chooser. */
+  const chooseComputer = useCallback(async () => {
+    const local = platform().computer;
+    if (local && readyComputer?.local && app.computers.hostId) {
+      const picked = await local.pickFolder(readyComputer.folder);
+      if (picked) setComputer({ host: app.computers.hostId, folder: picked });
+      return;
+    }
+    setComputerDialog(true);
+  }, [readyComputer, setComputer]);
+  const canChooseComputer = !!platform().computer || otherPcs.length > 0 || computerState?.kind === 'offline' || computerState?.kind === 'disabled';
+
+  /** /resume-from-…: the chat's computer, or the PC chooser first when there's none yet. */
+  const startResume = (agent: AgentKind) => {
+    if (readyComputer) setResume({ agent, computer: readyComputer });
+    else {
+      toast(`Choose a folder on a PC first, then type /resume-from-${agent} again.`);
+      setComputerDialog(true);
+    }
+  };
+
+  const resumeSession = async (agent: AgentKind, computer: ChatComputer, sessionId: string) => {
+    const session = await computer.readAgentSession(agent, sessionId);
+    if (!session) throw new Error('That session isn’t in this folder anymore.');
+    if (session.messages.length === 0) throw new Error(`That ${AGENT_NAMES[agent]} session has no messages to continue.`);
+    const id = await importAgentSession(app.conversations, agent, session, {
+      computer: { host: computer.hostId, folder: computer.folder },
+      assistantId: conv ? conv.assistantId ?? null : assistant.id === DEFAULT_ASSISTANT_ID ? null : assistant.id,
+      providerId: modelRef?.providerId ?? null,
+      modelId: modelRef?.modelId ?? null,
+      params,
+    });
+    navigate({ name: 'chat', id });
+  };
 
   const items: ThreadItem[] = useMemo(() => {
     if (!messages || !conv) return [];
@@ -157,12 +206,14 @@ export function ChatScreen({ route }: { route: Route }) {
       return false;
     }
     try {
+      // A new chat in the Windows app works in this PC's default folder unless the user picked another.
+      const computer = conversationId ? null : draftComputer !== undefined ? draftComputer : await app.computers.defaultBinding();
       const id = await app.chat.send(
         conversationId,
         text,
         attachmentIds,
         conversationId ? null : { assistantId: assistant.id === DEFAULT_ASSISTANT_ID ? null : assistant.id, model: modelRef, params, folderId: route.name === 'home' ? route.folderId ?? null : null },
-        conversationId ? null : draftWorkspace ?? workspace,
+        computer,
       );
       if (!conversationId) navigate({ name: 'chat', id }, true);
       return true;
@@ -171,6 +222,26 @@ export function ChatScreen({ route }: { route: Route }) {
       return false;
     }
   };
+
+  const commands: SlashCommand[] = useMemo(() => {
+    const list: SlashCommand[] = [
+      { name: 'new', description: 'Start a new chat', icon: <SquarePen size={16} />, run: () => navigate({ name: 'home' }) },
+      { name: 'model', description: 'Choose the model', icon: <Cpu size={16} />, run: () => setPicker({}) },
+    ];
+    if (canChooseComputer) {
+      list.push({ name: 'folder', description: readyComputer ? `Change the working folder (${folderName(readyComputer.folder)})` : 'Choose a folder to work in', icon: <FolderOpen size={16} />, run: () => void chooseComputer() });
+    }
+    if (otherPcs.length > 0) {
+      list.push({ name: 'pc', description: 'Choose which PC this chat works on', icon: <Monitor size={16} />, run: () => setComputerDialog(true) });
+    }
+    if (canChooseComputer) {
+      list.push(
+        { name: 'resume-from-claude', description: 'Continue a Claude Code session from this folder', icon: <History size={16} />, run: () => startResume('claude') },
+        { name: 'resume-from-codex', description: 'Continue a Codex session from this folder', icon: <History size={16} />, run: () => startResume('codex') },
+      );
+    }
+    return list;
+  }, [canChooseComputer, readyComputer, otherPcs.length, chooseComputer]);
 
   const actions: MessageActions = useMemo(() => ({
     regenerate: (id, model) => void run(() => app.chat.regenerate(id, model)),
@@ -285,13 +356,24 @@ export function ChatScreen({ route }: { route: Route }) {
         busy={busy}
         onSend={send}
         onStop={stop}
-        workspace={workspace}
-        onPickWorkspace={platform().computer ? pickWorkspace : null}
+        computer={computerState}
+        pcsOnline={otherPcs.length > 0}
+        onComputer={canChooseComputer ? () => void chooseComputer() : null}
+        commands={commands}
       />
       <div className="composer-hint" style={{ marginTop: -10, marginBottom: 8 }}>
-        {platform().kind === 'web' ? 'End-to-end encrypted. Replies come straight from the provider you choose.' : ''}
+        {platform().kind === 'web' ? 'AI can make mistakes. Chats are end-to-end encrypted, and replies come straight from the provider you choose.' : 'AI can make mistakes. Check important answers.'}
       </div>
 
+      {computerDialog && <ComputerDialog binding={binding} onPick={setComputer} onClose={() => setComputerDialog(false)} />}
+      {resume && (
+        <ResumeDialog
+          agent={resume.agent}
+          computer={resume.computer}
+          onResume={(id) => resumeSession(resume.agent, resume.computer, id)}
+          onClose={() => setResume(null)}
+        />
+      )}
       {picker && <ModelPicker current={picker.regenerate ? null : modelRef} onPick={pickModel} onClose={() => setPicker(null)} title={picker.regenerate ? 'Regenerate with' : 'Choose a model'} />}
       {settingsOpen && (
         <ChatSettings
@@ -300,8 +382,8 @@ export function ChatScreen({ route }: { route: Route }) {
           onParams={setParams}
           systemPrompt={conv?.systemPrompt ?? null}
           onSystemPrompt={conv ? (s) => void app.conversations.setSystemPrompt(conv.id, s) : null}
-          workspace={workspace}
-          onWorkspace={platform().computer ? (p) => { if (conv) void app.conversations.setWorkspace(conv.id, p); else setDraftWorkspace(p); setWorkspace(p); } : null}
+          computerLabel={readyComputer ? (readyComputer.local ? readyComputer.folder : `${readyComputer.name} · ${readyComputer.folder}`) : null}
+          onComputer={canChooseComputer ? () => void chooseComputer() : null}
           onChangeModel={() => setPicker({})}
           onClose={() => setSettingsOpen(false)}
         />

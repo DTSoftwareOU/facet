@@ -936,3 +936,53 @@ button.msg-meta:hover {
     padding: 0 12px 12px;
   }
 }
+
+/* ---- PC chip, folder browser ---- */
+
+.chip.muted {
+  border-style: dashed;
+  color: var(--text-3);
+}
+
+.folder-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 4px 8px;
+  border-bottom: 1px solid var(--outline-variant);
+}
+.folder-path .ellipsis {
+  flex: 1;
+  min-width: 0;
+}
+.folder-list {
+  display: flex;
+  flex-direction: column;
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  padding: 6px 0 2px;
+}
+.folder-list[aria-busy='true'] {
+  opacity: 0.6;
+  transition: opacity 120ms;
+}
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 15px;
+  text-align: left;
+}
+.folder-item svg:first-child {
+  flex: none;
+  color: var(--text-2);
+}
+.folder-item:hover,
+.folder-item:focus-visible {
+  background: var(--surface-high);
+}

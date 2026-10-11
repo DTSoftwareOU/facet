@@ -5,7 +5,16 @@
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type { DesktopApi } from '../../client/src/platform/desktop';
-import type { ComputerCallResult, ComputerInfo, ComputerToolInfo, UpdateState } from '../../client/src/platform/platform';
+import type {
+  AgentSessionSummary,
+  ComputerCallResult,
+  ComputerInfo,
+  ComputerToolInfo,
+  DesktopSettings,
+  FolderListing,
+  ImportedSession,
+  UpdateState,
+} from '../../client/src/platform/platform';
 import { Ch } from './channels';
 
 declare const __FACET_APP_VERSION__: string;
@@ -55,6 +64,13 @@ ipcRenderer.on(Ch.stdioExit, (_e: IpcRendererEvent, handle: string, code: number
 const updateListeners = new Set<(s: UpdateState) => void>();
 ipcRenderer.on(Ch.updatesChanged, (_e: IpcRendererEvent, state: UpdateState) => {
   for (const l of updateListeners) l(state);
+});
+
+// --- this PC's own settings -------------------------------------------------------------------------
+
+const settingsListeners = new Set<(s: DesktopSettings) => void>();
+ipcRenderer.on(Ch.hostSettingsChanged, (_e: IpcRendererEvent, s: DesktopSettings) => {
+  for (const l of settingsListeners) l(s);
 });
 
 const api: DesktopApi = {
@@ -146,6 +162,31 @@ const api: DesktopApi = {
     },
     check: () => invoke<void>(Ch.updatesCheck),
     install: () => invoke<void>(Ch.updatesInstall),
+  },
+  host: {
+    settings: () => invoke<DesktopSettings>(Ch.hostSettings),
+    setSettings: (patch) =>
+      invoke<DesktopSettings>(Ch.hostSetSettings, {
+        remoteAccess: typeof patch?.remoteAccess === 'boolean' ? patch.remoteAccess : undefined,
+        startWithWindows: typeof patch?.startWithWindows === 'boolean' ? patch.startWithWindows : undefined,
+        keepRunning: typeof patch?.keepRunning === 'boolean' ? patch.keepRunning : undefined,
+      }),
+    onSettings: (listener) => {
+      settingsListeners.add(listener);
+      return () => {
+        settingsListeners.delete(listener);
+      };
+    },
+    listFolders: (target, recent) =>
+      invoke<FolderListing>(Ch.hostListFolders, target == null ? null : String(target), Array.isArray(recent) ? recent.map(String) : []),
+    agentSessions: (agent, cwd) => invoke<AgentSessionSummary[]>(Ch.hostAgentSessions, String(agent), String(cwd)),
+    readAgentSession: (agent, cwd, id) => invoke<ImportedSession | null>(Ch.hostReadAgentSession, String(agent), String(cwd), String(id)),
+    setBusy: (value) => {
+      void invoke(Ch.hostSetBusy, !!value).catch(() => {});
+    },
+    activity: (text) => {
+      void invoke(Ch.hostActivity, text == null ? null : String(text)).catch(() => {});
+    },
   },
 };
 
