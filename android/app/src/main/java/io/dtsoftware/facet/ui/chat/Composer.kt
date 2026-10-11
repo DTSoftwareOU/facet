@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -71,14 +72,17 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.data.db.AttachmentEntity
 import io.dtsoftware.facet.data.db.PromptEntity
 import io.dtsoftware.facet.data.repo.AttachmentStore
@@ -209,10 +213,10 @@ fun Composer(
                 Modifier.fillMaxWidth().padding(start = 6.dp, end = 8.dp, bottom = 8.dp, top = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FacetIconButton(R.drawable.ic_plus, "Add attachment", onAttach, tint = c.textSecondary, size = 21.dp)
+                FacetIconButton(R.drawable.ic_plus, stringResource(R.string.chat_add_attachment), onAttach, tint = c.textSecondary, size = 21.dp)
                 if (caps?.webSearch == true || (caps?.tools == true && searchAvailable)) {
                     FacetChip(
-                        "Search", params.webSearch, { onParams(params.copy(webSearch = !params.webSearch)) },
+                        stringResource(R.string.chat_web_search), params.webSearch, { onParams(params.copy(webSearch = !params.webSearch)) },
                         icon = R.drawable.ic_globe,
                     )
                     Spacer(Modifier.width(6.dp))
@@ -227,7 +231,7 @@ fun Composer(
                 AnimatedVisibility(value.text.isBlank() && attachments.isEmpty() && !generating, enter = fadeIn(), exit = fadeOut()) {
                     FacetIconButton(
                         if (voice.listening) R.drawable.ic_mic_off else R.drawable.ic_mic,
-                        if (voice.listening) "Stop dictation" else "Dictate", onMic,
+                        stringResource(if (voice.listening) R.string.chat_dictation_stop else R.string.chat_dictate), onMic,
                         tint = if (voice.listening) c.primary else c.textSecondary, size = 21.dp,
                     )
                 }
@@ -248,10 +252,10 @@ private fun YoloBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .clip(FacetShapes.chip)
             .background(c.warning.copy(alpha = 0.16f))
             .border(1.dp, c.warning.copy(alpha = 0.55f), FacetShapes.chip)
-            .clickable(onClickLabel = "Turn off YOLO mode", onClick = onClick),
+            .clickable(onClickLabel = stringResource(R.string.chat_yolo_turn_off), onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        FacetIcon(R.drawable.ic_rocket, "YOLO mode is on", tint = c.warning, size = 17.dp)
+        FacetIcon(R.drawable.ic_rocket, stringResource(R.string.chat_yolo_on), tint = c.warning, size = 17.dp)
     }
 }
 
@@ -260,7 +264,7 @@ private fun EffortChip(caps: ModelCaps, params: GenParams, onParams: (GenParams)
     var open by remember { mutableStateOf(false) }
     val levels = caps.reasoning.efforts
     val current = params.effort
-    val label = current?.label ?: caps.reasoning.defaultEffort?.let { "${it.label}" } ?: "Auto"
+    val label = current?.label ?: caps.reasoning.defaultEffort?.let { "${it.label}" } ?: stringResource(R.string.common_auto)
     Box {
         FacetChip(label, current != null && current != Effort.NONE, { open = true }, icon = R.drawable.ic_brain)
         DropdownMenu(
@@ -270,13 +274,19 @@ private fun EffortChip(caps: ModelCaps, params: GenParams, onParams: (GenParams)
             shape = RoundedCornerShape(16.dp),
         ) {
             Text(
-                "Reasoning effort",
+                stringResource(R.string.chat_reasoning_effort),
                 style = FacetTheme.type.labelS,
                 color = FacetTheme.colors.textTertiary,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             DropdownMenuItem(
-                text = { Text("Model default" + (caps.reasoning.defaultEffort?.let { " (${it.label})" } ?: ""), style = FacetTheme.type.labelL) },
+                text = {
+                    val modelDefault = caps.reasoning.defaultEffort
+                    Text(
+                        if (modelDefault != null) stringResource(R.string.chat_model_default_with, modelDefault.label) else stringResource(R.string.chat_model_default),
+                        style = FacetTheme.type.labelL,
+                    )
+                },
                 onClick = { onParams(params.copy(effort = null)); open = false },
                 trailingIcon = { if (current == null) FacetIcon(R.drawable.ic_check, null, tint = FacetTheme.colors.primary, size = 18.dp) },
             )
@@ -305,7 +315,7 @@ private fun DraftAttachment(a: AttachmentEntity, thumbnail: suspend (String, Int
         }
     } else {
         FileChip(AttachmentStore.ref(a), onClick = {}) {
-            FacetIconButton(R.drawable.ic_close, "Remove ${a.name}", onRemove, tint = c.textSecondary, size = 16.dp, modifier = Modifier.size(34.dp))
+            FacetIconButton(R.drawable.ic_close, stringResource(R.string.chat_remove_attachment, a.name), onRemove, tint = c.textSecondary, size = 16.dp, modifier = Modifier.size(34.dp))
         }
     }
 }
@@ -321,7 +331,7 @@ private fun RemoveBadge(modifier: Modifier, onRemove: () -> Unit) {
             .clickable(onClick = onRemove),
         contentAlignment = Alignment.Center,
     ) {
-        FacetIcon(R.drawable.ic_close, "Remove", tint = androidx.compose.ui.graphics.Color.White, size = 13.dp)
+        FacetIcon(R.drawable.ic_close, stringResource(R.string.action_remove), tint = androidx.compose.ui.graphics.Color.White, size = 13.dp)
     }
 }
 
@@ -361,10 +371,17 @@ private fun SlashCommandList(items: List<SlashItem>, highlighted: Int, onPick: (
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("/" + item.name, style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // Built-in commands read left to right; saved prompts follow their title's direction.
+                        // Either way the name sits at the row's start edge, next to the icon.
+                        Text(
+                            "/" + item.name,
+                            style = if (item is SlashItem.Command) FacetTheme.type.labelL.copy(textDirection = TextDirection.Ltr) else FacetTheme.type.labelL,
+                            color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.wrapContentWidth(Alignment.Start),
+                        )
                         Text(
                             when (item) {
-                                is SlashItem.Command -> item.command.description
+                                is SlashItem.Command -> stringResource(item.command.descriptionRes)
                                 is SlashItem.Prompt -> item.prompt.body.replace('\n', ' ')
                             },
                             style = FacetTheme.type.labelM.copy(fontWeight = FontWeight.Normal), color = c.textSecondary,
@@ -380,11 +397,12 @@ private fun SlashCommandList(items: List<SlashItem>, highlighted: Int, onPick: (
 @Composable
 private fun ListeningRow(voice: VoiceInput) {
     val c = FacetTheme.colors
+    val hint = stringResource(if (voice.recording) R.string.chat_dictation_listening_tap_to_finish else R.string.chat_dictation_listening)
     Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Waveform(voice.level, Modifier.height(22.dp).width(46.dp))
         Spacer(Modifier.width(12.dp))
         Text(
-            voice.partial.ifBlank { if (voice.recording) "Listening… tap the mic to finish" else "Listening…" },
+            voice.partial.ifBlank { hint },
             style = FacetTheme.type.chat,
             color = if (voice.partial.isBlank()) c.textTertiary else c.text,
             maxLines = 3,
@@ -400,7 +418,7 @@ private fun TranscribingRow() {
     Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), color = c.primary, strokeWidth = 2.dp)
         Spacer(Modifier.width(12.dp))
-        Text("Transcribing…", style = FacetTheme.type.chat, color = c.textTertiary)
+        Text(stringResource(R.string.chat_dictation_transcribing), style = FacetTheme.type.chat, color = c.textTertiary)
     }
 }
 
@@ -463,7 +481,7 @@ class VoiceInput(private val context: Context) {
             r.start()
         } catch (e: Exception) {
             r.release()
-            onError("Couldn't start the microphone.")
+            onError(Strings.get(R.string.chat_dictation_mic_failed))
             return
         }
         recorder = r
@@ -483,15 +501,15 @@ class VoiceInput(private val context: Context) {
                 try {
                     val bytes = withContext(Dispatchers.IO) { file.readBytes() }
                     if (bytes.size < 1_000) {
-                        onError("Didn't catch that. Try again.")
+                        onError(Strings.get(R.string.chat_dictation_no_match))
                     } else {
                         val text = transcribe(bytes, "audio/mp4", "dictation.m4a")
-                        if (text.isNotBlank()) onResult(text) else onError("Didn't catch that. Try again.")
+                        if (text.isNotBlank()) onResult(text) else onError(Strings.get(R.string.chat_dictation_no_match))
                     }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    onError(e.message ?: "Transcription failed.")
+                    onError(e.message ?: Strings.get(R.string.chat_dictation_failed))
                 } finally {
                     transcribing = false
                     file.delete()
@@ -529,10 +547,10 @@ class VoiceInput(private val context: Context) {
                 if (text.isNotBlank()) onResult(text) else if (error != SpeechRecognizer.ERROR_CLIENT) {
                     onError(
                         when (error) {
-                            SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Didn't catch that. Try again."
-                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Allow microphone access to dictate."
-                            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Speech recognition needs a connection."
-                            else -> "Dictation stopped."
+                            SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> Strings.get(R.string.chat_dictation_no_match)
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> Strings.get(R.string.chat_dictation_permission)
+                            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> Strings.get(R.string.chat_dictation_offline)
+                            else -> Strings.get(R.string.chat_dictation_stopped)
                         },
                     )
                 }

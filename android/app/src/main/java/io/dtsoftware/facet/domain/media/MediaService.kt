@@ -1,5 +1,8 @@
 package io.dtsoftware.facet.domain.media
 
+import androidx.annotation.StringRes
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.data.db.AttachmentEntity
 import io.dtsoftware.facet.data.db.ProviderEntity
 import io.dtsoftware.facet.data.prefs.ModelRef
@@ -89,9 +92,7 @@ class MediaService(
         seconds: Int? = null,
         onProgress: (String) -> Unit = {},
     ): Pair<AttachmentEntity, MediaChoice> {
-        val choice = resolve(output) ?: throw LlmException(
-            LlmError(ErrorKind.BAD_REQUEST, "No ${output.noun} model is set up. Add a provider that makes ${output.what} in Settings → Media models."),
-        )
+        val choice = resolve(output) ?: throw LlmException(LlmError(ErrorKind.BAD_REQUEST, Strings.get(noModelMessage(output))))
         val prefs = settings.synced.value.media
         val job = MediaJob(
             output = output,
@@ -132,7 +133,7 @@ class MediaService(
 
     suspend fun transcribe(audio: ByteArray, mimeType: String, fileName: String): String {
         val choice = resolve(ModelOutput.TRANSCRIPTION, explicitOnly = true)
-            ?: throw LlmException(LlmError(ErrorKind.BAD_REQUEST, "Choose a transcription model in Settings → Media models."))
+            ?: throw LlmException(LlmError(ErrorKind.BAD_REQUEST, Strings.get(R.string.mediagen_choose_transcription)))
         return MediaGen.transcribe(providers.config(choice.provider), http, choice.model, audio, mimeType, fileName)
     }
 
@@ -148,6 +149,17 @@ class MediaService(
 
     companion object {
         private const val MAX_SPEECH_CACHE = 40L * 1024 * 1024
+
+        /** The error when no model makes [output]: what's missing and where to add one. */
+        @StringRes
+        fun noModelMessage(output: ModelOutput): Int = when (output) {
+            ModelOutput.IMAGE -> R.string.mediagen_no_model_image
+            ModelOutput.VIDEO -> R.string.mediagen_no_model_video
+            ModelOutput.SPEECH -> R.string.mediagen_no_model_speech
+            ModelOutput.MUSIC -> R.string.mediagen_no_model_music
+            ModelOutput.TRANSCRIPTION -> R.string.mediagen_no_model_transcription
+            ModelOutput.TEXT -> R.string.mediagen_no_model_other
+        }
 
         /** "A fox in the snow, watercolor" → "fox-in-the-snow-watercolor.png". */
         fun fileName(prompt: String, output: ModelOutput, ext: String): String {

@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -79,7 +81,7 @@ fun FacetTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (navIcon != null && onNav != null) {
-            FacetIconButton(navIcon, "Back", onNav)
+            FacetIconButton(navIcon, stringResource(R.string.action_back), onNav)
         } else {
             Spacer(Modifier.width(10.dp))
         }
@@ -223,7 +225,11 @@ fun FacetTextField(
                 .padding(start = 14.dp, end = if (trailing != null || password) 4.dp else 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val style: TextStyle = (if (mono) FacetTheme.type.code.copy(fontSize = 14.sp) else FacetTheme.type.body).copy(color = c.text)
+            // Keys, addresses, code and passwords read left to right in every language; other text
+            // follows its own direction, so Arabic typed in an English UI (and vice versa) reads right.
+            val ltr = mono || password || keyboardType == KeyboardType.Email || keyboardType == KeyboardType.Uri || keyboardType == KeyboardType.Password
+            val style: TextStyle = (if (mono) FacetTheme.type.code.copy(fontSize = 14.sp) else FacetTheme.type.body)
+                .copy(color = c.text, textDirection = if (ltr) TextDirection.Ltr else TextDirection.Content)
             Box(Modifier.weight(1f).padding(vertical = 14.dp)) {
                 if (value.isEmpty()) Text(placeholder, style = style.copy(color = c.textTertiary), maxLines = if (singleLine) 1 else maxLines)
                 BasicTextField(
@@ -249,7 +255,7 @@ fun FacetTextField(
             if (password) {
                 FacetIconButton(
                     if (reveal) R.drawable.ic_eye_off else R.drawable.ic_eye,
-                    if (reveal) "Hide" else "Show",
+                    stringResource(if (reveal) R.string.action_hide else R.string.action_show),
                     { reveal = !reveal },
                     tint = c.textSecondary,
                     size = 19.dp,
@@ -312,7 +318,7 @@ fun ConfirmDialog(
         confirmButton = {
             FacetButton(confirmText, { onConfirm(); onDismiss() }, style = if (danger) ButtonStyle.Danger else ButtonStyle.Primary)
         },
-        dismissButton = { FacetButton("Cancel", onDismiss, style = ButtonStyle.Text) },
+        dismissButton = { FacetButton(stringResource(R.string.action_cancel), onDismiss, style = ButtonStyle.Text) },
     )
 }
 
@@ -339,7 +345,7 @@ fun TextInputDialog(
         confirmButton = {
             FacetButton(confirmText, { onConfirm(text); onDismiss() }, enabled = text.isNotBlank())
         },
-        dismissButton = { FacetButton("Cancel", onDismiss, style = ButtonStyle.Text) },
+        dismissButton = { FacetButton(stringResource(R.string.action_cancel), onDismiss, style = ButtonStyle.Text) },
     )
 }
 

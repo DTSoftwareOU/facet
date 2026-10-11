@@ -81,6 +81,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -92,6 +93,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dtsoftware.facet.AppContainer
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.data.AttachmentRef
 import io.dtsoftware.facet.data.db.PromptEntity
 import io.dtsoftware.facet.data.prefs.ModelRef
@@ -165,7 +167,7 @@ fun ChatScreen(
     fun copy(text: String) {
         scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Facet", text))) }
         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-        if (Build.VERSION.SDK_INT < 33) toast("Copied")
+        if (Build.VERSION.SDK_INT < 33) toast(Strings.get(R.string.common_copied))
     }
 
     fun share(text: String) {
@@ -217,14 +219,14 @@ fun ChatScreen(
                     { input = appendText(input, it) },
                     { toast(it) },
                 )
-                !voice.available -> toast("Speech recognition isn't available on this device.")
+                !voice.available -> toast(Strings.get(R.string.chat_dictation_unavailable))
                 else -> startVoice(voice, { input = appendText(input, it) }, { toast(it) })
             }
         }
     }
 
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) beginDictation() else toast("Allow microphone access to dictate.")
+        if (granted) beginDictation() else toast(Strings.get(R.string.chat_dictation_permission))
     }
 
     fun onMic() {
@@ -399,7 +401,11 @@ fun ChatScreen(
                 Composer(
                     value = input,
                     onValueChange = { input = it },
-                    placeholder = if (state.assistant.id == BuiltinAssistants.DEFAULT_ID) "Ask anything" else "Message ${state.assistant.name}",
+                    placeholder = if (state.assistant.id == BuiltinAssistants.DEFAULT_ID) {
+                        stringResource(R.string.chat_placeholder_default)
+                    } else {
+                        stringResource(R.string.chat_placeholder_assistant, state.assistant.name)
+                    },
                     attachments = drafts,
                     onRemoveAttachment = vm::removeAttachment,
                     thumbnail = { id, px -> vm.thumbnail(id, px) },
@@ -418,7 +424,7 @@ fun ChatScreen(
                     yolo = yolo,
                     onYoloOff = {
                         container.settings.updateSynced { it.copy(yoloMode = false) }
-                        toast("YOLO mode is off. Facet will ask before tools that change things.")
+                        toast(Strings.get(R.string.chat_yolo_turned_off))
                     },
                     slashCommands = slashAvailable,
                     onSlashCommand = ::runSlash,
@@ -451,7 +457,7 @@ fun ChatScreen(
             onManageProviders = { sheet = null; onManageProviders() },
             onRefresh = { pid ->
                 scope.launch {
-                    container.providers.refreshModels(pid).onFailure { toast(it.message ?: "Couldn't load models.") }
+                    container.providers.refreshModels(pid).onFailure { toast(it.message ?: Strings.get(R.string.chat_error_load_models)) }
                 }
             },
             onDismiss = { sheet = null },
@@ -476,24 +482,24 @@ fun ChatScreen(
                 container.settings.updateSynced {
                     it.copy(defaultParams = state.params, defaultModel = m?.let { c -> ModelRef(c.providerId, c.model.id) } ?: it.defaultModel)
                 }
-                toast("New chats will use these settings.")
+                toast(Strings.get(R.string.chat_settings_saved_default))
             },
             onDismiss = { sheet = null },
         )
         Sheet.Attach -> MenuSheet(
             title = null,
             entries = listOf(
-                MenuEntry(R.drawable.ic_camera, "Camera") {
+                MenuEntry(R.drawable.ic_camera, stringResource(R.string.chat_attach_camera)) {
                     val dir = File(context.cacheDir, "camera").apply { mkdirs() }
                     val file = File(dir, "photo-${System.currentTimeMillis()}.jpg")
                     val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
                     cameraUri = uri
                     camera.launch(uri)
                 },
-                MenuEntry(R.drawable.ic_image, "Photos") {
+                MenuEntry(R.drawable.ic_image, stringResource(R.string.chat_attach_photos)) {
                     photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 },
-                MenuEntry(R.drawable.ic_files, "Files") {
+                MenuEntry(R.drawable.ic_files, stringResource(R.string.chat_attach_files)) {
                     filePicker.launch(arrayOf("image/*", "application/pdf", "text/*", "application/json", "application/xml", "application/javascript"))
                 },
             ),
@@ -501,20 +507,28 @@ fun ChatScreen(
         )
         is Sheet.Menu -> {
             val m = s.item.message
+            val copyLabel = stringResource(R.string.action_copy)
+            val selectLabel = stringResource(R.string.chat_menu_select_text)
+            val editLabel = stringResource(R.string.chat_menu_edit_resend)
+            val regenerateLabel = stringResource(R.string.chat_menu_regenerate_other)
+            val speakLabel = stringResource(if (speaker.speakingId == m.id) R.string.chat_menu_stop_reading else R.string.chat_menu_read_aloud)
+            val shareLabel = stringResource(R.string.action_share)
+            val usageLabel = stringResource(R.string.chat_menu_usage)
+            val deleteLabel = stringResource(R.string.chat_menu_delete_message)
             val entries = buildList {
-                if (m.content.isNotBlank()) add(MenuEntry(R.drawable.ic_copy, "Copy") { copy(m.content) })
-                if (m.content.isNotBlank()) add(MenuEntry(R.drawable.ic_select_text, "Select text") { sheet = Sheet.Select(m.content) })
+                if (m.content.isNotBlank()) add(MenuEntry(R.drawable.ic_copy, copyLabel) { copy(m.content) })
+                if (m.content.isNotBlank()) add(MenuEntry(R.drawable.ic_select_text, selectLabel) { sheet = Sheet.Select(m.content) })
                 if (m.role == "user") {
-                    add(MenuEntry(R.drawable.ic_edit, "Edit and resend") { sheet = Sheet.Edit(m.id, m.content) })
+                    add(MenuEntry(R.drawable.ic_edit, editLabel) { sheet = Sheet.Edit(m.id, m.content) })
                 } else {
-                    add(MenuEntry(R.drawable.ic_regenerate, "Regenerate with another model") { sheet = Sheet.RegeneratePicker(m.id) })
+                    add(MenuEntry(R.drawable.ic_regenerate, regenerateLabel) { sheet = Sheet.RegeneratePicker(m.id) })
                     if (m.content.isNotBlank()) {
-                        add(MenuEntry(R.drawable.ic_speak, if (speaker.speakingId == m.id) "Stop reading" else "Read aloud") { speaker.toggle(m.id, m.content) })
-                        add(MenuEntry(R.drawable.ic_share, "Share") { share(m.content) })
+                        add(MenuEntry(R.drawable.ic_speak, speakLabel) { speaker.toggle(m.id, m.content) })
+                        add(MenuEntry(R.drawable.ic_share, shareLabel) { share(m.content) })
                     }
-                    add(MenuEntry(R.drawable.ic_coins, "Usage and cost") { sheet = Sheet.Usage(s.item) })
+                    add(MenuEntry(R.drawable.ic_coins, usageLabel) { sheet = Sheet.Usage(s.item) })
                 }
-                add(MenuEntry(R.drawable.ic_delete, "Delete message", danger = true) { vm.deleteMessage(m) })
+                add(MenuEntry(R.drawable.ic_delete, deleteLabel, danger = true) { vm.deleteMessage(m) })
             }
             if (sheet is Sheet.Menu) MenuSheet(null, entries, onDismiss = { if (sheet is Sheet.Menu) sheet = null })
         }
@@ -546,7 +560,7 @@ fun ChatScreen(
                     onContinue = { session, folder ->
                         val truncated = vm.continueSession(s.agent, host.hostId, folder, session.id)
                         sheet = null
-                        if (truncated) toast("The session was long, so only its latest part came over.")
+                        if (truncated) toast(Strings.get(R.string.chat_resume_truncated))
                     },
                     onDismiss = { sheet = null },
                 )
@@ -555,11 +569,14 @@ fun ChatScreen(
         null -> Unit
     }
     if (renameOpen) {
-        TextInputDialog("Rename chat", state.conversation?.title.orEmpty(), "Rename", { vm.rename(it) }, { renameOpen = false })
+        TextInputDialog(
+            stringResource(R.string.chat_rename_title), state.conversation?.title.orEmpty(), stringResource(R.string.action_rename),
+            { vm.rename(it) }, { renameOpen = false },
+        )
     }
     if (deleteOpen) {
         ConfirmDialog(
-            "Delete this chat?", "It will be removed from all your devices.", "Delete",
+            stringResource(R.string.chat_delete_title), stringResource(R.string.chat_delete_body), stringResource(R.string.action_delete),
             onConfirm = { vm.deleteConversation() }, onDismiss = { deleteOpen = false }, danger = true,
         )
     }
@@ -599,7 +616,7 @@ private fun ChatTopBar(
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (showMenuButton) FacetIconButton(R.drawable.ic_menu, "Open chats", onMenu) else Spacer(Modifier.width(8.dp))
+        if (showMenuButton) FacetIconButton(R.drawable.ic_menu, stringResource(R.string.chat_open_chats), onMenu) else Spacer(Modifier.width(8.dp))
         // Fade the picker in once the chat has loaded, instead of flashing "Choose a model".
         val pickerAlpha by animateFloatAsState(if (state.loaded) 1f else 0f, tween(180), label = "picker")
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
@@ -613,7 +630,7 @@ private fun ChatTopBar(
         ) {
             Column(Modifier.weight(1f, fill = false)) {
                 Text(
-                    state.model?.model?.displayName ?: "Choose a model",
+                    state.model?.model?.displayName ?: stringResource(R.string.chat_choose_model),
                     style = FacetTheme.type.titleM, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 val sub = when {
@@ -627,16 +644,19 @@ private fun ChatTopBar(
             FacetIcon(R.drawable.ic_chevron_down, null, tint = c.textSecondary, size = 18.dp)
         }
         }
-        if (state.conversation != null) FacetIconButton(R.drawable.ic_new_chat, "New chat", onNewChat)
-        FacetIconButton(R.drawable.ic_sliders, "Chat settings", onSettings)
+        if (state.conversation != null) FacetIconButton(R.drawable.ic_new_chat, stringResource(R.string.shortcut_new_chat), onNewChat)
+        FacetIconButton(R.drawable.ic_sliders, stringResource(R.string.chat_settings), onSettings)
         if (state.conversation != null) {
             Box {
-                FacetIconButton(R.drawable.ic_more, "More", { menu = true })
+                FacetIconButton(R.drawable.ic_more, stringResource(R.string.action_more), { menu = true })
                 DropdownMenu(menu, { menu = false }, containerColor = c.surface, shape = RoundedCornerShape(16.dp)) {
-                    MenuItem(R.drawable.ic_edit, "Rename") { menu = false; onRename() }
-                    MenuItem(if (state.conversation.pinned) R.drawable.ic_pin_off else R.drawable.ic_pin, if (state.conversation.pinned) "Unpin" else "Pin") { menu = false; onPin() }
-                    MenuItem(R.drawable.ic_share, "Share as Markdown") { menu = false; onExport() }
-                    MenuItem(R.drawable.ic_delete, "Delete", danger = true) { menu = false; onDelete() }
+                    MenuItem(R.drawable.ic_edit, stringResource(R.string.action_rename)) { menu = false; onRename() }
+                    MenuItem(
+                        if (state.conversation.pinned) R.drawable.ic_pin_off else R.drawable.ic_pin,
+                        stringResource(if (state.conversation.pinned) R.string.action_unpin else R.string.action_pin),
+                    ) { menu = false; onPin() }
+                    MenuItem(R.drawable.ic_share, stringResource(R.string.chat_share_markdown)) { menu = false; onExport() }
+                    MenuItem(R.drawable.ic_delete, stringResource(R.string.action_delete), danger = true) { menu = false; onDelete() }
                 }
             }
         }
@@ -720,7 +740,7 @@ private fun ScrollToBottom(listState: LazyListState, modifier: Modifier, hidden:
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            FacetIcon(R.drawable.ic_arrow_down, "Scroll to bottom", tint = FacetTheme.colors.text, size = 19.dp)
+            FacetIcon(R.drawable.ic_arrow_down, stringResource(R.string.chat_scroll_to_bottom), tint = FacetTheme.colors.text, size = 19.dp)
         }
     }
 }
@@ -751,15 +771,15 @@ private fun EmptyChat(
         if (state.catalog.isEmpty()) {
             AssemblingGem(size = 64.dp)
             Spacer(Modifier.height(24.dp))
-            Text("Bring your own keys", style = FacetTheme.type.headline, color = c.text, textAlign = TextAlign.Center)
+            Text(stringResource(R.string.chat_empty_byok_title), style = FacetTheme.type.headline, color = c.text, textAlign = TextAlign.Center)
             Spacer(Modifier.height(10.dp))
             Text(
-                "Add an API key from OpenAI, Anthropic, Google, OpenRouter or any OpenAI-compatible service. Your keys stay encrypted on your devices.",
+                stringResource(R.string.chat_empty_byok_body),
                 style = FacetTheme.type.body, color = c.textSecondary, textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 420.dp),
             )
             Spacer(Modifier.height(24.dp))
-            FacetButton("Add an API key", onAddKey, icon = R.drawable.ic_key)
+            FacetButton(stringResource(R.string.chat_empty_add_key), onAddKey, icon = R.drawable.ic_key)
             return@Column
         }
         val a = state.assistant
@@ -770,7 +790,7 @@ private fun EmptyChat(
         }
         Spacer(Modifier.height(18.dp))
         Text(
-            if (a.id == BuiltinAssistants.DEFAULT_ID) "What can I help with?" else a.name,
+            if (a.id == BuiltinAssistants.DEFAULT_ID) stringResource(R.string.chat_empty_title) else a.name,
             style = FacetTheme.type.headline, color = c.text, textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(24.dp))

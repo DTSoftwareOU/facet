@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,6 +48,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.dtsoftware.facet.AppContainer
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.Dates
 import io.dtsoftware.facet.data.db.ConversationEntity
 import io.dtsoftware.facet.data.db.FolderEntity
@@ -89,14 +91,15 @@ class DrawerViewModel(private val c: AppContainer) : ViewModel() {
         c.conversations.observeConversations(false),
         c.folders.observeAll(),
         folderFilter,
-        combine(c.chat.active, hidden) { a, h -> a to h },
+        // Section labels ("Today", "Pinned") are text: rebuild them when the language changes.
+        combine(c.chat.active, hidden, Strings.language) { a, h, _ -> a to h },
         c.assistants.observeAll(),
     ) { convs, folders, filter, (active, hiddenIds), assistants ->
         val visible = convs.filter { it.id !in hiddenIds && (filter == null || it.folderId == filter) }
         val pinned = visible.filter { it.pinned }
         val rest = visible.filterNot { it.pinned }
         val sections = buildList {
-            if (pinned.isNotEmpty()) add("Pinned" to pinned)
+            if (pinned.isNotEmpty()) add(Strings.get(R.string.drawer_section_pinned) to pinned)
             rest.groupBy { Dates.bucketLabel(it.lastActivityAt) }.forEach { (label, list) -> add(label to list) }
         }
         DrawerState(sections, folders, filter, active, assistants, convs.isEmpty())
@@ -161,7 +164,7 @@ fun DrawerContent(
             Gem(size = 24.dp)
             Spacer(Modifier.width(10.dp))
             Text("facet", style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.weight(1f))
-            FacetIconButton(R.drawable.ic_new_chat, "New chat", { callbacks.onNewChat(null) })
+            FacetIconButton(R.drawable.ic_new_chat, stringResource(R.string.shortcut_new_chat), { callbacks.onNewChat(null) })
         }
         Row(
             Modifier
@@ -176,7 +179,7 @@ fun DrawerContent(
         ) {
             FacetIcon(R.drawable.ic_search, null, tint = c.textTertiary, size = 18.dp)
             Spacer(Modifier.width(10.dp))
-            Text("Search chats", style = FacetTheme.type.body, color = c.textTertiary)
+            Text(stringResource(R.string.drawer_search_chats), style = FacetTheme.type.body, color = c.textTertiary)
         }
         // Assistants: start a new chat with a persona.
         LazyRow(
@@ -199,12 +202,14 @@ fun DrawerContent(
             }
         }
         if (state.folders.isNotEmpty() || !state.isEmpty) {
+            val allChats = stringResource(R.string.drawer_all_chats)
+            val newFolder = stringResource(R.string.drawer_new_folder)
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.padding(bottom = 4.dp),
             ) {
-                item(key = "all") { FolderChip("All chats", null, state.folderFilter == null, { vm.setFolderFilter(null) }, {}) }
+                item(key = "all") { FolderChip(allChats, null, state.folderFilter == null, { vm.setFolderFilter(null) }, {}) }
                 items(state.folders, key = { it.id }) { f ->
                     FolderChip(f.name, accent(f.colorIndex), state.folderFilter == f.id, { vm.setFolderFilter(if (state.folderFilter == f.id) null else f.id) }) {
                         callbacks.onFolderMenu(f)
@@ -215,7 +220,7 @@ fun DrawerContent(
                         Modifier.height(32.dp).clip(FacetShapes.chip).border(1.dp, c.outlineVariant, FacetShapes.chip)
                             .clickable(onClick = callbacks.onNewFolder).padding(horizontal = 9.dp),
                         contentAlignment = Alignment.Center,
-                    ) { FacetIcon(R.drawable.ic_folder_plus, "New folder", tint = c.textSecondary, size = 16.dp) }
+                    ) { FacetIcon(R.drawable.ic_folder_plus, newFolder, tint = c.textSecondary, size = 16.dp) }
                 }
             }
         }
@@ -224,7 +229,7 @@ fun DrawerContent(
             if (state.isEmpty) {
                 item {
                     Text(
-                        "Your chats will appear here.",
+                        stringResource(R.string.drawer_empty),
                         style = FacetTheme.type.body, color = c.textTertiary,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 16.dp),
                     )
@@ -258,7 +263,7 @@ fun DrawerContent(
                 ) {
                     FacetIcon(R.drawable.ic_archive, null, tint = c.textTertiary, size = 17.dp)
                     Spacer(Modifier.width(12.dp))
-                    Text("Archived chats", style = FacetTheme.type.labelM, color = c.textSecondary)
+                    Text(stringResource(R.string.drawer_archived_chats), style = FacetTheme.type.labelM, color = c.textSecondary)
                 }
             }
         }
@@ -323,7 +328,7 @@ private fun ConversationRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                conv.title.ifBlank { "Untitled" },
+                conv.title.ifBlank { stringResource(R.string.common_untitled) },
                 style = FacetTheme.type.body.copy(fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal),
                 color = if (selected) c.text else c.text.copy(alpha = 0.88f),
                 maxLines = 1,
@@ -335,15 +340,15 @@ private fun ConversationRow(
                 Gem(size = 14.dp, thinking = true)
             } else if (conv.pinned) {
                 Spacer(Modifier.width(8.dp))
-                FacetIcon(R.drawable.ic_pin, "Pinned", tint = c.textTertiary, size = 13.dp)
+                FacetIcon(R.drawable.ic_pin, stringResource(R.string.drawer_pinned_icon), tint = c.textTertiary, size = 13.dp)
             }
         }
         DropdownMenu(menu, { menu = false }, containerColor = c.surfaceHigh, shape = RoundedCornerShape(16.dp)) {
-            MenuItem(R.drawable.ic_edit, "Rename") { menu = false; onRename() }
-            MenuItem(if (conv.pinned) R.drawable.ic_pin_off else R.drawable.ic_pin, if (conv.pinned) "Unpin" else "Pin") { menu = false; onPin() }
-            MenuItem(R.drawable.ic_folder, "Move to folder") { menu = false; onMove() }
-            MenuItem(R.drawable.ic_archive, "Archive") { menu = false; onArchive() }
-            MenuItem(R.drawable.ic_delete, "Delete", danger = true) { menu = false; onDelete() }
+            MenuItem(R.drawable.ic_edit, stringResource(R.string.action_rename)) { menu = false; onRename() }
+            MenuItem(if (conv.pinned) R.drawable.ic_pin_off else R.drawable.ic_pin, stringResource(if (conv.pinned) R.string.action_unpin else R.string.action_pin)) { menu = false; onPin() }
+            MenuItem(R.drawable.ic_folder, stringResource(R.string.drawer_move_to_folder)) { menu = false; onMove() }
+            MenuItem(R.drawable.ic_archive, stringResource(R.string.drawer_archive)) { menu = false; onArchive() }
+            MenuItem(R.drawable.ic_delete, stringResource(R.string.action_delete), danger = true) { menu = false; onDelete() }
         }
     }
 }
@@ -374,16 +379,16 @@ private fun AccountFooter(account: AccountState, sync: SyncState, callbacks: Dra
                     }
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(if (account is AccountState.Expired) "Sign in again" else "Sign in to sync", style = FacetTheme.type.labelL, color = c.text)
+                        Text(stringResource(if (account is AccountState.Expired) R.string.drawer_sign_in_again else R.string.drawer_sign_in_to_sync), style = FacetTheme.type.labelL, color = c.text)
                         Text(
-                            if (account is AccountState.Expired) "Sync is paused" else "Chats stay on this device",
+                            stringResource(if (account is AccountState.Expired) R.string.drawer_sync_is_paused else R.string.drawer_local_only),
                             style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
                         )
                     }
                 }
             }
         }
-        FacetIconButton(R.drawable.ic_settings, "Settings", callbacks.onSettings, tint = c.textSecondary)
+        FacetIconButton(R.drawable.ic_settings, stringResource(R.string.drawer_settings), callbacks.onSettings, tint = c.textSecondary)
     }
 }
 
@@ -391,12 +396,16 @@ private fun AccountFooter(account: AccountState, sync: SyncState, callbacks: Dra
 private fun SyncLine(sync: SyncState) {
     val c = FacetTheme.colors
     val (dot, text) = when (sync.phase) {
-        SyncPhase.SYNCING -> c.primary to "Syncing…"
-        SyncPhase.IDLE -> c.success to if (sync.lastSyncAt > 0) "Synced " + Dates.relative(sync.lastSyncAt).replaceFirstChar { it.lowercase() } else "Synced"
-        SyncPhase.OFFLINE -> c.warning to "Offline"
-        SyncPhase.ERROR -> c.error to "Sync problem"
-        SyncPhase.PAUSED -> c.warning to "Sync paused"
-        SyncPhase.OFF -> c.textTertiary to "Not syncing"
+        SyncPhase.SYNCING -> c.primary to stringResource(R.string.drawer_syncing)
+        SyncPhase.IDLE -> c.success to when {
+            sync.lastSyncAt <= 0 -> stringResource(R.string.drawer_synced)
+            Dates.justNow(sync.lastSyncAt) -> stringResource(R.string.drawer_synced_just_now)
+            else -> stringResource(R.string.drawer_synced_time, Dates.relative(sync.lastSyncAt))
+        }
+        SyncPhase.OFFLINE -> c.warning to stringResource(R.string.drawer_offline)
+        SyncPhase.ERROR -> c.error to stringResource(R.string.drawer_sync_problem)
+        SyncPhase.PAUSED -> c.warning to stringResource(R.string.drawer_sync_paused)
+        SyncPhase.OFF -> c.textTertiary to stringResource(R.string.drawer_not_syncing)
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(6.dp).clip(CircleShape).background(dot))

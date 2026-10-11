@@ -1,18 +1,24 @@
 package io.dtsoftware.facet.ui.chat
 
+import androidx.annotation.StringRes
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.data.db.PromptEntity
 import io.dtsoftware.facet.remote.RemoteFeature
 import io.dtsoftware.facet.remote.RemoteHost
 
 /** Built-in commands typed as "/name" at the start of an empty message (docs/REMOTE.md, "Slash commands"). */
-enum class SlashCommand(val command: String, val description: String, val icon: Int) {
-    NEW("new", "Start a new chat", R.drawable.ic_new_chat),
-    MODEL("model", "Choose the model", R.drawable.ic_cpu),
-    FOLDER("folder", "Choose the chat's working folder on your PC", R.drawable.ic_folder_open),
-    PC("pc", "Choose which PC the chat uses, or none", R.drawable.ic_monitor),
-    RESUME_CLAUDE("resume-from-claude", "Continue a Claude Code session from the chat's folder", R.drawable.ic_terminal),
-    RESUME_CODEX("resume-from-codex", "Continue a Codex session from the chat's folder", R.drawable.ic_terminal),
+enum class SlashCommand(val command: String, @StringRes val descriptionRes: Int, val icon: Int) {
+    NEW("new", R.string.chat_slash_new, R.drawable.ic_new_chat),
+    MODEL("model", R.string.chat_slash_model, R.drawable.ic_cpu),
+    FOLDER("folder", R.string.chat_slash_folder, R.drawable.ic_folder_open),
+    PC("pc", R.string.chat_slash_pc, R.drawable.ic_monitor),
+    RESUME_CLAUDE("resume-from-claude", R.string.chat_slash_resume_claude, R.drawable.ic_terminal),
+    RESUME_CODEX("resume-from-codex", R.string.chat_slash_resume_codex, R.drawable.ic_terminal),
+    ;
+
+    /** What the command does, in the app's language (composables use stringResource(descriptionRes)). */
+    val description: String get() = Strings.get(descriptionRes)
 }
 
 /** One row of the command list: a built-in command, or a saved prompt as "/<title in kebab-case>". */

@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.domain.tools
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.llm.Citation
 import java.io.IOException
@@ -89,9 +91,9 @@ class WebSearch(http: OkHttpClient, allowPrivateAddresses: Boolean = false) {
             if (!resp.isSuccessful) {
                 throw SearchException(
                     when (resp.code) {
-                        401, 403 -> "${config.kind.displayName} rejected the search key. Check it in Settings → Web search."
-                        429 -> "${config.kind.displayName} rate limit reached. Try again shortly."
-                        else -> "${config.kind.displayName} search failed (HTTP ${resp.code})."
+                        401, 403 -> Strings.get(R.string.websearch_key_rejected, config.kind.displayName)
+                        429 -> Strings.get(R.string.websearch_rate_limited, config.kind.displayName)
+                        else -> Strings.get(R.string.websearch_failed, config.kind.displayName, resp.code)
                     },
                 )
             }
@@ -102,7 +104,7 @@ class WebSearch(http: OkHttpClient, allowPrivateAddresses: Boolean = false) {
 
     private fun parse(kind: SearchKind, body: String): List<SearchResult> {
         val root = runCatching { AppJson.parseToJsonElement(body).jsonObject }.getOrElse {
-            throw SearchException("The search service returned something unexpected.")
+            throw SearchException(Strings.get(R.string.websearch_unexpected))
         }
         fun JsonObject.s(k: String) = this[k]?.jsonPrimitive?.contentOrNull.orEmpty()
         val items: JsonArray = when (kind) {

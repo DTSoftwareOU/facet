@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.llm.openai
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.net.HttpStatusException
 import io.dtsoftware.facet.core.net.fetchString
 import io.dtsoftware.facet.core.net.sseFlow
@@ -8,10 +10,8 @@ import io.dtsoftware.facet.llm.ApiStyle
 import io.dtsoftware.facet.llm.ChatMessage
 import io.dtsoftware.facet.llm.ChatRequest
 import io.dtsoftware.facet.llm.Effort
-import io.dtsoftware.facet.llm.ErrorKind
 import io.dtsoftware.facet.llm.HealAction
 import io.dtsoftware.facet.llm.LlmClient
-import io.dtsoftware.facet.llm.LlmError
 import io.dtsoftware.facet.llm.LlmErrors
 import io.dtsoftware.facet.llm.LlmException
 import io.dtsoftware.facet.llm.ModelCaps
@@ -85,7 +85,6 @@ internal class OpenAiChatClient(
         .build()
     private val kind = config.kind
     private val base = config.baseUrl.trimBaseUrl().ifBlank { kind.defaultBaseUrl.trimBaseUrl() }
-    private val provider get() = LlmErrors.providerName(config)
 
     private fun requestBuilder(path: String) = Request.Builder()
         .url("$base/$path")
@@ -268,7 +267,7 @@ internal class OpenAiChatClient(
     }.catch { e ->
         if (e is CancellationException) throw e
         if (e is IOException) emit(StreamEvent.Failed(LlmErrors.fromIo(config, e)))
-        else emit(StreamEvent.Failed(LlmError(ErrorKind.UNKNOWN, "Something went wrong reading the response from $provider.", detail = e.message)))
+        else emit(StreamEvent.Failed(LlmErrors.readFailed(config, e.message)))
     }.flowOn(Dispatchers.Default)
 
     private class StreamState(val request: ChatRequest) {
@@ -462,7 +461,7 @@ internal class OpenAiChatClient(
             calls.isNotEmpty() -> StopReason.TOOL_USE
             else -> StopReason.END
         }
-        if (stop == StopReason.REFUSAL) emit(StreamEvent.Notice("${s.model} stopped because of a content filter."))
+        if (stop == StopReason.REFUSAL) emit(StreamEvent.Notice(Strings.get(R.string.llm_content_filter, s.model)))
         val blocks = if (calls.isEmpty()) null else {
             val message = buildJsonObject {
                 put("role", "assistant")

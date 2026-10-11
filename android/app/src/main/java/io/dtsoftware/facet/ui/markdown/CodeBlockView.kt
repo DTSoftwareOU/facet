@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,11 +37,15 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.dtsoftware.facet.R
 import io.dtsoftware.facet.ui.theme.FacetShapes
@@ -65,7 +70,8 @@ internal fun CodeBlockView(block: MdBlock.Code, env: MdEnv, cursor: Boolean, mod
         }
     }
 
-    val codeStyle = env.code.copy(color = colors.syntax.plain)
+    // Code reads left to right in every language.
+    val codeStyle = env.code.copy(color = colors.syntax.plain, textDirection = TextDirection.Ltr)
     val highlighted = remember(block.code, block.language, colors.syntax) {
         SyntaxHighlighter.highlight(block.code, block.language, colors.syntax)
     }
@@ -94,14 +100,14 @@ internal fun CodeBlockView(block: MdBlock.Code, env: MdEnv, cursor: Boolean, mod
             Spacer(Modifier.weight(1f))
             HeaderButton(
                 icon = R.drawable.ic_wrap,
-                description = if (wrap) "Turn off line wrap" else "Wrap lines",
+                description = stringResource(if (wrap) R.string.markdown_unwrap_lines else R.string.markdown_wrap_lines),
                 tint = if (wrap) colors.primary else colors.textSecondary,
                 onClick = { wrap = !wrap },
             )
             Crossfade(targetState = copied, label = "copy") { done ->
                 HeaderButton(
                     icon = if (done) R.drawable.ic_check else R.drawable.ic_copy,
-                    description = if (done) "Copied" else "Copy code",
+                    description = stringResource(if (done) R.string.common_copied else R.string.markdown_copy_code),
                     tint = if (done) colors.success else colors.textSecondary,
                     onClick = {
                         scope.launch {
@@ -115,34 +121,37 @@ internal fun CodeBlockView(block: MdBlock.Code, env: MdEnv, cursor: Boolean, mod
             }
         }
         val contentPadding = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
-        if (wrap) {
-            Column(contentPadding) {
-                chunks.forEachIndexed { i, chunk ->
-                    Text(
-                        text = if (cursor && i == chunks.lastIndex) withCursor(chunk) else chunk,
-                        style = codeStyle,
-                        softWrap = true,
-                        inlineContent = if (cursor && i == chunks.lastIndex) cursorInline() else emptyMap(),
-                    )
-                }
-                if (chunks.isEmpty() && cursor) StreamingCursor()
-            }
-        } else {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-            ) {
-                Column(contentPadding) {
+        // Lay the code out left to right in RTL languages too: lines start at the left and the scroller starts there.
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            if (wrap) {
+                Column(Modifier.fillMaxWidth().then(contentPadding)) {
                     chunks.forEachIndexed { i, chunk ->
                         Text(
                             text = if (cursor && i == chunks.lastIndex) withCursor(chunk) else chunk,
                             style = codeStyle,
-                            softWrap = false,
+                            softWrap = true,
                             inlineContent = if (cursor && i == chunks.lastIndex) cursorInline() else emptyMap(),
                         )
                     }
                     if (chunks.isEmpty() && cursor) StreamingCursor()
+                }
+            } else {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                ) {
+                    Column(contentPadding) {
+                        chunks.forEachIndexed { i, chunk ->
+                            Text(
+                                text = if (cursor && i == chunks.lastIndex) withCursor(chunk) else chunk,
+                                style = codeStyle,
+                                softWrap = false,
+                                inlineContent = if (cursor && i == chunks.lastIndex) cursorInline() else emptyMap(),
+                            )
+                        }
+                        if (chunks.isEmpty() && cursor) StreamingCursor()
+                    }
                 }
             }
         }

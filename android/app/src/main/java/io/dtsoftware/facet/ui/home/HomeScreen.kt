@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -112,6 +113,10 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val fileNotHereYet = stringResource(R.string.home_file_not_here_yet)
+    val fileOnOtherDevice = stringResource(R.string.home_file_on_other_device)
+    val chatDeleted = stringResource(R.string.home_chat_deleted)
+    val undo = stringResource(R.string.home_undo)
 
     var prefill by remember { mutableStateOf<PrefillRequest?>(null) }
     var renameTarget by remember { mutableStateOf<ConversationEntity?>(null) }
@@ -142,7 +147,7 @@ fun HomeScreen(
         scope.launch {
             if (!container.sync.ensureLocal(ref.id)) {
                 val inSyncStorage = container.attachments.get(ref.id)?.uploaded != false
-                snackbar.showSnackbar(if (inSyncStorage) "This file isn't on this device yet." else "This file is only on another of your devices.")
+                snackbar.showSnackbar(if (inSyncStorage) fileNotHereYet else fileOnOtherDevice)
                 return@launch
             }
             if (ref.kind == "image") {
@@ -175,7 +180,7 @@ fun HomeScreen(
             drawerVm.hide(conv.id)
             if (conv.id == currentId) vm.newChat()
             scope.launch {
-                val result = snackbar.showSnackbar("Chat deleted", actionLabel = "Undo", duration = SnackbarDuration.Short)
+                val result = snackbar.showSnackbar(chatDeleted, actionLabel = undo, duration = SnackbarDuration.Short)
                 if (result == SnackbarResult.ActionPerformed) drawerVm.unhide(conv.id) else drawerVm.commitDelete(conv.id)
             }
         },
@@ -232,15 +237,20 @@ fun HomeScreen(
     }
 
     renameTarget?.let { conv ->
-        TextInputDialog("Rename chat", conv.title, "Rename", { drawerVm.rename(conv.id, it) }, { renameTarget = null })
+        TextInputDialog(
+            stringResource(R.string.home_rename_chat_title), conv.title, stringResource(R.string.action_rename),
+            { drawerVm.rename(conv.id, it) }, { renameTarget = null },
+        )
     }
     moveTarget?.let { conv ->
+        val noFolder = stringResource(R.string.home_no_folder)
+        val newFolderEntry = stringResource(R.string.home_new_folder_menu)
         MenuSheet(
-            title = "Move “${conv.title}” to",
+            title = stringResource(R.string.home_move_to_title, conv.title),
             entries = buildList {
-                add(MenuEntry(R.drawable.ic_messages, "No folder") { drawerVm.moveToFolder(conv.id, null) })
+                add(MenuEntry(R.drawable.ic_messages, noFolder) { drawerVm.moveToFolder(conv.id, null) })
                 drawerState.folders.forEach { f -> add(MenuEntry(R.drawable.ic_folder, f.name) { drawerVm.moveToFolder(conv.id, f.id) }) }
-                add(MenuEntry(R.drawable.ic_folder_plus, "New folder…") { newFolder = true })
+                add(MenuEntry(R.drawable.ic_folder_plus, newFolderEntry) { newFolder = true })
             },
             onDismiss = { moveTarget = null },
         )
@@ -251,13 +261,15 @@ fun HomeScreen(
     folderMenu?.let { f ->
         MenuSheet(
             title = f.name,
-            entries = listOf(MenuEntry(R.drawable.ic_delete, "Delete folder", danger = true) { deleteFolder = f }),
+            entries = listOf(MenuEntry(R.drawable.ic_delete, stringResource(R.string.home_delete_folder), danger = true) { deleteFolder = f }),
             onDismiss = { folderMenu = null },
         )
     }
     deleteFolder?.let { f ->
         ConfirmDialog(
-            "Delete “${f.name}”?", "Chats in this folder are kept and move to All chats.", "Delete folder",
+            stringResource(R.string.home_delete_folder_title, f.name),
+            stringResource(R.string.home_delete_folder_body),
+            stringResource(R.string.home_delete_folder),
             onConfirm = { drawerVm.deleteFolder(f.id) }, onDismiss = { deleteFolder = null }, danger = true,
         )
     }
@@ -271,8 +283,8 @@ private fun NewFolderSheet(onCreate: (String, Int) -> Unit, onDismiss: () -> Uni
     var color by remember { mutableStateOf(0) }
     FacetSheet(onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).navigationBarsPadding().padding(bottom = 16.dp)) {
-            Text("New folder", style = FacetTheme.type.titleL, color = FacetTheme.colors.text, modifier = Modifier.padding(bottom = 16.dp))
-            FacetTextField(name, { name = it }, placeholder = "Folder name")
+            Text(stringResource(R.string.home_new_folder_title), style = FacetTheme.type.titleL, color = FacetTheme.colors.text, modifier = Modifier.padding(bottom = 16.dp))
+            FacetTextField(name, { name = it }, placeholder = stringResource(R.string.home_folder_name_placeholder))
             Spacer(Modifier.height(16.dp))
             Row {
                 AccentChoices.indices.forEach { i ->
@@ -286,9 +298,9 @@ private fun NewFolderSheet(onCreate: (String, Int) -> Unit, onDismiss: () -> Uni
             }
             Spacer(Modifier.height(20.dp))
             Row {
-                FacetButton("Cancel", onDismiss, style = ButtonStyle.Tonal, modifier = Modifier.weight(1f))
+                FacetButton(stringResource(R.string.action_cancel), onDismiss, style = ButtonStyle.Tonal, modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(10.dp))
-                FacetButton("Create folder", { onCreate(name, color); onDismiss() }, enabled = name.isNotBlank(), modifier = Modifier.weight(1f))
+                FacetButton(stringResource(R.string.home_create_folder), { onCreate(name, color); onDismiss() }, enabled = name.isNotBlank(), modifier = Modifier.weight(1f))
             }
         }
     }
@@ -330,7 +342,7 @@ private fun ViewerButtons(container: AppContainer, ref: AttachmentRef, onDismiss
     val scope = rememberCoroutineScope()
     Row(modifier.statusBarsPadding().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FacetIconButton(
-            R.drawable.ic_share, "Share", {
+            R.drawable.ic_share, stringResource(R.string.action_share), {
                 scope.launch {
                     val a = container.attachments.get(ref.id) ?: return@launch
                     val file = container.attachments.file(a) ?: return@launch
@@ -345,7 +357,7 @@ private fun ViewerButtons(container: AppContainer, ref: AttachmentRef, onDismiss
             },
             tint = Color.White, background = Color(0x66000000),
         )
-        FacetIconButton(R.drawable.ic_close, "Close", onDismiss, tint = Color.White, background = Color(0x66000000))
+        FacetIconButton(R.drawable.ic_close, stringResource(R.string.action_close), onDismiss, tint = Color.White, background = Color(0x66000000))
     }
 }
 

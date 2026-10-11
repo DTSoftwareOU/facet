@@ -1,6 +1,7 @@
 package io.dtsoftware.facet.data.repo
 
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.core.util.Clock
 import io.dtsoftware.facet.core.util.Ids
@@ -12,6 +13,7 @@ import io.dtsoftware.facet.data.parseParams
 import io.dtsoftware.facet.data.prefs.ModelRef
 import io.dtsoftware.facet.llm.GenParams
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 /** An assistant (persona): built-in or user-made. */
@@ -31,19 +33,22 @@ data class Assistant(
 object BuiltinAssistants {
     const val DEFAULT_ID = "builtin.facet"
 
-    val all: List<Assistant> = listOf(
+    private fun starters(vararg ids: Int): List<String> = ids.map { Strings.get(it) }
+
+    /** Built every time so names and starters follow the app's language; instructions stay English (they go to the model). */
+    val all: List<Assistant> get() = listOf(
         Assistant(
             DEFAULT_ID, "Facet", null, R.drawable.ic_gem, 0, "", null, null,
-            listOf(
-                "Explain how HTTPS keeps a connection private",
-                "Plan a 3-day trip to Lisbon on a modest budget",
-                "Help me write a polite follow-up email",
-                "What should I know before adopting a cat?",
+            starters(
+                R.string.builtin_facet_https,
+                R.string.builtin_facet_trip,
+                R.string.builtin_facet_email,
+                R.string.builtin_facet_cat,
             ),
             builtin = true,
         ),
         Assistant(
-            "builtin.code", "Code", null, R.drawable.ic_code, 1,
+            "builtin.code", Strings.get(R.string.builtin_code), null, R.drawable.ic_code, 1,
             """
             You are a senior software engineer pairing with the user.
             Write correct, idiomatic, production-quality code and keep explanations short and concrete.
@@ -51,86 +56,88 @@ object BuiltinAssistants {
             Point out bugs, security issues, and edge cases you notice. If requirements are ambiguous, state your assumption briefly and proceed.
             """.trimIndent(),
             null, null,
-            listOf(
-                "Review this function for bugs",
-                "Write a Kotlin coroutine that retries with backoff",
-                "Explain the difference between a mutex and a semaphore",
-                "Convert this Python script to TypeScript",
+            starters(
+                R.string.builtin_code_review,
+                R.string.builtin_code_coroutine,
+                R.string.builtin_code_mutex,
+                R.string.builtin_code_convert,
             ),
             builtin = true,
         ),
         Assistant(
-            "builtin.writer", "Writer", null, R.drawable.ic_writer, 2,
+            "builtin.writer", Strings.get(R.string.builtin_writer), null, R.drawable.ic_writer, 2,
             """
             You are an experienced editor and writer.
             Match the user's voice and audience. Prefer plain, specific language over filler. When editing, keep the meaning, tighten the prose, and briefly list the main changes.
             When drafting, ask at most one clarifying question if the goal is unclear; otherwise write a strong first draft.
             """.trimIndent(),
             null, null,
-            listOf(
-                "Tighten this paragraph without changing its meaning",
-                "Draft a short bio for a conference talk",
-                "Make this message sound warmer but still professional",
-                "Give me five title ideas for this article",
+            starters(
+                R.string.builtin_writer_tighten,
+                R.string.builtin_writer_bio,
+                R.string.builtin_writer_warmer,
+                R.string.builtin_writer_titles,
             ),
             builtin = true,
         ),
         Assistant(
-            "builtin.tutor", "Tutor", null, R.drawable.ic_tutor, 3,
+            "builtin.tutor", Strings.get(R.string.builtin_tutor), null, R.drawable.ic_tutor, 3,
             """
             You are a patient tutor. Teach for understanding, not just answers.
             Start from what the learner knows, explain one idea at a time with a small example, and check understanding with a short question.
             For exercises, guide with hints before giving the full solution unless the learner asks for it. Use LaTeX for math.
             """.trimIndent(),
             null, null,
-            listOf(
-                "Teach me derivatives from scratch",
-                "Quiz me on Spanish past tense verbs",
-                "Why does the moon have phases?",
-                "Walk me through how a neural network learns",
+            starters(
+                R.string.builtin_tutor_derivatives,
+                R.string.builtin_tutor_quiz,
+                R.string.builtin_tutor_moon,
+                R.string.builtin_tutor_neural,
             ),
             builtin = true,
         ),
         Assistant(
-            "builtin.translator", "Translator", null, R.drawable.ic_languages, 4,
+            "builtin.translator", Strings.get(R.string.builtin_translator), null, R.drawable.ic_languages, 4,
             """
             You are a professional translator. Detect the source language automatically.
             If the user names a target language, translate into it; otherwise translate into English, or from English into the language the user last asked for.
             Preserve meaning, tone, formatting, and Markdown. Output only the translation unless the user asks for notes; add a brief note only when a phrase has no direct equivalent.
             """.trimIndent(),
             null, null,
-            listOf(
-                "Translate to Spanish: Where is the nearest train station?",
-                "Translate this email into formal Japanese",
-                "What does \"saudade\" mean?",
-                "Translate to French and keep the formatting",
+            starters(
+                R.string.builtin_translator_station,
+                R.string.builtin_translator_japanese,
+                R.string.builtin_translator_saudade,
+                R.string.builtin_translator_french,
             ),
             builtin = true,
         ),
         Assistant(
-            "builtin.analyst", "Analyst", null, R.drawable.ic_analyst, 5,
+            "builtin.analyst", Strings.get(R.string.builtin_analyst), null, R.drawable.ic_analyst, 5,
             """
             You are a rigorous analyst. Structure answers: the conclusion first, then the reasoning and the evidence.
             Show calculations, state assumptions and uncertainty explicitly, and use tables when comparing options. Distinguish facts from estimates.
             """.trimIndent(),
             null, null,
-            listOf(
-                "Compare renting vs buying with these numbers",
-                "Summarize the key risks in this plan",
-                "Build a simple unit economics model for a coffee shop",
-                "What's the expected value of this decision?",
+            starters(
+                R.string.builtin_analyst_renting,
+                R.string.builtin_analyst_risks,
+                R.string.builtin_analyst_coffee,
+                R.string.builtin_analyst_expected_value,
             ),
             builtin = true,
         ),
     )
 
-    fun byId(id: String?): Assistant? = all.firstOrNull { it.id == id }
+    fun byId(id: String?): Assistant? = if (id == null || !id.startsWith("builtin.")) null else all.firstOrNull { it.id == id }
 }
 
 class AssistantRepository(private val db: FacetDatabase, private val onLocalChange: () -> Unit) {
     private val dao = db.assistants()
 
-    fun observeAll(): Flow<List<Assistant>> = dao.observeAll().map { custom -> BuiltinAssistants.all + custom.map { it.toAssistant() } }
+    /** Built-in assistants first, named in the current language (so the list follows a language switch). */
+    fun observeAll(): Flow<List<Assistant>> =
+        combine(dao.observeAll(), Strings.language) { custom, _ -> BuiltinAssistants.all + custom.map { it.toAssistant() } }
 
     suspend fun get(id: String?): Assistant? {
         if (id == null) return null
@@ -151,7 +158,7 @@ class AssistantRepository(private val db: FacetDatabase, private val onLocalChan
         val existing = id?.let { dao.get(it) }
         val entity = AssistantEntity(
             id = existing?.id ?: Ids.new(),
-            name = name.trim().ifEmpty { "Assistant" },
+            name = name.trim().ifEmpty { Strings.get(R.string.builtin_default_assistant) },
             emoji = emoji.ifBlank { "✨" },
             colorIndex = colorIndex,
             instructions = instructions.trim(),
@@ -198,7 +205,7 @@ class FolderRepository(private val db: FacetDatabase, private val onLocalChange:
         val existing = id?.let { dao.get(it) }
         val e = FolderEntity(
             id = existing?.id ?: Ids.new(),
-            name = name.trim().ifEmpty { "Folder" },
+            name = name.trim().ifEmpty { Strings.get(R.string.builtin_default_folder) },
             colorIndex = colorIndex,
             sort = existing?.sort ?: 0,
             createdAt = existing?.createdAt ?: now,

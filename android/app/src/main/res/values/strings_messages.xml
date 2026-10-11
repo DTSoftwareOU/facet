@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Model picker (bottom sheet) -->
+    <!-- Title of the sheet that lists models -->
+    <string name="sheet_model_picker_title">Choose a model</string>
+    <!-- Content description of the key button that opens the provider settings -->
+    <string name="sheet_manage_providers">Manage providers</string>
+    <!-- Placeholder of the search field -->
+    <string name="sheet_search_models">Search models</string>
+    <!-- Content description of the button that empties the search field (verb) -->
+    <string name="sheet_clear_search">Clear</string>
+    <!-- Empty state title: no AI provider (OpenAI, Anthropic, …) is set up -->
+    <string name="sheet_no_providers_title">No providers yet</string>
+    <string name="sheet_no_providers_body">Add an API key to see its models here.</string>
+    <!-- Button -->
+    <string name="sheet_add_provider">Add a provider</string>
+    <!-- Section title above favorite models (noun) -->
+    <string name="sheet_favorites">Favorites</string>
+    <!-- Content description of the button that reloads a provider's model list -->
+    <string name="sheet_refresh_models">Refresh models</string>
+    <!-- Shown under a provider whose model list is empty -->
+    <string name="sheet_no_models_loaded">No models loaded. Tap refresh, or add a model ID in Providers.</string>
+    <!-- Shown under a provider when no model matches the search -->
+    <string name="sheet_no_matches">No matches.</string>
+    <!-- Tappable text that hides models the person hid from the list again. %1$d: number of hidden models -->
+    <plurals name="sheet_hide_hidden_models">
+        <item quantity="one">Hide %1$d hidden</item>
+        <item quantity="other">Hide %1$d hidden</item>
+    </plurals>
+    <!-- Tappable text: %1$d models are hidden; tapping shows them (“Show” is a verb) -->
+    <plurals name="sheet_show_hidden_models">
+        <item quantity="one">%1$d hidden · Show</item>
+        <item quantity="other">%1$d hidden · Show</item>
+    </plurals>
+    <!-- Accessibility action on long press of a model: opens its settings -->
+    <string name="sheet_edit_model">Edit model</string>
+    <!-- Model detail. %1$s: context window size, such as 128K or 1M (tokens) -->
+    <string name="sheet_model_context">%1$s context</string>
+    <!-- Model detail. %1$s: price for input, %2$s: price for output, both in US dollars per one million (1M) tokens -->
+    <string name="sheet_model_price">%1$s / %2$s per 1M</string>
+    <!-- Content description of the star button -->
+    <string name="sheet_add_favorite">Add to favorites</string>
+    <!-- Content description of the star button -->
+    <string name="sheet_remove_favorite">Remove from favorites</string>
+    <!-- Content descriptions of small icons that show what a model can do -->
+    <string name="sheet_cap_vision">Sees images</string>
+    <!-- Content description of an icon: the model can reason (think before answering) -->
+    <string name="sheet_cap_reasoning">Reasoning</string>
+    <string name="sheet_cap_pdf">Reads PDFs</string>
+
+    <!-- Chat settings (bottom sheet) -->
+    <!-- Title of the sheet (noun) -->
+    <string name="sheet_chat_settings_title">Chat settings</string>
+    <string name="sheet_no_model_selected">No model selected</string>
+    <!-- Section title: how much the model thinks before answering -->
+    <string name="sheet_reasoning">Reasoning</string>
+    <!-- Hints under the reasoning effort choice -->
+    <string name="sheet_effort_auto">The model decides how long to think.</string>
+    <string name="sheet_effort_none">Answers immediately without extended reasoning.</string>
+    <string name="sheet_effort_low">Quick answers for simple questions. Cheapest.</string>
+    <string name="sheet_effort_medium">Balanced depth, speed and cost.</string>
+    <string name="sheet_effort_high">Thinks longer for harder problems.</string>
+    <string name="sheet_effort_max">Maximum depth for the hardest problems. Slowest and most expensive.</string>
+    <!-- Switch title -->
+    <string name="sheet_show_reasoning">Show reasoning</string>
+    <string name="sheet_show_reasoning_subtitle">Stream the model\'s reasoning summary while it thinks.</string>
+    <!-- Switch title: a model setting that does more work per answer -->
+    <string name="sheet_pro_mode">Pro mode</string>
+    <string name="sheet_pro_mode_subtitle">Does more work per answer. Slower and costs more.</string>
+    <!-- Section title: how long replies are (noun) -->
+    <string name="sheet_length">Length</string>
+    <!-- Section title -->
+    <string name="sheet_tools_and_speed">Tools and speed</string>
+    <!-- Switch title, also the content description of an icon showing that a model can search the web -->
+    <string name="sheet_web_search">Web search</string>
+    <string name="sheet_web_search_builtin">Let the model search the web and cite sources.</string>
+    <string name="sheet_web_search_with_key">Uses your search key, then reads pages as needed.</string>
+    <!-- “Settings → Web search” is the place in the app where the key is added -->
+    <string name="sheet_web_search_needs_key">Add a search key in Settings → Web search to let this model search.</string>
+    <string name="sheet_web_search_unsupported">This model can\'t use tools or search the web.</string>
+    <!-- Switch title -->
+    <string name="sheet_mcp_tools">MCP tools and skills</string>
+    <!-- %1$s: what is available, such as “2 servers and 3 skills” -->
+    <string name="sheet_tools_available">%1$s available in this chat.</string>
+    <!-- Number of MCP servers, used inside “%1$s available in this chat.” -->
+    <plurals name="sheet_mcp_server_count">
+        <item quantity="one">%1$d server</item>
+        <item quantity="other">%1$d servers</item>
+    </plurals>
+    <!-- Number of skills, used inside “%1$s available in this chat.” -->
+    <plurals name="sheet_skill_count">
+        <item quantity="one">%1$d skill</item>
+        <item quantity="other">%1$d skills</item>
+    </plurals>
+    <!-- Under an MCP server's name: how many tools it has -->
+    <plurals name="sheet_mcp_tool_count">
+        <item quantity="one">%1$d tool</item>
+        <item quantity="other">%1$d tools</item>
+    </plurals>
+    <!-- Switch title. YOLO stays in English -->
+    <string name="sheet_yolo">YOLO mode</string>
+    <string name="sheet_yolo_subtitle">Run tools without asking, in every chat.</string>
+    <!-- Switch title -->
+    <string name="sheet_fast_mode">Fast mode</string>
+    <string name="sheet_fast_mode_subtitle">Up to 2.5× faster output at premium pricing.</string>
+    <!-- Section title: the model's sampling temperature setting -->
+    <string name="sheet_temperature">Temperature</string>
+    <!-- Section title -->
+    <string name="sheet_max_reply_length">Maximum reply length</string>
+    <!-- Label of a text field -->
+    <string name="sheet_instructions_label">Instructions for this chat</string>
+    <!-- Placeholder (example) of the instructions field -->
+    <string name="sheet_instructions_placeholder">e.g. Answer in Spanish. Keep replies under 150 words.</string>
+    <string name="sheet_instructions_supporting">Added to the assistant\'s instructions for this chat only.</string>
+    <!-- Button -->
+    <string name="sheet_make_default">Use these settings for new chats</string>
+
+    <!-- Usage details of a reply (bottom sheet) -->
+    <!-- Title (noun): tokens and cost of one reply -->
+    <string name="sheet_usage_title">Usage</string>
+    <string name="sheet_usage_input">Input tokens</string>
+    <!-- Indented under “Input tokens”: the part of them read from the provider's cache -->
+    <string name="sheet_usage_cache_read">of which read from cache</string>
+    <!-- Indented under “Input tokens”: the part of them written to the provider's cache -->
+    <string name="sheet_usage_cache_write">of which written to cache</string>
+    <string name="sheet_usage_output">Output tokens</string>
+    <string name="sheet_usage_reasoning">Reasoning tokens (in output)</string>
+    <string name="sheet_usage_cost">Estimated cost</string>
+    <!-- Value of “Estimated cost” when the model's price isn't known -->
+    <string name="sheet_usage_unknown_price">Unknown price</string>
+    <string name="sheet_usage_thinking_time">Thinking time</string>
+    <string name="sheet_usage_note">Costs are estimates from public price lists. Your provider\'s bill is the source of truth.</string>
+
+    <!-- Edit a sent message (bottom sheet) -->
+    <!-- Title -->
+    <string name="sheet_edit_message_title">Edit message</string>
+    <string name="sheet_edit_message_body">Sending creates a new branch. The original stays one tap away.</string>
+    <!-- Title of a sheet where part of a message can be selected and copied -->
+    <string name="sheet_select_text_title">Select text</string>
+
+    <!-- Messages in a chat -->
+    <!-- File type shown next to the size of an attached file that has no extension -->
+    <string name="msg_file">File</string>
+    <!-- Name shown above a reply when the model's name is unknown -->
+    <string name="msg_assistant">Assistant</string>
+    <!-- Button on a reply that failed -->
+    <string name="msg_retry">Retry</string>
+    <string name="msg_refused">The model declined to answer this. You can rephrase, or try another model.</string>
+    <!-- Button -->
+    <string name="msg_try_another_model">Try another model</string>
+    <string name="msg_truncated">This reply reached the output limit.</string>
+    <!-- Under a reply the person stopped before it finished -->
+    <string name="msg_stopped">Stopped</string>
+    <!-- The model is thinking right now -->
+    <string name="msg_thinking">Thinking</string>
+    <!-- The model is thinking right now. %1$s: time so far, such as 5s -->
+    <string name="msg_thinking_for">Thinking · %1$s</string>
+    <!-- %1$s: how long the model thought, such as 5s or 1m 5s -->
+    <string name="msg_thought_for">Thought for %1$s</string>
+    <!-- Title of a collapsed panel with the model's reasoning (noun) -->
+    <string name="msg_reasoning">Reasoning</string>
+    <!-- Content descriptions of the arrow that opens and closes the reasoning panel (verbs) -->
+    <string name="msg_collapse">Collapse</string>
+    <string name="msg_expand">Expand</string>
+    <!-- %1$s: what the model searches the web for -->
+    <string name="msg_searching_query">Searching “%1$s”</string>
+    <string name="msg_searching_web">Searching the web</string>
+    <string name="msg_searched_web">Searched the web</string>
+    <!-- %1$d: number of web searches (2 or more in English) -->
+    <plurals name="msg_searched_web_times">
+        <item quantity="one">Searched the web %1$d time</item>
+        <item quantity="other">Searched the web %1$d times</item>
+    </plurals>
+    <!-- Content description of a button under a reply: write the reply again (verb) -->
+    <string name="msg_regenerate">Regenerate</string>
+    <!-- Content description of a button under a reply (verb) -->
+    <string name="msg_read_aloud">Read aloud</string>
+    <!-- Tokens of a reply. %1$s: input tokens, %2$s: output tokens, such as 1.8k and 612 -->
+    <string name="msg_usage_tokens">%1$s in · %2$s out</string>
+    <!-- Content descriptions of the arrows that switch between versions of a message -->
+    <string name="msg_previous_version">Previous version</string>
+    <string name="msg_next_version">Next version</string>
+
+    <!-- Your PC: chip above the message box and its sheet. Claude Code, Codex, PowerShell and Windows stay in English -->
+    <!-- Name used when the PC's name is unknown, and title of the sheet -->
+    <string name="pcview_your_pc">Your PC</string>
+    <!-- Chip label (verb): work on one of your PCs in this chat -->
+    <string name="pcview_use_a_pc">Use a PC</string>
+    <!-- Content description of the chip -->
+    <string name="pcview_use_a_pc_description">Use a PC in this chat</string>
+    <!-- %1$s: the PC's name -->
+    <string name="pcview_pc_offline">%1$s is offline</string>
+    <!-- Content description of the chip. %1$s: the PC's name -->
+    <string name="pcview_pc_offline_description">%1$s is offline. This chat works without it.</string>
+    <!-- Remote access is turned off on that PC. %1$s: the PC's name -->
+    <string name="pcview_access_off">Access is off on %1$s</string>
+    <!-- Content description of the chip. %1$s: a folder path, %2$s: the PC's name -->
+    <string name="pcview_working_in">Working in %1$s on %2$s</string>
+    <!-- Content description of the chip. %1$s: the PC's name -->
+    <string name="pcview_working_in_default">Working in the default folder on %1$s</string>
+    <!-- Accessibility action of the chip -->
+    <string name="pcview_choose_pc_or_folder">Choose a PC or folder</string>
+    <string name="pcview_intro">The model can run commands and edit files in a folder on your PC. Everything between your devices is end-to-end encrypted.</string>
+    <string name="pcview_model_cant_use_tools">This model can\'t use tools, so it can\'t work on your PC. Pick one that can.</string>
+    <string name="pcview_tools_off">Tools are off in this chat, so the model can\'t use your PC.</string>
+    <!-- Button: turns tools on for this chat -->
+    <string name="pcview_turn_on">Turn on</string>
+    <!-- Section title: list of your computers -->
+    <string name="pcview_pcs">PCs</string>
+    <!-- Status of a PC -->
+    <string name="pcview_online">Online</string>
+    <!-- Status of a PC. %1$s: its operating system, such as Windows 11 -->
+    <string name="pcview_online_os">Online · %1$s</string>
+    <!-- Status of the chat's PC while it's offline -->
+    <string name="pcview_offline_until_back">Offline. This chat works without it until it\'s back.</string>
+    <!-- Section title (noun) -->
+    <string name="pcview_folder">Folder</string>
+    <string name="pcview_no_folder">No folder yet</string>
+    <string name="pcview_choose_where">Choose where the model works.</string>
+    <!-- Button, also an accessibility action -->
+    <string name="pcview_change_folder">Change folder</string>
+    <string name="pcview_dont_use_pc">Don\'t use a PC</string>
+    <string name="pcview_dont_use_pc_subtitle">This chat works as a normal chat.</string>
+    <!-- Content description of a check mark next to the chat's PC -->
+    <string name="pcview_used_by_chat">Used by this chat</string>
+
+    <!-- Your PC: folder browser -->
+    <string name="pcview_folder_gone">That folder isn\'t there anymore.</string>
+    <string name="pcview_folders_failed">Couldn\'t load folders.</string>
+    <!-- Title -->
+    <string name="pcview_choose_folder">Choose a folder</string>
+    <!-- Subtitle. %1$s: the PC's name -->
+    <string name="pcview_on_pc">On %1$s</string>
+    <string name="pcview_loading_folders">Loading folders…</string>
+    <!-- %1$s: the PC's name. Places are the starting points: home folder, Desktop, drives -->
+    <string name="pcview_no_places">%1$s didn\'t list any places.</string>
+    <string name="pcview_no_folders">No folders in here.</string>
+    <!-- Button -->
+    <string name="pcview_use_folder">Use this folder</string>
+    <string name="pcview_pick_place">Pick a place to start, then the folder the model should work in.</string>
+    <!-- Content description of a button: go to the parent folder -->
+    <string name="pcview_up_one_folder">Up one folder</string>
+    <!-- First item of the folder path (breadcrumbs): the starting points such as home folder, Desktop and drives -->
+    <string name="pcview_places">Places</string>
+
+    <!-- Your PC: continue a Claude Code or Codex session -->
+    <string name="pcview_sessions_failed">Couldn\'t load sessions.</string>
+    <!-- Title. %1$s: Claude Code or Codex -->
+    <string name="pcview_continue_session_title">Continue a %1$s session</string>
+    <!-- %1$s: a folder name, %2$s: the PC's name -->
+    <string name="pcview_folder_on_pc">%1$s on %2$s</string>
+    <!-- Button next to the folder: pick another folder (verb) -->
+    <string name="pcview_change">Change</string>
+    <string name="pcview_session_read_failed">Couldn\'t read that session.</string>
+    <string name="pcview_looking_for_sessions">Looking for sessions…</string>
+    <!-- %1$s: Claude Code or Codex, %2$s: a folder name -->
+    <string name="pcview_no_sessions">No %1$s sessions in %2$s.</string>
+    <!-- Button -->
+    <string name="pcview_choose_another_folder">Choose another folder</string>
+    <!-- Accessibility action of a session in the list -->
+    <string name="pcview_continue_this_session">Continue this session</string>
+    <string name="pcview_untitled_session">Untitled session</string>
+    <!-- Number of messages in a session -->
+    <plurals name="pcview_message_count">
+        <item quantity="one">%1$d message</item>
+        <item quantity="other">%1$d messages</item>
+    </plurals>
+
+    <!-- Tool steps in a reply and tool approvals -->
+    <!-- Expands the list of tool steps. %1$d: number of hidden steps -->
+    <plurals name="toolview_show_more">
+        <item quantity="one">Show %1$d more</item>
+        <item quantity="other">Show %1$d more</item>
+    </plurals>
+    <!-- A command the person declined to run on their PC. %1$s: the command, shown as code -->
+    <string name="toolview_didnt_run">Didn\'t run %1$s</string>
+    <!-- A command the person declined to run on their PC (the command is unknown) -->
+    <string name="toolview_didnt_run_a_command">Didn\'t run a command</string>
+    <!-- %1$s: a tool step, such as Searching “cats”. The person declined to let it run -->
+    <string name="toolview_step_declined">%1$s · declined</string>
+    <!-- %1$s: a tool step, such as Searching “cats”. The step ended with an error -->
+    <string name="toolview_step_failed">%1$s · failed</string>
+    <!-- Content descriptions of the arrow that shows a tool step's input and result -->
+    <string name="toolview_show_details">Show details</string>
+    <string name="toolview_hide_details">Hide details</string>
+    <!-- Heading above what was sent to a tool (noun) -->
+    <string name="toolview_input">Input</string>
+    <!-- Heading above what a tool returned (noun) -->
+    <string name="toolview_result">Result</string>
+    <!-- Asks before a model creates a video -->
+    <string name="toolview_create_video">Create this video? Clips can cost a few dollars each.</string>
+    <!-- Asks before a tool runs. %1$s: the MCP server's name, %2$s: the tool's name -->
+    <string name="toolview_allow_server_tool">Allow %1$s to run %2$s?</string>
+    <!-- Asks before a tool runs. %1$s: the tool's name -->
+    <string name="toolview_allow_tool">Allow this tool to run %1$s?</string>
+    <!-- Button (verb) -->
+    <string name="toolview_deny">Deny</string>
+    <!-- Button (verb) -->
+    <string name="toolview_allow">Allow</string>
+    <!-- Allows this PC tool without asking again in this chat -->
+    <string name="toolview_allow_for_chat">Allow for this chat</string>
+    <string name="toolview_always_allow">Always allow this tool</string>
+</resources>

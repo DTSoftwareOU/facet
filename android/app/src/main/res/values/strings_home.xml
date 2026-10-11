@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home screen: snackbars, folder sheets and dialogs over the chat list -->
+    <string name="home_file_not_here_yet">This file isn\'t on this device yet.</string>
+    <string name="home_file_on_other_device">This file is only on another of your devices.</string>
+    <!-- Snackbar after deleting a chat from the chat list -->
+    <string name="home_chat_deleted">Chat deleted</string>
+    <!-- Snackbar button: undo the deletion -->
+    <string name="home_undo">Undo</string>
+    <!-- Dialog title -->
+    <string name="home_rename_chat_title">Rename chat</string>
+    <!-- Title of a sheet listing folders. %1$s: the chat's title -->
+    <string name="home_move_to_title">Move “%1$s” to</string>
+    <!-- Menu entry: take the chat out of its folder -->
+    <string name="home_no_folder">No folder</string>
+    <!-- Menu entry that opens the "New folder" sheet -->
+    <string name="home_new_folder_menu">New folder…</string>
+    <!-- Menu entry and confirm button -->
+    <string name="home_delete_folder">Delete folder</string>
+    <!-- Dialog title. %1$s: a folder name -->
+    <string name="home_delete_folder_title">Delete “%1$s”?</string>
+    <!-- "All chats" is the name of the chat list filter that shows every chat -->
+    <string name="home_delete_folder_body">Chats in this folder are kept and move to All chats.</string>
+    <!-- Sheet title -->
+    <string name="home_new_folder_title">New folder</string>
+    <!-- Placeholder of a text field -->
+    <string name="home_folder_name_placeholder">Folder name</string>
+    <!-- Button -->
+    <string name="home_create_folder">Create folder</string>
+
+    <!-- Chat list (side drawer) -->
+    <!-- Placeholder of the search box that opens chat search -->
+    <string name="drawer_search_chats">Search chats</string>
+    <!-- Filter chip: show chats from every folder -->
+    <string name="drawer_all_chats">All chats</string>
+    <!-- Content description of the button that creates a folder -->
+    <string name="drawer_new_folder">New folder</string>
+    <!-- Shown in the empty chat list -->
+    <string name="drawer_empty">Your chats will appear here.</string>
+    <!-- Section header above the pinned chats -->
+    <string name="drawer_section_pinned">Pinned</string>
+    <!-- Content description of the pin icon next to a pinned chat -->
+    <string name="drawer_pinned_icon">Pinned</string>
+    <!-- Link at the end of the chat list -->
+    <string name="drawer_archived_chats">Archived chats</string>
+    <!-- Menu item (verb) -->
+    <string name="drawer_move_to_folder">Move to folder</string>
+    <!-- Menu item (verb): archive this chat -->
+    <string name="drawer_archive">Archive</string>
+    <!-- Account footer when the sign-in expired -->
+    <string name="drawer_sign_in_again">Sign in again</string>
+    <string name="drawer_sync_is_paused">Sync is paused</string>
+    <!-- Account footer without an account -->
+    <string name="drawer_sign_in_to_sync">Sign in to sync</string>
+    <string name="drawer_local_only">Chats stay on this device</string>
+    <!-- Content description of the settings button -->
+    <string name="drawer_settings">Settings</string>
+    <!-- Sync status under the account name -->
+    <string name="drawer_syncing">Syncing…</string>
+    <string name="drawer_synced">Synced</string>
+    <string name="drawer_synced_just_now">Synced just now</string>
+    <!-- %1$s: when, e.g. "5 min. ago" or a short date such as "Oct 3" -->
+    <string name="drawer_synced_time">Synced %1$s</string>
+    <!-- Sync status: no internet connection -->
+    <string name="drawer_offline">Offline</string>
+    <string name="drawer_sync_problem">Sync problem</string>
+    <string name="drawer_sync_paused">Sync paused</string>
+    <string name="drawer_not_syncing">Not syncing</string>
+
+    <!-- Search -->
+    <!-- Placeholder of the search field -->
+    <string name="search_placeholder">Search all chats</string>
+    <string name="search_empty_title">Search everything</string>
+    <string name="search_empty_body">Find words in any chat, on any of your devices\' synced history.</string>
+    <string name="search_no_results_title">No results</string>
+    <!-- %1$s: what the person searched for -->
+    <string name="search_no_results_body">Nothing matches “%1$s”.</string>
+    <!-- Section header: chats whose title matches -->
+    <string name="search_section_chats">Chats</string>
+    <!-- Section header: messages that match -->
+    <string name="search_section_messages">Messages</string>
+
+    <!-- Archived chats screen -->
+    <!-- Screen title -->
+    <string name="search_archive_title">Archived chats</string>
+    <!-- Content description of a button -->
+    <string name="search_archive_delete_all">Delete all archived</string>
+    <string name="search_archive_empty_title">Nothing archived</string>
+    <string name="search_archive_empty_body">Archive chats from the chat list to tuck them away without deleting them.</string>
+    <!-- Content description of a button (verb): move the chat back to the chat list -->
+    <string name="search_archive_unarchive">Unarchive</string>
+    <!-- Dialog title -->
+    <string name="search_archive_delete_all_title">Delete all archived chats?</string>
+    <plurals name="search_archive_delete_all_body">
+        <item quantity="one">%1$d chat will be removed from all your devices.</item>
+        <item quantity="other">%1$d chats will be removed from all your devices.</item>
+    </plurals>
+    <!-- Dialog button -->
+    <string name="search_archive_delete_all_confirm">Delete all</string>
+
+    <!-- Sign in and create account -->
+    <!-- Shown when an error has no message of its own -->
+    <string name="auth_error_generic">Something went wrong.</string>
+    <!-- Screen title -->
+    <string name="auth_create_title">Create your account</string>
+    <!-- Screen title when signing in -->
+    <string name="auth_welcome_back">Welcome back</string>
+    <string name="auth_create_subtitle">Your chats, assistants and keys are encrypted on this device before they sync. Not even we can read them.</string>
+    <string name="auth_sign_in_subtitle">Sign in to sync your encrypted chats to this device.</string>
+    <!-- Text field label -->
+    <string name="auth_name_label">Name (optional)</string>
+    <!-- Text field placeholder -->
+    <string name="auth_name_placeholder">What should we call you?</string>
+    <!-- Email address: text field label and the tab for resetting the password by email -->
+    <string name="auth_email">Email</string>
+    <!-- Text field label -->
+    <string name="auth_password">Password</string>
+    <!-- Text field label -->
+    <string name="auth_confirm_password">Confirm password</string>
+    <!-- Error under a text field -->
+    <string name="auth_passwords_mismatch">Passwords don\'t match.</string>
+    <string name="auth_no_reset_warning">Because your data is end-to-end encrypted, we can\'t reset your password for you. You\'ll get a recovery code next. Keep it somewhere safe.</string>
+    <string name="auth_registration_closed">This server isn\'t accepting new accounts.</string>
+    <!-- Button text while an account is being created -->
+    <string name="auth_securing">Securing your account…</string>
+    <!-- Button text while signing in -->
+    <string name="auth_unlocking">Unlocking…</string>
+    <!-- Button -->
+    <string name="auth_create_account">Create account</string>
+    <!-- Link that switches the form to signing in -->
+    <string name="auth_switch_to_sign_in">Already have an account? Sign in</string>
+    <!-- Link that switches the form to creating an account -->
+    <string name="auth_switch_to_sign_up">New to Facet? Create an account</string>
+    <!-- Link -->
+    <string name="auth_forgot_password">Forgot password?</string>
+    <!-- Tappable line. %1$s: the sync server's address, e.g. facet.dtsoftware.io. "Change" is the action -->
+    <string name="auth_sync_server">Sync server: %1$s · Change</string>
+
+    <!-- Recovery code screen -->
+    <!-- Heading of the saved recovery code file, and the clipboard label -->
+    <string name="auth_recovery_file_title">Facet recovery code</string>
+    <!-- Second line of the saved recovery code file -->
+    <string name="auth_recovery_file_body">Keep this somewhere safe. It unlocks your encrypted data if you forget your password.</string>
+    <!-- Text shared to a password manager. %1$s: the recovery code -->
+    <string name="auth_recovery_share_text">Facet recovery code: %1$s</string>
+    <!-- Screen title -->
+    <string name="auth_recovery_title">Save your recovery code</string>
+    <string name="auth_recovery_after_reset">Your password was reset. Here is your new recovery code. Any older code no longer works.</string>
+    <string name="auth_recovery_regenerated">Here is your new recovery code. Your previous code no longer works.</string>
+    <string name="auth_recovery_new">If you forget your password, this code is the only way to unlock your encrypted data. We can\'t recover it for you.</string>
+    <!-- Button: save the recovery code as a text file -->
+    <string name="auth_recovery_save_file">Save file</string>
+    <!-- Button -->
+    <string name="auth_recovery_share">Share to a password manager</string>
+    <!-- Checkbox label -->
+    <string name="auth_recovery_saved">I saved my recovery code somewhere safe</string>
+
+    <!-- Forgot password -->
+    <!-- Screen title -->
+    <string name="auth_reset_title">Reset your password</string>
+    <!-- Text field label and the tab for resetting the password with the recovery code -->
+    <string name="auth_recovery_code">Recovery code</string>
+    <string name="auth_reset_keeps_data">Your data stays intact. You\'ll get a new recovery code afterwards.</string>
+    <!-- Text field label -->
+    <string name="auth_new_password">New password</string>
+    <!-- Text field label -->
+    <string name="auth_confirm_new_password">Confirm new password</string>
+    <!-- Button -->
+    <string name="auth_reset_password">Reset password</string>
+    <string name="auth_no_email">This sync server can\'t send email. Use your recovery code instead, or ask the server\'s operator.</string>
+    <string name="auth_email_reset_warning">Without your recovery code, your encrypted data on the server can\'t be unlocked, so it will be deleted. Chats on this device are uploaded again afterwards.</string>
+    <!-- Button -->
+    <string name="auth_email_me_code">Email me a code</string>
+    <!-- %1$s: an email address -->
+    <string name="auth_email_code_sent">If an account exists for %1$s, we sent an 8-digit code. It expires in 30 minutes.</string>
+    <!-- Text field label -->
+    <string name="auth_email_code_label">Code from the email</string>
+    <!-- Button: resets the password and deletes the encrypted data on the server -->
+    <string name="auth_reset_password_and_data">Reset password and data</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome_title">Every model.\nOne home.</string>
+    <string name="onboarding_welcome_body">Facet is a private, open-source chat app for your own OpenAI, Anthropic, Google and other API keys.</string>
+    <string name="onboarding_keys_point_title">Your keys, your bill</string>
+    <string name="onboarding_keys_point_body">Pay providers directly. See the cost of every reply.</string>
+    <string name="onboarding_encrypted_point_title">Encrypted end to end</string>
+    <string name="onboarding_encrypted_point_body">Chats and keys are locked on your device before they sync.</string>
+    <string name="onboarding_control_point_title">Full control</string>
+    <string name="onboarding_control_point_body">Reasoning effort, web search, and every model a provider offers.</string>
+    <!-- Button -->
+    <string name="onboarding_get_started">Get started</string>
+    <!-- Screen title -->
+    <string name="onboarding_sync_title">Sync, privately</string>
+    <string name="onboarding_sync_body">A free account keeps your chats, assistants and keys in step across your phone, tablet and future devices. Everything is encrypted with a key only you hold.</string>
+    <!-- Button -->
+    <string name="onboarding_create_account">Create an account</string>
+    <!-- Button -->
+    <string name="onboarding_have_account">I already have an account</string>
+    <!-- Button -->
+    <string name="onboarding_skip_account">Use without an account</string>
+    <string name="onboarding_skip_account_note">Without an account, everything stays on this device. You can create one later in Settings.</string>
+    <!-- Screen title: add an API key -->
+    <string name="onboarding_keys_title">Add a key</string>
+    <string name="onboarding_keys_body">Paste an API key from any provider. You can add more, and switch between all their models, any time.</string>
+    <!-- Link that shows the rest of the provider list -->
+    <string name="onboarding_more_providers">More providers</string>
+    <!-- Button -->
+    <string name="onboarding_skip_for_now">Skip for now</string>
+    <!-- Button -->
+    <string name="onboarding_start_chatting">Start chatting</string>
+
+    <!-- App updates: the update dialog and Settings > About > Updates -->
+    <!-- Title -->
+    <string name="update_allow_install_title">Allow Facet to install updates</string>
+    <!-- Title. %1$s: a version number such as 1.2.0 -->
+    <string name="update_updating_to">Updating to Facet %1$s</string>
+    <!-- Title. %1$s: a version number such as 1.2.0 -->
+    <string name="update_available_title">Facet %1$s is available</string>
+    <!-- %1$s: the installed version number, %2$s: the download size, e.g. 18.4 MB -->
+    <string name="update_installed_and_size">You have %1$s · %2$s download</string>
+    <!-- Download progress. %1$s: amount downloaded, %2$s: total size (e.g. 14.2 MB of 18.4 MB) -->
+    <string name="update_progress_bytes">%1$s of %2$s</string>
+    <string name="update_verifying">Checking the download…</string>
+    <!-- "Allow from this source" is the name of an Android setting: use Android's own wording for it in your language -->
+    <string name="update_permission_body">Android asks once before an app can install updates. On the next screen, turn on \"Allow from this source\", then come back to Facet.</string>
+    <string name="update_installing_body">Confirm the update in Android\'s prompt. Facet closes while it installs.</string>
+    <!-- Button (verb): download and install the update -->
+    <string name="update_update">Update</string>
+    <!-- Shown when an update has no release notes -->
+    <string name="update_no_notes">Bug fixes and improvements.</string>
+    <!-- Heading above the release notes -->
+    <string name="update_whats_new">What\'s new</string>
+    <!-- Settings section title -->
+    <string name="update_section_title">Updates</string>
+    <!-- Settings row (action) -->
+    <string name="update_check">Check for updates</string>
+    <!-- Settings switch -->
+    <string name="update_auto_check">Check for updates automatically</string>
+    <string name="update_auto_check_subtitle">Asks facet.dtsoftware.io for the latest version when Facet opens and every few hours. No personal data is sent.</string>
+    <!-- %1$s: a version number such as 1.2.0 -->
+    <string name="update_version">Version %1$s</string>
+    <!-- %1$s: a version number such as 1.2.0 -->
+    <string name="update_downloading_version">Downloading version %1$s</string>
+    <!-- "Allow from this source" is the name of an Android setting: use Android's own wording for it in your language -->
+    <string name="update_permission_short">Turn on \"Allow from this source\" for Facet, then come back.</string>
+    <!-- %1$s: a version number such as 1.2.0 -->
+    <string name="update_installing_version">Installing version %1$s</string>
+    <string name="update_confirm_prompt">Confirm the update in Android\'s prompt.</string>
+    <string name="update_checking">Checking for updates…</string>
+    <!-- %1$s: a version number such as 1.2.0 -->
+    <string name="update_version_available">Version %1$s is available</string>
+    <!-- %1$s: the installed version number -->
+    <string name="update_you_have">You have %1$s</string>
+    <string name="update_up_to_date">Facet is up to date</string>
+    <!-- When the app last checked for updates -->
+    <string name="update_checked_just_now">Checked just now</string>
+    <!-- When the app last checked for updates. %1$s: e.g. "5 min. ago" or a short date such as "Oct 3" -->
+    <string name="update_checked">Checked %1$s</string>
+    <string name="update_not_checked">Not checked yet</string>
+
+    <!-- Message formatting: code blocks, task lists, images -->
+    <!-- Content description of a code block button -->
+    <string name="markdown_wrap_lines">Wrap lines</string>
+    <!-- Content description of a code block button -->
+    <string name="markdown_unwrap_lines">Turn off line wrap</string>
+    <!-- Content description of a code block button -->
+    <string name="markdown_copy_code">Copy code</string>
+    <!-- Content description of a ticked checkbox in a task list: the task is completed -->
+    <string name="markdown_task_done">Done</string>
+    <!-- Shown in a message in place of an image that has no description -->
+    <string name="markdown_image">image</string>
+</resources>

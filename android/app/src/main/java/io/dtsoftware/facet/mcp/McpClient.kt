@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.mcp
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.net.SseReader
 import io.dtsoftware.facet.core.net.await
 import java.io.IOException
@@ -156,11 +158,12 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
                 }
                 if (result == null) {
                     notifyCancelled(id)
-                    throw McpException("${config.name} didn't answer within ${timeoutMs / 1000} seconds.")
+                    val seconds = (timeoutMs / 1000).toInt()
+                    throw McpException(Strings.plural(R.plurals.mcp_error_timeout, seconds, config.name, seconds))
                 }
                 return result
             } catch (e: SessionExpiredException) {
-                if (reinitialized) throw McpException("${config.name} keeps ending the session. Try again in a moment.")
+                if (reinitialized) throw McpException(Strings.get(R.string.mcp_error_session_ending, config.name))
                 reinitialized = true
                 invalidate(gen)
             } catch (e: UnauthorizedException) {
@@ -175,14 +178,14 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {
-                if (closed) throw McpException("This connection to ${config.name} was closed.")
-                throw McpException("Couldn't reach ${config.name}. Check the address and your connection.", cause = e)
+                if (closed) throw McpException(Strings.get(R.string.mcp_error_connection_closed, config.name))
+                throw McpException(Strings.get(R.string.mcp_error_unreachable, config.name), cause = e)
             }
         }
     }
 
     private suspend fun ensureSession(): Pair<McpServerInfo, Int> {
-        if (closed) throw McpException("This connection to ${config.name} was closed.")
+        if (closed) throw McpException(Strings.get(R.string.mcp_error_connection_closed, config.name))
         info?.let { return it to generation }
         return initMutex.withLock {
             info?.let { return@withLock it to generation }
@@ -195,11 +198,11 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
                     if (refreshed || !refreshTokens(e.tokenUsed)) throw McpAuthRequiredException(config.id, e.wwwAuthenticate)
                     refreshed = true
                 } catch (e: RpcErrorException) {
-                    throw McpException("${config.name} refused to start a session: ${e.message}")
+                    throw McpException(Strings.get(R.string.mcp_error_session_refused, config.name, e.message.orEmpty()))
                 } catch (e: SessionExpiredException) {
-                    throw McpException("Couldn't start a session with ${config.name}.")
+                    throw McpException(Strings.get(R.string.mcp_error_session_failed, config.name))
                 } catch (e: IOException) {
-                    throw McpException("Couldn't reach ${config.name}. Check the address and your connection.", cause = e)
+                    throw McpException(Strings.get(R.string.mcp_error_unreachable, config.name), cause = e)
                 }
             }
             @Suppress("UNREACHABLE_CODE")
@@ -226,7 +229,7 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
                 try {
                     initLegacy()
                 } catch (legacyError: McpException) {
-                    throw McpException("No MCP server answered at this address (HTTP ${e.status}).")
+                    throw McpException(Strings.get(R.string.mcp_error_no_server_status, e.status.toString()))
                 }
             }
         }
@@ -246,9 +249,9 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
 
     private fun serverInfo(result: JsonObject): McpServerInfo {
         val version = result.str("protocolVersion")
-            ?: throw McpException("${config.name} didn't say which MCP version it speaks.")
+            ?: throw McpException(Strings.get(R.string.mcp_error_no_version, config.name))
         if (version !in Mcp.SUPPORTED_VERSIONS) {
-            throw McpException("${config.name} uses MCP version $version, which Facet doesn't support yet.")
+            throw McpException(Strings.get(R.string.mcp_error_unsupported_version, config.name, version))
         }
         val si = result.obj("serverInfo")
         negotiated = version
@@ -318,12 +321,12 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
             code == 401 -> throw UnauthorizedException(challenge, tokenUsed)
             code == 403 && parseBearerChallenge(challenge)["error"] == "insufficient_scope" ->
                 throw McpAuthRequiredException(config.id, challenge)
-            code == 403 -> throw McpException("${config.name} refused access (HTTP 403).", 403)
+            code == 403 -> throw McpException(Strings.get(R.string.mcp_error_forbidden, config.name), 403)
             code == 404 && !initializing && sessionId != null -> throw SessionExpiredException()
-            code == 404 -> throw McpException("No MCP server was found at this address (HTTP 404).", 404)
-            code == 429 -> throw McpException("${config.name} is rate limiting requests. Try again shortly.", 429)
-            code >= 500 -> throw McpException("${config.name} had a server error (HTTP $code).", code)
-            else -> throw McpException("${config.name} rejected the request (HTTP $code).", code)
+            code == 404 -> throw McpException(Strings.get(R.string.mcp_error_not_found), 404)
+            code == 429 -> throw McpException(Strings.get(R.string.mcp_error_rate_limited, config.name), 429)
+            code >= 500 -> throw McpException(Strings.get(R.string.mcp_error_server, config.name, code.toString()), code)
+            else -> throw McpException(Strings.get(R.string.mcp_error_rejected, config.name, code.toString()), code)
         }
     }
 
@@ -335,7 +338,7 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
                 if (type.contains("text/event-stream")) {
                     val reader = SseReader(res.body.source())
                     while (true) {
-                        val ev = reader.next() ?: throw McpException("${config.name} closed the stream before answering.")
+                        val ev = reader.next() ?: throw McpException(Strings.get(R.string.mcp_error_stream_closed, config.name))
                         if (ev.event != null && ev.event != "message") continue
                         val msg = runCatching { Mcp.json.parseToJsonElement(ev.data) }.getOrNull() ?: continue
                         handleIncoming(msg, id)?.let { return@withContext it }
@@ -344,15 +347,15 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
                     error("unreachable")
                 } else {
                     val text = res.body.string()
-                    if (res.code == 202 || text.isBlank()) throw McpException("${config.name} accepted the request but sent no answer.")
-                    val notMcp = "The address answered, but not as an MCP server."
+                    if (res.code == 202 || text.isBlank()) throw McpException(Strings.get(R.string.mcp_error_no_answer, config.name))
+                    val notMcp = Strings.get(R.string.mcp_error_not_mcp)
                     val msg = try {
                         Mcp.json.parseToJsonElement(text)
                     } catch (e: SerializationException) {
                         throw McpException(notMcp)
                     }
                     if (msg !is JsonObject && msg !is JsonArray) throw McpException(notMcp)
-                    handleIncoming(msg, id) ?: throw McpException("${config.name} answered a different request.")
+                    handleIncoming(msg, id) ?: throw McpException(Strings.get(R.string.mcp_error_wrong_answer, config.name))
                 }
             }
         }
@@ -467,7 +470,7 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
                 // Stream dropped or was cancelled: fail pending requests below.
             } finally {
                 dead = true
-                endpoint.completeExceptionally(McpException("${config.name} closed the connection."))
+                endpoint.completeExceptionally(McpException(Strings.get(R.string.mcp_error_connection_ended, config.name)))
                 pending.values.forEach { it.completeExceptionally(SessionExpiredException()) }
                 pending.clear()
             }
@@ -519,7 +522,7 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
         }
         if (!response.isSuccessful || !response.header("Content-Type").orEmpty().contains("text/event-stream", ignoreCase = true)) {
             response.close()
-            throw McpException("No MCP server answered at this address.")
+            throw McpException(Strings.get(R.string.mcp_error_no_server))
         }
         val channel = LegacyChannel(call, response)
         try {
@@ -527,7 +530,7 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
         } catch (e: Exception) {
             channel.close()
             if (e is CancellationException && e !is kotlinx.coroutines.TimeoutCancellationException) throw e
-            throw McpException("${config.name} didn't send its message endpoint.")
+            throw McpException(Strings.get(R.string.mcp_error_no_endpoint, config.name))
         }
         legacy?.close()
         legacy = channel
@@ -536,7 +539,7 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
         negotiated = null
         val id = ids.getAndIncrement()
         val result = withTimeoutOrNull(REQUEST_TIMEOUT_MS) { legacyRequest(id, "initialize", initParams()) }
-            ?: throw McpException("${config.name} didn't answer the initialize request.")
+            ?: throw McpException(Strings.get(R.string.mcp_error_no_initialize, config.name))
         val built = serverInfo(result)
         legacyPost(channel, rpc(null, "notifications/initialized", null)).response.close()
         return built
@@ -551,7 +554,7 @@ class McpClient(val config: McpServerConfig, http: OkHttpClient, private val tok
                 when {
                     it.code == 401 -> throw UnauthorizedException(it.header("WWW-Authenticate"), sent.token)
                     it.code == 404 -> throw SessionExpiredException()
-                    !it.isSuccessful -> throw McpException("${config.name} rejected the request (HTTP ${it.code}).", it.code)
+                    !it.isSuccessful -> throw McpException(Strings.get(R.string.mcp_error_rejected, config.name, it.code.toString()), it.code)
                 }
             }
             val msg = deferred.await()

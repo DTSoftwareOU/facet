@@ -36,6 +36,11 @@ import okhttp3.OkHttpClient
 
 /** Manual dependency graph: small, explicit, and fast to start. */
 class AppContainer(private val app: Application) {
+    init {
+        // Text built outside Compose (errors, notifications) reads the app's language through Strings.
+        io.dtsoftware.facet.core.i18n.Strings.init(app)
+    }
+
     val appContext: android.content.Context get() = app
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val secrets = KeystoreSecretBox()

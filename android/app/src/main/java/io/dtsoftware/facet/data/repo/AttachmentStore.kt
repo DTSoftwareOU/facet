@@ -13,6 +13,8 @@ import android.util.LruCache
 import android.webkit.MimeTypeMap
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.Clock
 import io.dtsoftware.facet.core.util.Ids
 import io.dtsoftware.facet.data.AttachmentRef
@@ -59,7 +61,7 @@ class AttachmentStore(
             mime == "application/pdf" -> importRaw(uri, name, mime, "pdf", MAX_PDF, declaredSize)
             mime.startsWith("text/") || ext in TEXT_EXTENSIONS || mime in TEXT_MIMES ->
                 importRaw(uri, name, "text/plain", "text", MAX_TEXT, declaredSize)
-            else -> throw AttachmentException("Facet can attach images, PDFs and text files. \"$name\" isn't one of those.")
+            else -> throw AttachmentException(Strings.get(R.string.data_attach_unsupported, name))
         }
     }
 
@@ -67,12 +69,12 @@ class AttachmentStore(
         val cr = context.contentResolver
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         cr.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-        if (bounds.outWidth <= 0) throw AttachmentException("That image couldn't be read.")
+        if (bounds.outWidth <= 0) throw AttachmentException(Strings.get(R.string.data_attach_image_unreadable))
         var sample = 1
         while (bounds.outWidth / (sample * 2) >= MAX_EDGE && bounds.outHeight / (sample * 2) >= MAX_EDGE) sample *= 2
         val decoded = cr.openInputStream(uri)?.use {
             BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
-        } ?: throw AttachmentException("That image couldn't be read.")
+        } ?: throw AttachmentException(Strings.get(R.string.data_attach_image_unreadable))
         val orientation = runCatching {
             cr.openInputStream(uri)?.use { ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL) }
         }.getOrNull() ?: ExifInterface.ORIENTATION_NORMAL
@@ -112,7 +114,7 @@ class AttachmentStore(
     }
 
     private suspend fun importRaw(uri: Uri, name: String, mime: String, kind: String, max: Long, declared: Long): AttachmentEntity {
-        if (declared > max) throw AttachmentException("\"$name\" is larger than ${max / (1024 * 1024)} MB.")
+        if (declared > max) throw AttachmentException(Strings.get(R.string.data_attach_too_large, name, (max / (1024 * 1024)).toInt()))
         val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
             val buf = ByteArrayOutputStream()
             val chunk = ByteArray(64 * 1024)
@@ -121,11 +123,11 @@ class AttachmentStore(
                 val n = input.read(chunk)
                 if (n < 0) break
                 total += n
-                if (total > max) throw AttachmentException("\"$name\" is larger than ${max / (1024 * 1024)} MB.")
+                if (total > max) throw AttachmentException(Strings.get(R.string.data_attach_too_large, name, (max / (1024 * 1024)).toInt()))
                 buf.write(chunk, 0, n)
             }
             buf.toByteArray()
-        } ?: throw AttachmentException("\"$name\" couldn't be read.")
+        } ?: throw AttachmentException(Strings.get(R.string.data_attach_unreadable, name))
         val id = Ids.new()
         val fileName = "$id.${if (kind == "pdf") "pdf" else "txt"}"
         File(dir, fileName).writeBytes(bytes)

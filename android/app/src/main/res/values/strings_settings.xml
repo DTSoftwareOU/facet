@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings: main page -->
+    <string name="settings_title">Settings</string>
+    <!-- Content description of a shield icon next to the signed-in account -->
+    <string name="settings_e2e_encrypted">End-to-end encrypted</string>
+    <!-- Account card title when the session ended -->
+    <string name="settings_sign_in_again">Sign in again</string>
+    <!-- Account card title when not signed in -->
+    <string name="settings_sync_across_devices">Sync across devices</string>
+    <string name="settings_account_promo">End-to-end encrypted. Free and open source.</string>
+    <string name="settings_providers">Providers and keys</string>
+    <string name="settings_providers_empty">Add your first API key</string>
+    <!-- Subtitle of "Providers and keys": how many AI providers are set up -->
+    <plurals name="settings_providers_connected">
+        <item quantity="one">%1$d connected</item>
+        <item quantity="other">%1$d connected</item>
+    </plurals>
+    <string name="settings_assistants">Assistants</string>
+    <string name="settings_assistants_subtitle">Personas with their own instructions and model</string>
+    <string name="settings_prompts">Prompt library</string>
+    <!-- "/" is the character people type to open the prompt library -->
+    <string name="settings_prompts_subtitle">Type / in a message to insert</string>
+    <!-- Title of the chat preferences page (noun) -->
+    <string name="settings_chat">Chat</string>
+    <string name="settings_chat_subtitle">Custom instructions, defaults, titles</string>
+    <!-- Section title (noun) -->
+    <string name="settings_tools">Tools</string>
+    <string name="settings_web_search">Web search</string>
+    <string name="settings_web_search_subtitle">Search for any model with your own key</string>
+    <string name="settings_mcp_servers">MCP servers</string>
+    <string name="settings_mcp_servers_subtitle">Connect apps and data sources</string>
+    <string name="settings_skills">Skills</string>
+    <string name="settings_skills_subtitle">Reusable instructions models load on demand</string>
+    <string name="settings_media_models">Media models</string>
+    <string name="settings_media_models_subtitle">Images, video, voices, music and transcription</string>
+    <!-- "YOLO" is a name; keep it -->
+    <string name="settings_yolo_mode">YOLO mode</string>
+    <!-- %1$d: the maximum number of tool rounds per reply -->
+    <plurals name="settings_yolo_mode_subtitle">
+        <item quantity="one">Run every tool without asking, and allow up to %1$d tool round per reply.</item>
+        <item quantity="other">Run every tool without asking, and allow up to %1$d tool rounds per reply.</item>
+    </plurals>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_privacy">Privacy and security</string>
+    <string name="settings_data">Data and storage</string>
+    <string name="settings_about_facet">About Facet AI</string>
+
+    <!-- Settings: Appearance -->
+    <!-- Section title: the color theme (noun) -->
+    <string name="settings_theme">Theme</string>
+    <!-- Theme choice: follow the system's light or dark setting -->
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <!-- Theme choice: pure black background (for OLED screens) -->
+    <string name="settings_theme_black">Black</string>
+    <string name="settings_wallpaper_colors">Wallpaper colors</string>
+    <!-- "Material You" is Android's name for wallpaper-based colors; keep it -->
+    <string name="settings_wallpaper_colors_subtitle">Tint accents with your Material You palette.</string>
+    <string name="settings_reduce_motion">Reduce motion</string>
+    <string name="settings_reduce_motion_subtitle">Replace movement with simple fades.</string>
+    <!-- Vibration feedback on taps -->
+    <string name="settings_haptics">Haptics</string>
+    <string name="settings_text_size">Chat text size</string>
+    <!-- Sample sentence that previews the chosen text size; any natural sentence of similar length works -->
+    <string name="settings_text_size_preview">The quick brown fox explains quantum tunneling in plain words.</string>
+
+    <!-- Settings: Chat -->
+    <!-- A model that is no longer offered by its provider -->
+    <string name="settings_model_unavailable">Unavailable</string>
+    <!-- Section title -->
+    <string name="settings_custom_instructions">Custom instructions</string>
+    <string name="settings_use_custom_instructions">Use custom instructions</string>
+    <string name="settings_use_custom_instructions_subtitle">Applied to every new message, with any assistant.</string>
+    <string name="settings_about_me_label">What should Facet know about you?</string>
+    <!-- Placeholder example of what someone might write about themselves -->
+    <string name="settings_about_me_placeholder">e.g. I\'m a backend developer in Lisbon. I prefer metric units.</string>
+    <string name="settings_response_style_label">How should Facet respond?</string>
+    <!-- Placeholder example of instructions for the style of replies -->
+    <string name="settings_response_style_placeholder">e.g. Be direct. Skip the preamble. Use tables for comparisons.</string>
+    <string name="settings_instructions_supporting">Synced across your devices and end-to-end encrypted.</string>
+    <!-- Button -->
+    <string name="settings_save_instructions">Save instructions</string>
+    <!-- Section title -->
+    <string name="settings_models">Models</string>
+    <string name="settings_default_model">Default model for new chats</string>
+    <string name="settings_title_model">Model for chat titles</string>
+    <!-- Title model choice: use the chat's own model -->
+    <string name="settings_title_model_same">Same as the chat</string>
+    <string name="settings_auto_title">Name chats automatically</string>
+    <!-- Section title -->
+    <string name="settings_behavior">Behavior</string>
+    <string name="settings_send_with_enter">Send with Enter</string>
+    <string name="settings_send_with_enter_subtitle">Use Shift+Enter or the keyboard\'s newline key for line breaks.</string>
+    <string name="settings_expand_reasoning">Expand reasoning</string>
+    <string name="settings_expand_reasoning_subtitle">Show the model\'s reasoning open by default.</string>
+    <string name="settings_show_tokens">Show token counts</string>
+    <string name="settings_show_cost">Show estimated cost</string>
+    <string name="settings_pricing_feed">Live pricing data</string>
+    <string name="settings_pricing_feed_subtitle">Daily public price list from openrouter.ai, used for cost estimates. No personal data is sent.</string>
+    <string name="settings_notify">Notify when a reply finishes</string>
+    <string name="settings_notify_subtitle">Only while Facet is in the background.</string>
+
+    <!-- Settings: Privacy and security -->
+    <string name="settings_app_lock">App lock</string>
+    <string name="settings_app_lock_subtitle">Require your fingerprint, face or screen lock to open Facet.</string>
+    <!-- Error when turning on app lock on a device without a PIN, pattern or password -->
+    <string name="settings_app_lock_no_screen_lock">Set up a screen lock on this device first.</string>
+    <!-- Title of the system fingerprint or screen lock prompt when turning on app lock -->
+    <string name="settings_app_lock_prompt">Turn on app lock</string>
+    <string name="settings_hide_recents">Hide in recent apps</string>
+    <string name="settings_hide_recents_subtitle">Blanks Facet in the app switcher and blocks screenshots.</string>
+    <string name="settings_protection_title">How Facet protects your data</string>
+    <string name="settings_protection_direct">Messages go straight from this device to the provider you choose. Facet\'s servers never see them.</string>
+    <string name="settings_protection_encrypted">Synced chats, files, assistants and API keys are encrypted on your device with a key only you hold. The sync server stores ciphertext it can\'t read.</string>
+    <string name="settings_protection_password">Your password never leaves the device. It\'s turned into a login key and an encryption key here.</string>
+    <string name="settings_protection_keystore">API keys are also sealed with a hardware-backed key in Android\'s keystore.</string>
+    <string name="settings_protection_no_tracking">No ads, no analytics, no tracking.</string>
+
+    <!-- Settings: Data and storage -->
+    <string name="settings_export_saved">Export saved.</string>
+    <string name="settings_export_failed">Export failed.</string>
+    <!-- Section title (noun) -->
+    <string name="settings_export">Export</string>
+    <string name="settings_export_all">Export all data</string>
+    <string name="settings_export_all_subtitle">Chats, assistants, prompts and settings as JSON. API keys are not included.</string>
+    <!-- Section title -->
+    <string name="settings_maintenance">Maintenance</string>
+    <string name="settings_reset_quirks">Reset learned model quirks</string>
+    <string name="settings_reset_quirks_subtitle">Facet remembers parameters a model rejected. Reset if a provider changed its API.</string>
+    <!-- Confirmation shown after resetting -->
+    <string name="settings_quirks_reset_done">Model quirks reset.</string>
+    <string name="settings_delete_all_chats">Delete all chats</string>
+    <string name="settings_delete_all_chats_subtitle">Removes every chat from all your devices.</string>
+    <!-- Dialog title -->
+    <string name="settings_delete_all_chats_title">Delete all chats?</string>
+    <string name="settings_delete_all_chats_body">Every chat will be removed from all your devices. This can\'t be undone.</string>
+    <!-- Dialog button -->
+    <string name="settings_delete_everything">Delete everything</string>
+    <string name="settings_all_chats_deleted">All chats deleted.</string>
+
+    <!-- Settings: About -->
+    <!-- Page title -->
+    <string name="settings_about">About</string>
+    <!-- %1$s: the app version, e.g. 1.1.0 -->
+    <string name="settings_version">Version %1$s</string>
+    <!-- "DT Software OÜ" is a company name; keep it -->
+    <string name="settings_about_tagline">Every model, one home. Open source and end-to-end encrypted.\nMade by DT Software OÜ.</string>
+    <string name="settings_about_disclaimer">Facet is independent and isn\'t affiliated with or endorsed by any AI provider. Product and model names are trademarks of their owners.</string>
+    <string name="settings_website">Website</string>
+    <string name="settings_source_code">Source code</string>
+    <string name="settings_privacy_policy">Privacy policy</string>
+    <!-- Link to the terms of service -->
+    <string name="settings_terms">Terms</string>
+    <string name="settings_licenses">Open-source licenses</string>
+    <!-- %1$s: a license name and project address (stays English). OFL is the SIL Open Font License; keep it -->
+    <string name="settings_license_math_fonts">%1$s (math fonts under OFL)</string>
+
+    <!-- Account -->
+    <string name="account_title">Account</string>
+    <string name="account_resume_title">Sign in to resume sync</string>
+    <string name="account_sync_title">Sync across your devices</string>
+    <!-- %1$s: the account's email address -->
+    <string name="account_expired_body">Your session for %1$s ended. Your chats are still on this device.</string>
+    <string name="account_sync_body">Keep chats, assistants and API keys in step on every device. Everything is encrypted before it leaves your phone.</string>
+    <!-- Button -->
+    <string name="account_create">Create a free account</string>
+    <!-- Section and sheet title (noun) -->
+    <string name="account_sync_server">Sync server</string>
+    <!-- "DT Software" is a company name -->
+    <string name="account_server_hosted">Hosted by DT Software</string>
+    <string name="account_server_self_hosted">Self-hosted</string>
+    <string name="account_self_host_note">Facet is open source. You can run your own sync server and point the app at it before signing in.</string>
+    <string name="account_server_address">Server address</string>
+    <!-- %1$s: an example web address -->
+    <string name="account_server_hint">The address of a Facet sync server, e.g. %1$s</string>
+    <!-- Button: use the default sync server -->
+    <string name="account_use_default">Use default</string>
+    <string name="account_server_unreachable">No Facet server answered at that address.</string>
+    <string name="account_e2e_sync">End-to-end encrypted sync</string>
+    <string name="account_syncing">Syncing now…</string>
+    <string name="account_last_synced_just_now">Last synced just now</string>
+    <!-- %1$s: a relative time such as "5 min. ago", or a short date -->
+    <string name="account_last_synced">Last synced %1$s</string>
+    <string name="account_up_to_date">Up to date</string>
+    <string name="account_waiting_to_sync">Waiting to sync</string>
+    <!-- Button -->
+    <string name="account_sync_now">Sync now</string>
+    <!-- %1$s: storage used, %2$s: storage available (sizes such as "14.2 MB") -->
+    <string name="account_storage_used">%1$s of %2$s sync storage used</string>
+    <string name="account_display_name">Display name</string>
+    <!-- Row title, sheet title and button -->
+    <string name="account_change_password">Change password</string>
+    <string name="account_recovery_code">Recovery code</string>
+    <string name="account_recovery_code_subtitle">Create a new code if you lost yours</string>
+    <string name="account_devices">Signed-in devices</string>
+    <!-- Row title and button -->
+    <string name="account_delete">Delete account</string>
+    <!-- %1$s: the sync server's address -->
+    <string name="account_server">Server: %1$s</string>
+    <string name="account_new_recovery_title">New recovery code</string>
+    <string name="account_new_recovery_body">Your current recovery code will stop working. Enter your password to continue.</string>
+    <!-- Button -->
+    <string name="account_new_recovery_action">Create new code</string>
+    <string name="account_sign_out_title">Sign out?</string>
+    <string name="account_sign_out_body">Your data stays safe in your account. Choose whether to keep a copy on this device.</string>
+    <!-- Button -->
+    <string name="account_sign_out_remove">Sign out and remove data from this device</string>
+    <!-- Button -->
+    <string name="account_sign_out_keep">Sign out and keep data here</string>
+    <string name="account_delete_title">Delete your account?</string>
+    <string name="account_delete_body">This permanently deletes your account and all synced data on the server, for every device. Chats stay on this device unless you remove them.</string>
+    <string name="account_password_changed">Password changed. Other devices were signed out and will ask for the new password.</string>
+    <string name="account_current_password">Current password</string>
+    <string name="account_new_password">New password</string>
+    <string name="account_confirm_password">Confirm new password</string>
+    <!-- Text field label -->
+    <string name="account_password">Password</string>
+    <!-- Error when an action failed without a reason -->
+    <string name="account_generic_error">That didn\'t work.</string>
+    <!-- Password strength hints under a new password field -->
+    <string name="account_password_hint">At least 10 characters. A passphrase of a few words works well.</string>
+    <!-- %1$d: how many more characters the password needs -->
+    <plurals name="account_password_more">
+        <item quantity="one">%1$d more character</item>
+        <item quantity="other">%1$d more characters</item>
+    </plurals>
+    <string name="account_password_good">Good. Longer is even stronger.</string>
+    <!-- Password strength -->
+    <string name="account_password_strong">Strong</string>
+    <string name="account_devices_error">Couldn\'t load devices</string>
+    <string name="account_unknown_device">Unknown device</string>
+    <string name="account_unknown_this_device">Unknown device (this device)</string>
+    <!-- %1$s: a device name, e.g. Pixel 8 -->
+    <string name="account_this_device">%1$s (this device)</string>
+    <!-- When a signed-in device was last used -->
+    <string name="account_active_just_now">Active just now</string>
+    <!-- %1$s: a relative time such as "5 min. ago", or a short date -->
+    <string name="account_active">Active %1$s</string>
+    <string name="account_sign_out_others">Sign out of all other devices</string>
+
+    <!-- Data and storage: storage -->
+    <string name="storage_sync_title">Sync storage</string>
+    <!-- %1$s: storage used, %2$s: storage available (sizes such as "14.2 MB") -->
+    <string name="storage_used_of_total">%1$s of %2$s</string>
+    <!-- Legend of the storage bar -->
+    <string name="storage_chats_settings">Chats &amp; settings</string>
+    <!-- Legend of the storage bar -->
+    <string name="storage_files">Files</string>
+    <string name="storage_note_ok">Everything here is end-to-end encrypted. Chats are compressed before upload; files sync until the space is used.</string>
+    <string name="storage_note_full_auto">Storage is full and this phone has no older files left to clear. New changes wait here until you free up space below or delete old chats.</string>
+    <string name="storage_note_full">Storage is full. New changes and files wait on this device until you free up space below or delete old chats.</string>
+    <string name="storage_auto_free">Free up space automatically</string>
+    <string name="storage_auto_free_subtitle">When storage is full, the oldest files leave sync storage. They stay on the devices that have them.</string>
+    <!-- %1$d: number of files, %2$s: their total size (e.g. "14.2 MB") -->
+    <plurals name="storage_cleanup_just_now">
+        <item quantity="one">Last clean-up, just now: cleared %1$d old file (%2$s) from sync storage.</item>
+        <item quantity="other">Last clean-up, just now: cleared %1$d old files (%2$s) from sync storage.</item>
+    </plurals>
+    <!-- %1$d: number of files, %2$s: their total size (e.g. "14.2 MB"), %3$s: a relative time such as "5 min. ago", or a short date -->
+    <plurals name="storage_cleanup">
+        <item quantity="one">Last clean-up, %3$s: cleared %1$d old file (%2$s) from sync storage.</item>
+        <item quantity="other">Last clean-up, %3$s: cleared %1$d old files (%2$s) from sync storage.</item>
+    </plurals>
+    <!-- Section title -->
+    <string name="storage_device_title">On this device</string>
+    <string name="storage_device_used">Used on this phone</string>
+    <string name="storage_calculating">Calculating…</string>
+    <string name="storage_remove_copies">Remove downloaded copies</string>
+    <string name="storage_remove_copies_subtitle">Files already in your sync storage download again when you open them.</string>
+    <!-- %1$s: a size such as "14.2 MB" -->
+    <string name="storage_freed">Freed %1$s on this device.</string>
+    <string name="storage_nothing_to_remove">Nothing to remove.</string>
+    <plurals name="storage_device_only">
+        <item quantity="one">%1$d file is only on this device</item>
+        <item quantity="other">%1$d files are only on this device</item>
+    </plurals>
+    <!-- Subtitle under files that are only on this device, when there is exactly one such file ("it": that file) -->
+    <string name="storage_device_only_subtitle_one">Cleared from sync storage to make room. Tap to upload it again if there\'s space.</string>
+    <!-- The same, when there are two or more such files ("them": those files) -->
+    <string name="storage_device_only_subtitle_many">Cleared from sync storage to make room. Tap to upload them again if there\'s space.</string>
+    <string name="storage_retrying">Trying again. Files upload while there\'s space.</string>
+    <!-- Section title -->
+    <string name="storage_largest">Largest files</string>
+    <!-- File status -->
+    <string name="storage_status_device_only">This device only</string>
+    <!-- File status -->
+    <string name="storage_status_synced">Synced</string>
+    <!-- File status -->
+    <string name="storage_status_waiting">Waiting to sync</string>
+    <!-- Button: remove a file from sync storage, keeping it on this device -->
+    <string name="storage_free_up">Free up</string>
+    <!-- %1$s: a file name -->
+    <string name="storage_kept_on_device">%1$s is now kept on this device only.</string>
+    <string name="storage_free_failed">Couldn\'t free that file. Check your connection.</string>
+
+    <!-- Settings: Your PC -->
+    <!-- Page and row title -->
+    <string name="pcsettings_title">Your PC</string>
+    <!-- Choice under "Ask before": ask before every action on the PC -->
+    <string name="pcsettings_ask_every_action">Every action</string>
+    <!-- Choice under "Ask before" (noun): ask before commands and file changes -->
+    <string name="pcsettings_ask_changes">Changes</string>
+    <!-- Choice under "Ask before": never ask -->
+    <string name="pcsettings_ask_never">Never</string>
+    <string name="pcsettings_blurb_always">Ask before every command and every file the model reads or changes.</string>
+    <string name="pcsettings_blurb_writes">Ask before commands and file changes. Reading and searching files runs without asking.</string>
+    <string name="pcsettings_blurb_never">Run everything on your PC without asking.</string>
+    <!-- "Facet for Windows" is the product name of the PC app; keep it -->
+    <string name="pcsettings_subtitle_none">Use Facet for Windows from this device</string>
+    <!-- %1$s: a PC's name -->
+    <string name="pcsettings_subtitle_one">%1$s is online</string>
+    <plurals name="pcsettings_subtitle_many">
+        <item quantity="one">%1$d PC online</item>
+        <item quantity="other">%1$d PCs online</item>
+    </plurals>
+    <string name="pcsettings_intro">While Facet for Windows runs on your PC, chats here can run commands and edit files in a folder there, and continue Claude Code and Codex sessions. Messages between your devices are end-to-end encrypted.</string>
+    <!-- Section title: PCs that are online right now -->
+    <string name="pcsettings_online_now">Online now</string>
+    <string name="pcsettings_sign_in">Sign in to use your PC</string>
+    <string name="pcsettings_sign_in_subtitle">Your PC and this device need the same Facet account.</string>
+    <string name="pcsettings_none_online">No PC is online</string>
+    <string name="pcsettings_none_online_subtitle">Open Facet on your PC and sign in with this account.</string>
+    <!-- PC status: ready to be used from this device -->
+    <string name="pcsettings_ready">Ready</string>
+    <!-- Label above the choices "Every action", "Changes", "Never" -->
+    <string name="pcsettings_ask_before">Ask before</string>
+    <string name="pcsettings_yolo_on">YOLO mode is on, so actions on your PC run without asking. Turn it off in Settings to use this.</string>
+    <!-- "/pc" is a command; keep it -->
+    <string name="pcsettings_how_to_pick">To pick a PC and folder for a chat, tap the PC chip above the message box, or type /pc.</string>
+
+    <!-- App lock -->
+    <!-- Title of the system fingerprint or screen lock prompt -->
+    <string name="lock_prompt_title">Unlock Facet</string>
+    <string name="lock_locked">Facet is locked</string>
+    <!-- Button -->
+    <string name="lock_unlock">Unlock</string>
+</resources>

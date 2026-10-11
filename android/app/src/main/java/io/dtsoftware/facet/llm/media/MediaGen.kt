@@ -1,5 +1,8 @@
 package io.dtsoftware.facet.llm.media
 
+import androidx.annotation.StringRes
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.net.HttpStatusException
 import io.dtsoftware.facet.core.net.await
 import io.dtsoftware.facet.core.net.fetchString
@@ -43,10 +46,13 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 /** Shape of a picture or video. */
 @kotlinx.serialization.Serializable
-enum class Aspect(val label: String, val ratio: String) {
-    SQUARE("Square", "1:1"),
-    PORTRAIT("Portrait", "9:16"),
-    LANDSCAPE("Landscape", "16:9"),
+enum class Aspect(@StringRes val labelRes: Int, val ratio: String) {
+    SQUARE(R.string.mediagen_aspect_square, "1:1"),
+    PORTRAIT(R.string.mediagen_aspect_portrait, "9:16"),
+    LANDSCAPE(R.string.mediagen_aspect_landscape, "16:9");
+
+    /** The shape's name in the app's language. */
+    val label: String get() = Strings.get(labelRes)
 }
 
 /** What to make. [seconds] applies to video and music; [voice] to speech. */
@@ -143,7 +149,7 @@ object MediaGen {
             }
         }.getOrDefault(emptyList()).ifEmpty { listOf(Voice(ELEVEN_DEFAULT_VOICE, "George")) }
         // Mistral voices are the ones saved (or cloned) in your Mistral account; "" lets Mistral pick.
-        ProviderKind.MISTRAL -> listOf(Voice("", "Default voice")) + runCatching {
+        ProviderKind.MISTRAL -> listOf(Voice("", Strings.get(R.string.mediagen_default_voice))) + runCatching {
             val res = parseJsonOrNull(http.fetchString(authorize(config, Request.Builder().url("${config.baseUrl.trimBaseUrl()}/audio/voices")).get().build()))
             val items = (res as? kotlinx.serialization.json.JsonArray)
                 ?: (res as? JsonObject)?.let { it.arr("data") ?: it.arr("voices") ?: it.arr("items") }
@@ -220,10 +226,10 @@ object MediaGen {
                     }
                 }
                 val res = json(http, post(config, "$base/images/generations", body.toString().toJsonBody()))
-                val first = res.arr("data")?.firstOrNull() as? JsonObject ?: throw failure(config, "returned no image")
+                val first = res.arr("data")?.firstOrNull() as? JsonObject ?: throw failure(R.string.mediagen_no_image, config)
                 first.str("b64_json")?.let { fileFromBase64(it, null) }
                     ?: first.str("url")?.let { download(http, it, null) }
-                    ?: throw failure(config, "returned no image")
+                    ?: throw failure(R.string.mediagen_no_image, config)
             }
         }
     }
@@ -244,7 +250,9 @@ object MediaGen {
         val res = json(http, post(config, "${config.baseUrl.trimBaseUrl()}/chat/completions", body.toString().toJsonBody()))
         val message = (res.arr("choices")?.firstOrNull() as? JsonObject)?.obj("message")
         val url = (message?.arr("images")?.firstOrNull() as? JsonObject)?.obj("image_url")?.str("url")
-            ?: throw failure(config, "didn't return an image" + (message?.str("content")?.takeIf { it.isNotBlank() }?.let { ": ${it.take(200)}" } ?: ""))
+            ?: throw message?.str("content")?.takeIf { it.isNotBlank() }
+                ?.let { failure(R.string.mediagen_no_image_reason, config, it.take(200)) }
+                ?: failure(R.string.mediagen_no_image_plain, config)
         return if (url.startsWith("data:")) fileFromDataUrl(url) else download(http, url, null)
     }
 
@@ -277,21 +285,21 @@ object MediaGen {
         }
         val start = json(http, post(config, "${config.baseUrl.trimBaseUrl()}/v1/$id", body.toString().toJsonBody()))
         val pollUrl = start.str("polling_url") ?: start.str("id")?.let { "${config.baseUrl.trimBaseUrl()}/v1/get_result?id=$it" }
-            ?: throw failure(config, "didn't start the image")
+            ?: throw failure(R.string.mediagen_image_not_started, config)
         val began = System.currentTimeMillis()
         while (System.currentTimeMillis() - began < MAX_POLL_MS) {
             delay(1_500)
             val res = json(http, authorize(config, Request.Builder().url(pollUrl)).get().build())
-            when (res.str("status")) {
+            when (val status = res.str("status")) {
                 "Ready" -> {
-                    val sample = res.obj("result")?.str("sample") ?: throw failure(config, "returned no image")
+                    val sample = res.obj("result")?.str("sample") ?: throw failure(R.string.mediagen_no_image, config)
                     return download(http, sample, null, withAuth = null)
                 }
                 "Pending", "Queued", "Processing", null -> Unit
-                else -> throw failure(config, "couldn't make that image (${res.str("status")})")
+                else -> throw failure(R.string.mediagen_image_failed_status, config, status.orEmpty())
             }
         }
-        throw failure(config, "took too long to make the image")
+        throw failure(R.string.mediagen_image_timeout, config)
     }
 
     // ------------------------------------------------------------------ video
@@ -300,7 +308,7 @@ object MediaGen {
         if (config.kind != ProviderKind.GOOGLE) unsupported(config, ModelOutput.VIDEO)
         val aspect = if (job.aspect == Aspect.PORTRAIT) "9:16" else "16:9"
         if (!id.startsWith("veo")) {
-            onProgress("Creating video")
+            onProgress(Strings.get(R.string.mediagen_creating_video))
             return interaction(config, http, id, job.prompt, "video") { put("aspect_ratio", aspect) }
         }
         // Veo: long-running operation, polled until done.
@@ -310,22 +318,25 @@ object MediaGen {
             putJsonObject("parameters") { put("aspectRatio", aspect) }
         }
         val op = json(http, post(config, "$native/models/$id:predictLongRunning", body.toString().toJsonBody()))
-        val name = op.str("name") ?: throw failure(config, "didn't start the video")
+        val name = op.str("name") ?: throw failure(R.string.mediagen_video_not_started, config)
         val began = System.currentTimeMillis()
         while (System.currentTimeMillis() - began < MAX_POLL_MS) {
             delay(8_000)
             val elapsed = (System.currentTimeMillis() - began) / 1000
-            onProgress("Creating video · ${elapsed / 60}:${(elapsed % 60).toString().padStart(2, '0')}")
+            onProgress(Strings.get(R.string.mediagen_creating_video_time, "${elapsed / 60}:${(elapsed % 60).toString().padStart(2, '0')}"))
             val res = json(http, authorize(config, Request.Builder().url("$native/$name")).get().build())
-            res.obj("error")?.let { throw failure(config, it.str("message") ?: "couldn't make that video") }
+            res.obj("error")?.let { e ->
+                throw e.str("message")?.let { failure(R.string.mediagen_video_failed_reason, config, it) }
+                    ?: failure(R.string.mediagen_video_failed, config)
+            }
             if (res["done"]?.toString() == "true") {
                 val uri = res.obj("response")?.obj("generateVideoResponse")?.arr("generatedSamples")
                     ?.firstOrNull()?.let { it as? JsonObject }?.obj("video")?.str("uri")
-                    ?: throw failure(config, "finished without a video (it may have been filtered)")
+                    ?: throw failure(R.string.mediagen_video_filtered, config)
                 return download(http, uri, "video/mp4", withAuth = config)
             }
         }
-        throw failure(config, "took too long to make the video")
+        throw failure(R.string.mediagen_video_timeout, config)
     }
 
     // ------------------------------------------------------------------ speech
@@ -361,7 +372,7 @@ object MediaGen {
                     if (voice.isNotBlank()) put("voice_id", voice)
                 }
                 val res = json(http, post(config, "$base/audio/speech", body.toString().toJsonBody()))
-                res.str("audio_data")?.let { fileFromBase64(it, "audio/mpeg") } ?: throw failure(config, "returned no audio")
+                res.str("audio_data")?.let { fileFromBase64(it, "audio/mpeg") } ?: throw failure(R.string.mediagen_no_audio, config)
             }
             ProviderKind.DEEPGRAM -> {
                 val url = "$base/v1/speak".toHttpUrl().newBuilder()
@@ -444,15 +455,16 @@ object MediaGen {
 
     private suspend fun interactionResult(config: ProviderConfig, http: OkHttpClient, body: JsonObject, type: String): MediaFile {
         val res = json(http, post(config, "${geminiNative(config)}/interactions", body.toString().toJsonBody()))
-        (res.arr("errors")?.firstOrNull() as? JsonObject)?.let { throw failure(config, it.str("message") ?: "couldn't make that") }
+        (res.arr("errors")?.firstOrNull() as? JsonObject)?.let { e ->
+            throw e.str("message")?.let { failure(R.string.mediagen_failed_reason, config, it) } ?: failure(R.string.mediagen_failed, config)
+        }
         val blocks = res.arr("steps").orEmpty().mapNotNull { it as? JsonObject }
             .flatMap { step -> step.arr("content").orEmpty().mapNotNull { it as? JsonObject } }
             .filter { it.str("type") == type }
-        val block = blocks.lastOrNull()
-            ?: throw failure(config, "returned no $type" + (res.str("status")?.let { " (status: $it)" } ?: ""))
+        val block = blocks.lastOrNull() ?: throw noResult(config, type, res.str("status"))
         val mime = block.str("mime_type")
         block.str("data")?.let { return normalizeAudio(fileFromBase64(it, mime)) }
-        val uri = block.str("uri") ?: throw failure(config, "returned no $type")
+        val uri = block.str("uri") ?: throw noResult(config, type, null)
         val url = if (uri.startsWith("http")) uri else "${geminiNative(config)}/$uri:download?alt=media"
         return normalizeAudio(download(http, url, mime, withAuth = config))
     }
@@ -579,10 +591,28 @@ object MediaGen {
         else -> "bin"
     }
 
-    private fun failure(config: ProviderConfig, what: String) = LlmException(LlmError(ErrorKind.UNKNOWN, "${config.label} $what."))
+    /** A failed job; [message] is a sentence whose first argument is the provider's name. */
+    private fun failure(@StringRes message: Int, config: ProviderConfig, vararg more: Any) =
+        LlmException(LlmError(ErrorKind.UNKNOWN, Strings.get(message, config.label, *more)))
 
-    private fun unsupported(config: ProviderConfig, output: ModelOutput): Nothing =
-        throw LlmException(LlmError(ErrorKind.BAD_REQUEST, "Facet can't make ${output.what} with ${config.label} yet."))
+    /** No [type] ("image", "video" or "audio") in an Interactions API result. */
+    private fun noResult(config: ProviderConfig, type: String, status: String?): LlmException = when (type) {
+        "image" -> if (status != null) failure(R.string.mediagen_no_image_status, config, status) else failure(R.string.mediagen_no_image, config)
+        "video" -> if (status != null) failure(R.string.mediagen_no_video_status, config, status) else failure(R.string.mediagen_no_video, config)
+        else -> if (status != null) failure(R.string.mediagen_no_audio_status, config, status) else failure(R.string.mediagen_no_audio, config)
+    }
+
+    private fun unsupported(config: ProviderConfig, output: ModelOutput): Nothing {
+        val message = when (output) {
+            ModelOutput.TEXT -> R.string.mediagen_unsupported_chat
+            ModelOutput.IMAGE -> R.string.mediagen_unsupported_images
+            ModelOutput.VIDEO -> R.string.mediagen_unsupported_video
+            ModelOutput.SPEECH -> R.string.mediagen_unsupported_speech
+            ModelOutput.MUSIC -> R.string.mediagen_unsupported_music
+            ModelOutput.TRANSCRIPTION -> R.string.mediagen_unsupported_transcripts
+        }
+        throw LlmException(LlmError(ErrorKind.BAD_REQUEST, Strings.get(message, config.label)))
+    }
 
     private const val ELEVEN_DEFAULT_VOICE = "JBFqnCBsd6RMkjVDRZzb"
 

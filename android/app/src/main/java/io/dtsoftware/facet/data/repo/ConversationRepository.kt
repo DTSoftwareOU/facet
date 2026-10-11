@@ -1,6 +1,8 @@
 package io.dtsoftware.facet.data.repo
 
 import androidx.room.withTransaction
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.core.util.Clock
 import io.dtsoftware.facet.core.util.Ids
@@ -40,7 +42,7 @@ class ConversationRepository(
         val now = Clock.now()
         val c = ConversationEntity(
             id = Ids.new(),
-            title = "New chat",
+            title = Strings.get(R.string.shortcut_new_chat),
             assistantId = assistantId,
             folderId = folderId,
             providerId = providerId,
@@ -78,7 +80,7 @@ class ConversationRepository(
         onLocalChange()
     }
 
-    suspend fun rename(id: String, title: String) = update(id) { it.copy(title = title.trim().ifEmpty { "Untitled" }, titleSet = true) }
+    suspend fun rename(id: String, title: String) = update(id) { it.copy(title = title.trim().ifEmpty { Strings.get(R.string.common_untitled) }, titleSet = true) }
     suspend fun setPinned(id: String, pinned: Boolean) = update(id) { it.copy(pinned = pinned) }
     suspend fun setArchived(id: String, archived: Boolean) = update(id) { it.copy(archived = archived) }
     suspend fun moveToFolder(id: String, folderId: String?) = update(id) { it.copy(folderId = folderId) }

@@ -1,7 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Interface text, in English. Every other values-<lang>/ folder translates each of these files
+  (StringResourcesTest checks that they're complete). Keys are grouped by screen in
+  strings_<area>.xml; this file has the app name, launcher text and words used everywhere.
+  Text sent to models, tool schemas, brand and model names, and logs stay in Kotlin, in English.
+-->
 <resources>
-    <string name="app_name">Facet AI</string>
+    <string name="app_name" translatable="false">Facet AI</string>
     <string name="shortcut_new_chat">New chat</string>
     <string name="shortcut_voice">Voice message</string>
     <string name="share_label">Ask Facet AI</string>
+
+    <!-- Buttons and actions used on many screens -->
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
+    <string name="action_done">Done</string>
+    <string name="action_continue">Continue</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_share">Share</string>
+    <string name="action_send">Send</string>
+    <string name="action_stop">Stop</string>
+    <string name="action_show">Show</string>
+    <string name="action_hide">Hide</string>
+    <string name="action_try_again">Try again</string>
+    <string name="action_sign_in">Sign in</string>
+    <string name="action_sign_out">Sign out</string>
+    <string name="action_not_now">Not now</string>
+    <string name="action_open_settings">Open settings</string>
+    <string name="action_pin">Pin</string>
+    <string name="action_unpin">Unpin</string>
+    <string name="action_more">More</string>
+
+    <!-- Short words used on many screens -->
+    <string name="common_copied">Copied</string>
+    <string name="common_auto">Auto</string>
+    <string name="common_unknown">Unknown</string>
+    <string name="common_untitled">Untitled</string>
+    <string name="common_none">None</string>
+    <string name="common_off">Off</string>
+    <string name="common_not_set">Not set</string>
+    <string name="common_name">Name</string>
+    <string name="common_loading">Loading…</string>
+
+    <!-- Dates: conversation list sections and relative times -->
+    <string name="date_today">Today</string>
+    <string name="date_yesterday">Yesterday</string>
+    <string name="date_previous_7_days">Previous 7 days</string>
+    <string name="date_previous_30_days">Previous 30 days</string>
+    <string name="date_just_now">Just now</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_progress">Replies in progress</string>
+    <string name="notification_channel_progress_description">Shown while Facet finishes a reply in the background.</string>
+    <string name="notification_channel_ready">Finished replies</string>
+    <string name="notification_channel_ready_description">Tells you when a reply finishes while Facet is in the background.</string>
+    <string name="notification_progress_title">Finishing your reply</string>
+    <string name="notification_progress_text">Facet keeps working while you\'re away.</string>
+    <string name="notification_reply_ready">Reply ready</string>
+
+    <!-- Settings > Appearance > Language -->
+    <string name="language_title">Language</string>
+    <string name="language_system">Automatic (system)</string>
 </resources>

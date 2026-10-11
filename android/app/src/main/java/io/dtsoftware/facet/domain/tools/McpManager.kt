@@ -1,7 +1,9 @@
 package io.dtsoftware.facet.domain.tools
 
 import android.content.Context
+import io.dtsoftware.facet.R
 import io.dtsoftware.facet.core.crypto.SecretBox
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.core.util.Clock
 import io.dtsoftware.facet.core.util.Ids
@@ -164,7 +166,7 @@ class McpManager(
 
     /** Connects, lists tools and caches them. Marks the server "sign in required" when OAuth is needed. */
     suspend fun refreshTools(id: String): Result<List<McpTool>> {
-        val e = dao.get(id) ?: return Result.failure(McpException("Server not found."))
+        val e = dao.get(id) ?: return Result.failure(McpException(Strings.get(R.string.toolrun_mcp_server_not_found)))
         return try {
             val c = client(e)
             val info = c.connect()
@@ -175,18 +177,18 @@ class McpManager(
             dao.setStatus(id, STATUS_SIGN_IN)
             Result.failure(ex)
         } catch (ex: Exception) {
-            dao.setStatus(id, ex.message ?: "Couldn't connect.")
+            dao.setStatus(id, ex.message ?: Strings.get(R.string.toolrun_mcp_couldnt_connect))
             Result.failure(ex)
         }
     }
 
     suspend fun call(serverId: String, tool: String, argumentsJson: String): McpCallResult {
-        val e = dao.get(serverId)?.takeIf { !it.deleted } ?: throw McpException("That MCP server was removed.")
+        val e = dao.get(serverId)?.takeIf { !it.deleted } ?: throw McpException(Strings.get(R.string.toolrun_mcp_server_removed))
         return try {
             client(e).callTool(tool, argumentsJson)
         } catch (ex: McpAuthRequiredException) {
             dao.setStatus(serverId, STATUS_SIGN_IN)
-            throw McpException("${e.name} needs you to sign in again. Open Settings → MCP servers.")
+            throw McpException(Strings.get(R.string.toolrun_mcp_sign_in_again, e.name))
         }
     }
 
@@ -201,7 +203,7 @@ class McpManager(
 
     /** Starts browser sign-in. Returns the URL to open. */
     suspend fun beginSignIn(id: String): String {
-        val e = dao.get(id) ?: throw McpException("Server not found.")
+        val e = dao.get(id) ?: throw McpException(Strings.get(R.string.toolrun_mcp_server_not_found))
         val previous = load(id)
         val wwwAuth = probeWwwAuthenticate(e)
         val pending = McpOAuth.begin(id, e.url, wwwAuth, redirectUri, "Facet AI", http, previous)
@@ -211,7 +213,7 @@ class McpManager(
 
     /** Finishes sign-in from the redirect. Returns the server id. */
     suspend fun completeSignIn(state: String, code: String): String {
-        val sealed = prefs.getString("pending_$state", null) ?: throw McpException("This sign-in link expired. Start again from Settings.")
+        val sealed = prefs.getString("pending_$state", null) ?: throw McpException(Strings.get(R.string.toolrun_mcp_link_expired))
         prefs.edit().remove("pending_$state").apply()
         val pending = AppJson.decodeFromString<McpPendingAuth>(secrets.openString(sealed))
         val oauth = McpOAuth.complete(pending, code, http)
@@ -250,7 +252,9 @@ class McpManager(
     }
 
     companion object {
-        const val STATUS_SIGN_IN = "Sign in required"
-        fun hostOf(url: String) = runCatching { java.net.URI(url.trim()).host?.removePrefix("www.") }.getOrNull() ?: "MCP server"
+        /** The status line of a server that needs sign-in (stored on this device only, in the app's language). */
+        val STATUS_SIGN_IN: String get() = Strings.get(R.string.toolrun_mcp_sign_in_required)
+        fun hostOf(url: String) = runCatching { java.net.URI(url.trim()).host?.removePrefix("www.") }.getOrNull()
+            ?: Strings.get(R.string.toolrun_mcp_default_name)
     }
 }

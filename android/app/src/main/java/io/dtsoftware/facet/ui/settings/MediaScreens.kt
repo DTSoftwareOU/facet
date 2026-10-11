@@ -1,5 +1,6 @@
 package io.dtsoftware.facet.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,12 +24,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dtsoftware.facet.AppContainer
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
+import io.dtsoftware.facet.core.util.Format
 import io.dtsoftware.facet.data.prefs.MediaPrefs
 import io.dtsoftware.facet.data.prefs.ModelRef
 import io.dtsoftware.facet.domain.media.MediaChoice
@@ -61,6 +66,17 @@ fun outputIcon(o: ModelOutput): Int = when (o) {
     ModelOutput.TEXT -> R.drawable.ic_message
 }
 
+/** "None of your providers makes images", one whole sentence per kind of media. */
+@StringRes
+private fun noneMakes(o: ModelOutput): Int? = when (o) {
+    ModelOutput.IMAGE -> R.string.mediasettings_none_images
+    ModelOutput.VIDEO -> R.string.mediasettings_none_video
+    ModelOutput.SPEECH -> R.string.mediasettings_none_speech
+    ModelOutput.MUSIC -> R.string.mediasettings_none_music
+    ModelOutput.TRANSCRIPTION -> R.string.mediasettings_none_transcripts
+    ModelOutput.TEXT -> null
+}
+
 /** Settings → Media models: which model makes images, video, speech, music and transcripts. */
 @Composable
 fun MediaModelsScreen(container: AppContainer, onBack: () -> Unit, onProviders: () -> Unit) {
@@ -78,11 +94,8 @@ fun MediaModelsScreen(container: AppContainer, onBack: () -> Unit, onProviders: 
     fun update(t: (MediaPrefs) -> MediaPrefs) = container.settings.updateSynced { it.copy(media = t(it.media)) }
     val speech = resolved[ModelOutput.SPEECH]
 
-    SettingsPage("Media models", onBack) {
-        Intro(
-            "Pick the model that makes each kind of media. Chat models use them when you ask for a picture, a video, " +
-                "a voiceover or a song, and the results are saved in the chat. Models are sorted automatically by what they make.",
-        )
+    SettingsPage(stringResource(R.string.mediasettings_title), onBack) {
+        Intro(stringResource(R.string.mediasettings_intro))
         SettingsGroup {
             OUTPUTS.forEachIndexed { i, o ->
                 if (i > 0) GroupDivider()
@@ -90,9 +103,9 @@ fun MediaModelsScreen(container: AppContainer, onBack: () -> Unit, onProviders: 
                 SettingsRow(
                     o.label,
                     subtitle = when {
-                        r == null -> "None of your providers makes ${o.what}"
+                        r == null -> noneMakes(o)?.let { stringResource(it) }
                         r.explicit -> r.label
-                        else -> "Automatic · ${r.label}"
+                        else -> stringResource(R.string.mediasettings_automatic_model, r.label)
                     },
                     icon = outputIcon(o),
                     onClick = { picking = o },
@@ -100,22 +113,34 @@ fun MediaModelsScreen(container: AppContainer, onBack: () -> Unit, onProviders: 
             }
         }
 
-        SettingsGroup(title = "Options") {
+        SettingsGroup(title = stringResource(R.string.mediasettings_options)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Option("Image shape") {
+                Option(stringResource(R.string.mediasettings_image_shape)) {
                     Segmented(Aspect.entries.toList(), prefs.imageAspect, { it.label }, { a -> update { it.copy(imageAspect = a) } })
                 }
-                Option("Video shape") {
+                Option(stringResource(R.string.mediasettings_video_shape)) {
                     Segmented(listOf(Aspect.LANDSCAPE, Aspect.PORTRAIT), prefs.videoAspect, { it.label }, { a -> update { it.copy(videoAspect = a) } })
                 }
-                Option("Music length") {
-                    Segmented(listOf(15, 30, 60, 120), prefs.musicSeconds, { if (it < 60) "${it}s" else "${it / 60} min" }, { s -> update { it.copy(musicSeconds = s) } })
+                Option(stringResource(R.string.mediasettings_music_length)) {
+                    val oneMinute = pluralStringResource(R.plurals.mediasettings_music_minutes, 1, 1)
+                    val twoMinutes = pluralStringResource(R.plurals.mediasettings_music_minutes, 2, 2)
+                    Segmented(
+                        listOf(15, 30, 60, 120), prefs.musicSeconds,
+                        {
+                            when (it) {
+                                60 -> oneMinute
+                                120 -> twoMinutes
+                                else -> Format.seconds(it * 1000L)
+                            }
+                        },
+                        { s -> update { it.copy(musicSeconds = s) } },
+                    )
                 }
             }
             GroupDivider()
             SettingsRow(
-                "Voice",
-                subtitle = speech?.let { container.media.voiceFor(it).let { v -> voiceName(it, v) } } ?: "Choose a speech model first",
+                stringResource(R.string.mediasettings_voice),
+                subtitle = speech?.let { container.media.voiceFor(it).let { v -> voiceName(it, v) } } ?: stringResource(R.string.mediasettings_choose_speech_first),
                 icon = R.drawable.ic_audio,
                 onClick = if (speech != null) ({ pickingVoice = true }) else null,
             )
@@ -123,27 +148,26 @@ fun MediaModelsScreen(container: AppContainer, onBack: () -> Unit, onProviders: 
 
         SettingsGroup {
             SwitchRow(
-                "Let chat models create media", prefs.chatTools, { v -> update { it.copy(chatTools = v) } },
-                subtitle = "Gives tool-capable chat models image, video, speech and music tools.", icon = R.drawable.ic_sparkles,
+                stringResource(R.string.mediasettings_chat_tools), prefs.chatTools, { v -> update { it.copy(chatTools = v) } },
+                subtitle = stringResource(R.string.mediasettings_chat_tools_subtitle), icon = R.drawable.ic_sparkles,
             )
             GroupDivider()
             SwitchRow(
-                "Read aloud with this voice", prefs.aiReadAloud && prefs.speech != null, { v -> update { it.copy(aiReadAloud = v) } },
-                subtitle = if (prefs.speech != null) "Read aloud uses your speech model instead of the phone's voice." else "Choose a speech model above to use it for Read aloud.",
+                stringResource(R.string.mediasettings_read_aloud), prefs.aiReadAloud && prefs.speech != null, { v -> update { it.copy(aiReadAloud = v) } },
+                subtitle = stringResource(if (prefs.speech != null) R.string.mediasettings_read_aloud_on else R.string.mediasettings_read_aloud_off),
                 icon = R.drawable.ic_speak, enabled = prefs.speech != null,
             )
             GroupDivider()
             SwitchRow(
-                "Dictate with this model", prefs.aiDictation && prefs.transcription != null, { v -> update { it.copy(aiDictation = v) } },
-                subtitle = if (prefs.transcription != null) "The mic records, then your transcription model writes it down." else "Choose a transcription model above to use it for dictation.",
+                stringResource(R.string.mediasettings_dictation), prefs.aiDictation && prefs.transcription != null, { v -> update { it.copy(aiDictation = v) } },
+                subtitle = stringResource(if (prefs.transcription != null) R.string.mediasettings_dictation_on else R.string.mediasettings_dictation_off),
                 icon = R.drawable.ic_mic, enabled = prefs.transcription != null,
             )
         }
 
-        FacetButton("Add a media provider", onProviders, style = ButtonStyle.Tonal, icon = R.drawable.ic_plus, modifier = Modifier.fillMaxWidth())
+        FacetButton(stringResource(R.string.mediasettings_add_provider), onProviders, style = ButtonStyle.Tonal, icon = R.drawable.ic_plus, modifier = Modifier.fillMaxWidth())
         Text(
-            "Media is made by the provider you pick, with your own key, and billed by them. OpenAI, Google, OpenRouter, xAI, " +
-                "Together and Groq keys cover several kinds; ElevenLabs, Stability AI, Black Forest Labs and Deepgram add more.",
+            stringResource(R.string.mediasettings_footer),
             style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = FacetTheme.colors.textTertiary,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
@@ -178,7 +202,7 @@ private fun Option(title: String, content: @Composable () -> Unit) {
 
 /** Voice ids are opaque for some providers (ElevenLabs); show a friendly name when we know one. */
 private fun voiceName(choice: MediaChoice, voice: String): String =
-    if (voice.isBlank()) "Default voice" else if (ProviderKind.fromId(choice.provider.kind) == ProviderKind.ELEVENLABS && voice == io.dtsoftware.facet.llm.media.MediaGen.defaultVoice(ProviderKind.ELEVENLABS, choice.model.id)) "George"
+    if (voice.isBlank()) Strings.get(R.string.mediasettings_default_voice) else if (ProviderKind.fromId(choice.provider.kind) == ProviderKind.ELEVENLABS && voice == io.dtsoftware.facet.llm.media.MediaGen.defaultVoice(ProviderKind.ELEVENLABS, choice.model.id)) "George"
     else voice.replaceFirstChar(Char::titlecase)
 
 @Composable
@@ -194,29 +218,42 @@ private fun MediaModelPicker(
     val c = FacetTheme.colors
     FacetSheet(onDismiss) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.8f).navigationBarsPadding()) {
-            Text("${output.label} model", style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
+            val title = when (output) {
+                ModelOutput.IMAGE -> stringResource(R.string.mediasettings_picker_image)
+                ModelOutput.VIDEO -> stringResource(R.string.mediasettings_picker_video)
+                ModelOutput.SPEECH -> stringResource(R.string.mediasettings_picker_speech)
+                ModelOutput.MUSIC -> stringResource(R.string.mediasettings_picker_music)
+                ModelOutput.TRANSCRIPTION -> stringResource(R.string.mediasettings_picker_transcription)
+                ModelOutput.TEXT -> output.label
+            }
+            Text(title, style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
             if (choices.isEmpty()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        "None of your providers makes ${output.what} yet. " + when (output) {
-                            ModelOutput.IMAGE -> "OpenAI, Google, OpenRouter, xAI, Together, Stability AI and Black Forest Labs do."
-                            ModelOutput.VIDEO -> "Google (Gemini API) does."
-                            ModelOutput.SPEECH -> "OpenAI, Google, Mistral, ElevenLabs and Deepgram do."
-                            ModelOutput.MUSIC -> "Google, ElevenLabs and Stability AI do."
-                            ModelOutput.TRANSCRIPTION -> "OpenAI, Mistral, Groq, Together, ElevenLabs and Deepgram do."
-                            ModelOutput.TEXT -> ""
-                        },
-                        style = FacetTheme.type.body, color = c.textSecondary,
-                    )
-                    FacetButton("Add a provider", onAddProvider, icon = R.drawable.ic_plus)
+                    // Two whole sentences: nobody makes this yet, and which providers do.
+                    val sentences = when (output) {
+                        ModelOutput.IMAGE -> R.string.mediasettings_none_yet_images to R.string.mediasettings_who_images
+                        ModelOutput.VIDEO -> R.string.mediasettings_none_yet_video to R.string.mediasettings_who_video
+                        ModelOutput.SPEECH -> R.string.mediasettings_none_yet_speech to R.string.mediasettings_who_speech
+                        ModelOutput.MUSIC -> R.string.mediasettings_none_yet_music to R.string.mediasettings_who_music
+                        ModelOutput.TRANSCRIPTION -> R.string.mediasettings_none_yet_transcripts to R.string.mediasettings_who_transcripts
+                        ModelOutput.TEXT -> null
+                    }
+                    sentences?.let { (none, who) ->
+                        Text(
+                            stringResource(none) + " " + stringResource(who),
+                            style = FacetTheme.type.body, color = c.textSecondary,
+                        )
+                    }
+                    FacetButton(stringResource(R.string.mediasettings_add_a_provider), onAddProvider, icon = R.drawable.ic_plus)
                 }
                 return@Column
             }
             LazyColumn(Modifier.weight(1f)) {
                 item {
                     PickRow(
-                        title = "Automatic",
-                        subtitle = automatic?.let { "Now: ${it.label}" } ?: "The best model you have",
+                        title = stringResource(R.string.mediasettings_automatic),
+                        subtitle = automatic?.let { stringResource(R.string.mediasettings_automatic_now, it.label) }
+                            ?: stringResource(R.string.mediasettings_automatic_best),
                         checked = selected == null,
                         leading = { FacetIcon(R.drawable.ic_sparkles, null, tint = c.primary, size = 20.dp) },
                     ) { onPick(null) }
@@ -256,7 +293,7 @@ private fun PickRow(title: String, subtitle: String?, checked: Boolean, leading:
             Text(title, style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             subtitle?.let { Text(it, style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
-        if (checked) FacetIcon(R.drawable.ic_check, "Selected", tint = c.primary, size = 20.dp)
+        if (checked) FacetIcon(R.drawable.ic_check, stringResource(R.string.mediasettings_selected), tint = c.primary, size = 20.dp)
     }
 }
 
@@ -266,12 +303,12 @@ private fun VoicePicker(container: AppContainer, speech: MediaChoice, current: S
     val voices by produceState<List<Voice>?>(null, speech.ref) { value = container.media.voices(speech) }
     FacetSheet(onDismiss) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.75f).navigationBarsPadding()) {
-            Text("Voice", style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
+            Text(stringResource(R.string.mediasettings_voice), style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
             Text(speech.label, style = FacetTheme.type.labelM.copy(fontWeight = FontWeight.Normal), color = c.textTertiary, modifier = Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(8.dp))
             val list = voices
             if (list == null) {
-                Text("Loading voices…", style = FacetTheme.type.body, color = c.textTertiary, modifier = Modifier.padding(20.dp))
+                Text(stringResource(R.string.mediasettings_loading_voices), style = FacetTheme.type.body, color = c.textTertiary, modifier = Modifier.padding(20.dp))
             } else {
                 LazyColumn(Modifier.weight(1f)) {
                     items(list, key = { it.id }) { v ->

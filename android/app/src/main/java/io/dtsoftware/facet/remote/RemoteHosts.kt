@@ -1,8 +1,10 @@
 package io.dtsoftware.facet.remote
 
+import io.dtsoftware.facet.R
 import io.dtsoftware.facet.core.crypto.FacetCrypto
 import io.dtsoftware.facet.core.crypto.RelayCrypto
 import io.dtsoftware.facet.core.crypto.ReplayGuard
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.core.util.Ids
 import java.io.IOException
@@ -75,8 +77,6 @@ class RemoteHosts(
     /** The PC's name, from the online host or remembered; null when this device never saw it. */
     fun nameOf(hostId: String): String? = _hosts.value[hostId]?.name ?: _names.value[hostId]
 
-    private fun displayName(hostId: String) = nameOf(hostId) ?: "Your PC"
-
     // ---- stream events ----
 
     private fun handle(event: String, data: String) {
@@ -148,7 +148,7 @@ class RemoteHosts(
             _names.update { it + (host.hostId to host.name) }
         }
         if (previous != null && previous.sessionId != host.sessionId) {
-            failPending(previous.sessionId) { RemoteException(RemoteException.OFFLINE, "${host.name} restarted. Try again.") }
+            failPending(previous.sessionId) { RemoteException(RemoteException.OFFLINE, Strings.get(R.string.remote_error_restarted, host.name)) }
         }
         // Warm the tool list so the first reply on this PC doesn't wait for it.
         if (host.remote && host.has(RemoteFeature.COMPUTER) && cached(toolsCache, host) == null && warming.add(host.hostId)) {
@@ -165,8 +165,13 @@ class RemoteHosts(
     private fun dropSession(session: String) {
         val names = _hosts.value.values.filter { it.sessionId == session }.map { it.name }
         _hosts.update { m -> m.filterValues { it.sessionId != session } }
-        val name = names.firstOrNull() ?: "The PC"
-        failPending(session) { RemoteException(RemoteException.OFFLINE, "$name went offline.") }
+        val name = names.firstOrNull()
+        failPending(session) {
+            RemoteException(
+                RemoteException.OFFLINE,
+                if (name != null) Strings.get(R.string.remote_error_went_offline, name) else Strings.get(R.string.remote_error_pc_went_offline),
+            )
+        }
     }
 
     private fun failPending(session: String, error: () -> RemoteException) {
@@ -177,38 +182,41 @@ class RemoteHosts(
         _hosts.value = emptyMap()
         toolsCache.clear()
         infoCache.clear()
-        pending.values.forEach { it.result.completeExceptionally(RemoteException(RemoteException.NOT_CONNECTED, "You're signed out.")) }
+        pending.values.forEach { it.result.completeExceptionally(RemoteException(RemoteException.NOT_CONNECTED, Strings.get(R.string.remote_error_signed_out))) }
     }
 
     // ---- sending ----
 
     private suspend fun sendTo(session: String, msg: JsonObject) {
-        val me = transport.sessionId ?: throw RemoteException(RemoteException.NOT_CONNECTED, "Sign in to use your PC from here.")
-        val key = relayKey() ?: throw RemoteException(RemoteException.NOT_CONNECTED, "Sign in to use your PC from here.")
+        val me = transport.sessionId ?: throw RemoteException(RemoteException.NOT_CONNECTED, Strings.get(R.string.remote_error_sign_in))
+        val key = relayKey() ?: throw RemoteException(RemoteException.NOT_CONNECTED, Strings.get(R.string.remote_error_sign_in))
         val envelope = RelayCrypto.seal(key, me, session, RelayMessages.encode(msg))
         try {
             transport.send(session, FacetCrypto.b64(envelope))
         } catch (e: PeerOfflineException) {
             // The host went away: fail at once and treat it as offline.
-            val name = _hosts.value.values.firstOrNull { it.sessionId == session }?.name ?: "The PC"
+            val name = _hosts.value.values.firstOrNull { it.sessionId == session }?.name
             dropSession(session)
-            throw RemoteException(RemoteException.OFFLINE, "$name is offline.")
+            throw RemoteException(
+                RemoteException.OFFLINE,
+                if (name != null) Strings.get(R.string.remote_error_offline, name) else Strings.get(R.string.remote_error_pc_offline),
+            )
         } catch (e: io.dtsoftware.facet.sync.ApiException) {
-            throw RemoteException("failed", e.message ?: "The sync server couldn't pass this on.")
+            throw RemoteException("failed", e.message ?: Strings.get(R.string.remote_error_relay_failed))
         } catch (e: io.dtsoftware.facet.sync.AuthException) {
-            throw RemoteException(RemoteException.NOT_CONNECTED, e.message ?: "Sign in to use your PC from here.")
+            throw RemoteException(RemoteException.NOT_CONNECTED, e.message ?: Strings.get(R.string.remote_error_sign_in))
         } catch (e: IOException) {
-            throw RemoteException(RemoteException.NOT_CONNECTED, "Couldn't reach the sync server. Check your connection.")
+            throw RemoteException(RemoteException.NOT_CONNECTED, Strings.get(R.string.remote_error_unreachable))
         }
     }
 
     private suspend fun ensureConnected() {
         if (transport.sessionId == null || transport.vaultKey() == null) {
-            throw RemoteException(RemoteException.NOT_CONNECTED, "Sign in to use your PC from here.")
+            throw RemoteException(RemoteException.NOT_CONNECTED, Strings.get(R.string.remote_error_sign_in))
         }
         if (transport.connected.value) return
         withTimeoutOrNull(CONNECT_TIMEOUT_MS) { transport.connected.first { it } }
-            ?: throw RemoteException(RemoteException.NOT_CONNECTED, "Couldn't reach the sync server. Check your connection.")
+            ?: throw RemoteException(RemoteException.NOT_CONNECTED, Strings.get(R.string.remote_error_unreachable))
     }
 
     /**
@@ -224,14 +232,17 @@ class RemoteHosts(
         val release = transport.holdStream()
         try {
             ensureConnected()
-            val host = _hosts.value[hostId] ?: throw RemoteException(RemoteException.OFFLINE, "${displayName(hostId)} is offline.")
+            val host = _hosts.value[hostId] ?: throw RemoteException(
+                RemoteException.OFFLINE,
+                nameOf(hostId)?.let { Strings.get(R.string.remote_error_offline, it) } ?: Strings.get(R.string.remote_error_your_pc_offline),
+            )
             val id = Ids.new()
             val result = CompletableDeferred<JsonObject>()
             pending[id] = Pending(host.sessionId, result)
             try {
                 sendTo(host.sessionId, RelayMessages.call(id, clock(), method, params))
                 val msg = withTimeoutOrNull(timeoutMs) { result.await() }
-                    ?: throw RemoteException(RemoteException.TIMEOUT, "${host.name} didn't answer. Check that Facet is running there.")
+                    ?: throw RemoteException(RemoteException.TIMEOUT, Strings.get(R.string.remote_error_no_answer, host.name))
                 return try {
                     RelayMessages.resultValue(msg)
                 } catch (e: RemoteException) {
@@ -258,7 +269,7 @@ class RemoteHosts(
     private fun <T> decode(value: JsonElement, serializer: kotlinx.serialization.KSerializer<T>): T = try {
         AppJson.decodeFromJsonElement(serializer, value)
     } catch (e: Exception) {
-        throw RemoteException("bad_response", "The PC sent an answer this version of Facet doesn't understand.")
+        throw RemoteException("bad_response", Strings.get(R.string.remote_error_bad_response))
     }
 
     private fun <T> cached(cache: ConcurrentHashMap<String, Cached<T>>, host: RemoteHost): T? =
@@ -320,7 +331,6 @@ class RemoteHosts(
         /** How long a call waits for the change stream to (re)connect before giving up. */
         const val CONNECT_TIMEOUT_MS = 15_000L
 
-        fun turnOnHint(pcName: String) =
-            "Turn on Let your other devices use this PC in Facet on $pcName: Settings → Computer access."
+        fun turnOnHint(pcName: String) = Strings.get(R.string.remote_turn_on_hint, pcName)
     }
 }

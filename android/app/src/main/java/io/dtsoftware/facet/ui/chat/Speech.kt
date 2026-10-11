@@ -12,6 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -60,7 +62,7 @@ class Speaker(context: Context, private val scope: CoroutineScope) {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    onError(e.message ?: "Couldn't create the voice.")
+                    onError(e.message ?: Strings.get(R.string.chat_read_aloud_failed))
                     if (speakingId == id) speakingId = null
                     return@launch
                 }
@@ -99,10 +101,11 @@ class Speaker(context: Context, private val scope: CoroutineScope) {
     companion object {
         private const val PLAYBACK_PREFIX = "speak:"
 
-        /** Markdown → speakable text: drops code blocks and syntax characters. */
+        /** Markdown → speakable text: drops code blocks and syntax characters (said in the app's language). */
         fun plain(md: String): String = md
-            .replace(Regex("```[\\s\\S]*?(```|$)"), " Code omitted. ")
-            .replace(Regex("\\$\\$[\\s\\S]*?\\$\\$"), " An equation. ")
+            // Lambdas, so a "$" or "\" in a translation isn't read as a group reference.
+            .replace(Regex("```[\\s\\S]*?(```|$)")) { " " + Strings.get(R.string.chat_read_aloud_code_omitted) + " " }
+            .replace(Regex("\\$\\$[\\s\\S]*?\\$\\$")) { " " + Strings.get(R.string.chat_read_aloud_equation) + " " }
             .replace(Regex("!\\[([^]]*)]\\([^)]*\\)"), "$1")
             .replace(Regex("\\[([^]]+)]\\([^)]*\\)"), "$1")
             .replace(Regex("(?m)^\\s{0,3}#{1,6}\\s*"), "")

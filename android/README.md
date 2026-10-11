@@ -54,12 +54,37 @@ Then `./gradlew assembleRelease` and upload `app-release.apk` to the server's
   `cd server && npm run build && PORT=8788 JWT_SECRET=… SERVER_SECRET=… node dist/index.js`.
 - `AppScreenshotTest` renders the main screens with sample data for design review.
 
+## Languages
+
+The interface comes in the same 20 languages as the web and Windows app (docs/DESIGN.md,
+"Languages"). English lives in `app/src/main/res/values/strings*.xml`, grouped by screen; every
+other language has the same files in `values-<lang>/` (`values-zh-rCN`, `values-pt-rBR`, and
+`values-in` for Indonesian, Android's legacy code). Composables use `stringResource()` /
+`pluralStringResource()`; code outside Compose (errors, notifications, tool-step labels saved with
+a message) uses `core/i18n/Strings`. Dates and numbers go through `Dates` and `Format`, which
+follow the app's language. Text sent to models, tool schemas, slash command names, brand and model
+names, and logs stay English in the code.
+
+A new or changed string needs its translation in all 19 languages: `StringResourcesTest` fails
+until each one has every key with the same `%1$s`/`%1$d` arguments and the plural forms its
+language needs, and no string may use an em dash (or a spaced en dash) as punctuation. Lint treats
+a missing translation as fatal, so release builds stop on one too.
+
+Settings → Appearance → Language picks a language or follows the system. On Android 13+ that is
+the system's per-app language (`res/xml/locales_config.xml`, also under the phone's app settings);
+before Android 13, `AppLanguage` keeps the choice and applies it to the activity and to `Strings`.
+Arabic and Urdu read right to left: Compose mirrors the layout, directional icons are
+`autoMirrored`, each Markdown reply lays out in its own direction, and code, keys, addresses and
+paths stay left to right. `LocalizedScreenshotTest` renders key screens in English, Arabic,
+Japanese, Hindi and German.
+
 ## Structure
 
 ```
 app/src/main/java/io/dtsoftware/facet/
   AppContainer.kt        manual dependency graph
   core/crypto            client-side encryption (docs/SECURITY.md), Keystore-backed SecretBox
+  core/i18n              interface language (per-app language picker) and Strings for text built outside Compose
   core/net               SSE parser and HTTP helpers
   data/db                Room entities, DAOs, FTS search
   data/repo              conversations (with branches), providers/keys, assistants, prompts, folders, attachments

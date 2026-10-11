@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.llm.media
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.net.HttpStatusException
 import io.dtsoftware.facet.core.net.fetchString
 import io.dtsoftware.facet.llm.ChatRequest
@@ -48,7 +50,7 @@ class MediaProviderClient(override val config: ProviderConfig, private val http:
     }
 
     override fun stream(request: ChatRequest): Flow<StreamEvent> = flow {
-        emit(StreamEvent.Failed(LlmError(ErrorKind.BAD_REQUEST, "${config.label} makes media only. Pick a chat model for conversations.")))
+        emit(StreamEvent.Failed(LlmError(ErrorKind.BAD_REQUEST, Strings.get(R.string.llm_media_only, config.label))))
     }
 
     override suspend fun verify(): Result<Unit> = try {

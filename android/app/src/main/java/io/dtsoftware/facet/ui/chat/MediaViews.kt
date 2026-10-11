@@ -34,10 +34,14 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.data.AttachmentRef
 import io.dtsoftware.facet.ui.components.FacetIcon
 import io.dtsoftware.facet.ui.theme.FacetTheme
@@ -73,7 +77,7 @@ private fun MediaFrame(a: AttachmentRef, actions: MessageActions, isVideo: Boole
             .aspectRatio(ratio.coerceIn(0.5f, 2.2f))
             .clip(RoundedCornerShape(18.dp))
             .background(c.surfaceHigh)
-            .clickable(onClickLabel = if (isVideo) "Play video" else "Open image") { actions.onOpenAttachment(a) },
+            .clickable(onClickLabel = stringResource(if (isVideo) R.string.chat_media_play_video else R.string.chat_media_open_image)) { actions.onOpenAttachment(a) },
     ) {
         bmp?.let { Image(it, a.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
             ?: FacetIcon(if (isVideo) R.drawable.ic_film else R.drawable.ic_image, null, tint = c.textTertiary, size = 28.dp, modifier = Modifier.align(Alignment.Center))
@@ -124,7 +128,7 @@ private fun AudioCard(a: AttachmentRef, actions: MessageActions) {
                 .size(44.dp)
                 .clip(CircleShape)
                 .background(c.primary)
-                .clickable(onClickLabel = if (playing) "Pause" else "Play") {
+                .clickable(onClickLabel = stringResource(if (playing) R.string.chat_media_pause else R.string.chat_media_play)) {
                     scope.launch { actions.mediaFile(a.id)?.let { AudioPlayback.toggle(a.id, it) } }
                 },
             contentAlignment = Alignment.Center,
@@ -145,12 +149,17 @@ private fun AudioCard(a: AttachmentRef, actions: MessageActions) {
             }
             Spacer(Modifier.height(8.dp))
             val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
+            // The bar fills from the start edge, which is the right in Arabic and Urdu.
+            val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(18.dp)
-                    .pointerInput(a.id, active) {
-                        detectTapGestures { o -> if (active) AudioPlayback.seekTo(o.x / size.width) }
+                    .pointerInput(a.id, active, rtl) {
+                        detectTapGestures { o ->
+                            val x = o.x / size.width
+                            if (active) AudioPlayback.seekTo(if (rtl) 1f - x else x)
+                        }
                     },
                 contentAlignment = Alignment.CenterStart,
             ) {
@@ -161,7 +170,8 @@ private fun AudioCard(a: AttachmentRef, actions: MessageActions) {
     }
 }
 
+/** "m:ss", with the app language's digits. */
 private fun clock(ms: Long): String {
     val s = (ms / 1000).coerceAtLeast(0)
-    return "${s / 60}:${(s % 60).toString().padStart(2, '0')}"
+    return String.format(Strings.locale, "%d:%02d", s / 60, s % 60)
 }

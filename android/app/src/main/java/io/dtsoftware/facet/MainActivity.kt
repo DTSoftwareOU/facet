@@ -1,5 +1,6 @@
 package io.dtsoftware.facet
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -14,6 +15,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.dtsoftware.facet.core.i18n.AppLanguage
+import io.dtsoftware.facet.domain.Notifications
 import io.dtsoftware.facet.ui.FacetRoot
 import io.dtsoftware.facet.ui.LaunchRequest
 import io.dtsoftware.facet.ui.lock.DeviceAuth
@@ -24,10 +27,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 class MainActivity : ComponentActivity() {
     private val launchRequests = MutableStateFlow<LaunchRequest?>(null)
 
+    /** Before Android 13, the language picked in Settings → Appearance (Android 13+ applies it itself). */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
         val container = (application as FacetApp).container
+        // The activity is recreated when the interface language changes: redraw cached text, rename channels.
+        io.dtsoftware.facet.core.i18n.Strings.refresh()
+        Notifications.createChannels(this)
         if (savedInstanceState == null) {
             // The update check keeps the splash up for at most 1.5 s, so a prompt can be the first thing shown.
             val updateGate = container.updates.launchCheck()

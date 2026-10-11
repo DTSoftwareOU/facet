@@ -36,10 +36,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.dtsoftware.facet.R
 import io.dtsoftware.facet.ui.theme.FacetShapes
 import io.dtsoftware.facet.ui.theme.FacetTheme
 import io.dtsoftware.facet.ui.theme.GemPalette
@@ -191,6 +193,8 @@ fun SendButton(
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.9f else 1f, label = "sendScale")
     val active = enabled || generating
+    val stopLabel = stringResource(R.string.action_stop)
+    val sendLabel = stringResource(R.string.action_send)
     val brush = when {
         generating -> Brush.linearGradient(listOf(c.text, c.text))
         enabled -> Brush.linearGradient(listOf(GemPalette.Flash, GemPalette.Glint))
@@ -205,7 +209,7 @@ fun SendButton(
             .clickable(
                 enabled = active,
                 role = Role.Button,
-                onClickLabel = if (generating) "Stop" else "Send",
+                onClickLabel = if (generating) stopLabel else sendLabel,
                 interactionSource = interaction,
                 indication = ripple(color = Color.White),
             ) {
@@ -218,7 +222,7 @@ fun SendButton(
             Box(Modifier.size(13.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(3.dp)).background(c.background))
         } else {
             FacetIcon(
-                io.dtsoftware.facet.R.drawable.ic_arrow_up, "Send",
+                R.drawable.ic_arrow_up, sendLabel,
                 tint = if (enabled) Color(0xFF071318) else c.textTertiary, size = 20.dp,
             )
         }

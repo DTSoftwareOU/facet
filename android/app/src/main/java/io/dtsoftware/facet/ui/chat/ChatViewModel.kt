@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.dtsoftware.facet.AppContainer
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.data.MessageTree
 import io.dtsoftware.facet.data.db.AttachmentEntity
@@ -237,7 +239,7 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
         if (text.isBlank() && _attachments.value.isEmpty()) return false
         if (s.generating) return false
         val model = s.model ?: run {
-            _events.tryEmit(ChatEvent.Message("Add an API key in Providers to start chatting."))
+            _events.tryEmit(ChatEvent.Message(Strings.get(R.string.chat_error_no_model)))
             return false
         }
         val atts = _attachments.value
@@ -256,7 +258,7 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
                 if (conversationId.value == null) conversationId.value = id
                 _events.emit(ChatEvent.Sent)
             } catch (e: ChatException) {
-                _events.emit(ChatEvent.Message(e.message ?: "Couldn't send."))
+                _events.emit(ChatEvent.Message(e.message ?: Strings.get(R.string.chat_error_send)))
                 _attachments.value = atts
             }
         }
@@ -272,7 +274,7 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
             for (uri in uris.take(10)) {
                 runCatching { c.attachments.import(uri) }
                     .onSuccess { a -> _attachments.update { it + a } }
-                    .onFailure { _events.emit(ChatEvent.Message(it.message ?: "Couldn't attach that file.")) }
+                    .onFailure { _events.emit(ChatEvent.Message(it.message ?: Strings.get(R.string.chat_error_attach))) }
             }
         }
     }
@@ -365,11 +367,13 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
     fun exportMarkdown(): String? {
         val s = state.value
         val conv = s.conversation ?: return null
+        val you = Strings.get(R.string.chat_export_you)
+        val assistant = Strings.get(R.string.chat_export_assistant)
         return buildString {
             append("# ").append(conv.title).append("\n\n")
             s.thread.forEach { item ->
                 val m = item.message
-                append(if (m.role == "user") "**You**" else "**${m.modelName ?: "Assistant"}**").append("\n\n")
+                append("**").append(if (m.role == "user") you else m.modelName ?: assistant).append("**\n\n")
                 append(m.content.trim()).append("\n\n---\n\n")
             }
         }
@@ -404,7 +408,7 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
         try {
             block()
         } catch (e: ChatException) {
-            _events.emit(ChatEvent.Message(e.message ?: "Something went wrong."))
+            _events.emit(ChatEvent.Message(e.message ?: Strings.get(R.string.chat_error_generic)))
         }
     }
 

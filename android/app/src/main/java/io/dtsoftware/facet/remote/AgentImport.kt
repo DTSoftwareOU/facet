@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.remote
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.core.util.Ids
 import io.dtsoftware.facet.data.db.ConversationEntity
@@ -24,7 +26,7 @@ object AgentImport {
     fun title(session: AgentSession, agent: CodingAgent): String =
         session.title.trim().ifBlank {
             session.messages.firstOrNull { it.role == "user" && it.text.isNotBlank() }?.text?.trim()?.lineSequence()?.firstOrNull()?.take(60)
-        }?.takeIf { it.isNotBlank() } ?: "${agent.displayName} session"
+        }?.takeIf { it.isNotBlank() } ?: Strings.get(R.string.remote_import_title, agent.displayName)
 
     /**
      * The new chat (same PC and folder, the composer's model) and its messages as one branch: every message DONE,
@@ -40,7 +42,7 @@ object AgentImport {
         now: Long,
     ): Pair<ConversationEntity, List<MessageEntity>> {
         val source = session.messages.filter { it.text.isNotBlank() && (it.role == "user" || it.role == "assistant") }
-        if (source.isEmpty()) throw IllegalArgumentException("This session has no messages to continue.")
+        if (source.isEmpty()) throw IllegalArgumentException(Strings.get(R.string.remote_import_empty))
         val convId = Ids.new()
         // Keep the session's times when it has them, strictly increasing and never in the future.
         var t = (source.first().at ?: (session.updatedAt.takeIf { it > 0 } ?: now) - source.size).coerceAtMost(now - source.size)

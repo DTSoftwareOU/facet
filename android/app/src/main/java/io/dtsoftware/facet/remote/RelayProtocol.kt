@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.remote
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import java.time.Instant
 import kotlinx.serialization.KSerializer
@@ -70,7 +72,7 @@ data class RemoteHost(
             return RemoteHost(
                 hostId = hostId,
                 sessionId = sessionId,
-                name = msg.str("name")?.takeIf { it.isNotBlank() } ?: "Your PC",
+                name = msg.str("name")?.takeIf { it.isNotBlank() } ?: Strings.get(R.string.remote_your_pc),
                 os = msg.str("os").orEmpty(),
                 version = msg.str("version").orEmpty(),
                 remote = (msg["remote"] as? JsonPrimitive)?.booleanOrNull == true,
@@ -136,7 +138,7 @@ object RelayMessages {
         val ok = (msg["ok"] as? JsonPrimitive)?.booleanOrNull == true
         if (ok) return msg["value"] ?: JsonNull
         val err = msg["error"] as? JsonObject
-        throw RemoteException(err?.str("code") ?: "failed", err?.str("message")?.takeIf { it.isNotBlank() } ?: "The PC couldn't do that.")
+        throw RemoteException(err?.str("code") ?: "failed", err?.str("message")?.takeIf { it.isNotBlank() } ?: Strings.get(R.string.remote_error_pc_failed))
     }
 }
 

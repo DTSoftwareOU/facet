@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -44,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dtsoftware.facet.AppContainer
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
+import io.dtsoftware.facet.core.util.Format
 import io.dtsoftware.facet.data.db.McpServerEntity
 import io.dtsoftware.facet.domain.tools.McpCategory
 import io.dtsoftware.facet.domain.tools.McpDirectory
@@ -103,25 +107,22 @@ fun WebSearchScreen(container: AppContainer, onBack: () -> Unit) {
     var editing by remember { mutableStateOf<SearchKind?>(null) }
     var confirmRemove by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    SettingsPage("Web search", onBack) {
-        Intro(
-            "Claude, GPT and Gemini models can search on their own. For every other model, add a search key here and Facet gives the model " +
-                "a search tool and a page reader. Searches go straight from your phone to the service you pick.",
-        )
+    SettingsPage(stringResource(R.string.tools_web_search_title), onBack) {
+        Intro(stringResource(R.string.tools_web_search_intro))
         if (current != null) {
             val kind = SearchKind.fromId(current.kind)
-            SettingsGroup(title = "In use") {
+            SettingsGroup(title = stringResource(R.string.tools_web_search_in_use)) {
                 SettingsRow(
                     kind?.displayName ?: current.label,
-                    subtitle = if (current.enabled) "Ready" else "Off",
+                    subtitle = stringResource(if (current.enabled) R.string.tools_web_search_ready else R.string.common_off),
                     icon = R.drawable.ic_globe,
                     onClick = { editing = kind },
                 )
                 GroupDivider()
-                SettingsRow("Remove", icon = R.drawable.ic_delete, iconTint = FacetTheme.colors.error, titleColor = FacetTheme.colors.error, onClick = { confirmRemove = true })
+                SettingsRow(stringResource(R.string.action_remove), icon = R.drawable.ic_delete, iconTint = FacetTheme.colors.error, titleColor = FacetTheme.colors.error, onClick = { confirmRemove = true })
             }
         }
-        SettingsGroup(title = if (current == null) "Choose a search service" else "Switch service") {
+        SettingsGroup(title = stringResource(if (current == null) R.string.tools_web_search_choose else R.string.tools_web_search_switch)) {
             SearchKind.entries.forEachIndexed { i, k ->
                 if (i > 0) GroupDivider()
                 SettingsRow(k.displayName, subtitle = k.blurb, icon = R.drawable.ic_search, onClick = { editing = k })
@@ -129,9 +130,9 @@ fun WebSearchScreen(container: AppContainer, onBack: () -> Unit) {
         }
         SettingsGroup {
             SwitchRow(
-                "Prefer built-in search", synced.preferNativeSearch,
+                stringResource(R.string.tools_web_search_prefer_native), synced.preferNativeSearch,
                 { v -> container.settings.updateSynced { it.copy(preferNativeSearch = v) } },
-                subtitle = "When a model can search on its own, let it. Turn off to always use your search service.",
+                subtitle = stringResource(R.string.tools_web_search_prefer_native_subtitle),
                 icon = R.drawable.ic_sparkles,
             )
         }
@@ -141,7 +142,7 @@ fun WebSearchScreen(container: AppContainer, onBack: () -> Unit) {
     }
     if (confirmRemove && current != null) {
         ConfirmDialog(
-            "Remove web search?", "Models without built-in search won't be able to search the web.", "Remove",
+            stringResource(R.string.tools_web_search_remove_title), stringResource(R.string.tools_web_search_remove_body), stringResource(R.string.action_remove),
             onConfirm = { scope.launch { container.providers.delete(current.id) } }, onDismiss = { confirmRemove = false }, danger = true,
         )
     }
@@ -164,35 +165,38 @@ private fun SearchSetupSheet(container: AppContainer, kind: SearchKind, existing
             Text(kind.displayName, style = FacetTheme.type.titleL, color = FacetTheme.colors.text)
             Text(kind.blurb, style = FacetTheme.type.body, color = FacetTheme.colors.textSecondary)
             if (kind.needsKey) {
-                FacetTextField(key, { key = it.trim(); status = null }, label = "API key", password = true, mono = true)
+                FacetTextField(key, { key = it.trim(); status = null }, label = stringResource(R.string.tools_api_key), password = true, mono = true)
                 kind.keyUrl?.let { link ->
                     Text(
-                        "Get an API key from ${kind.displayName}", style = FacetTheme.type.labelM, color = FacetTheme.colors.primary,
+                        stringResource(R.string.tools_get_api_key, kind.displayName), style = FacetTheme.type.labelM, color = FacetTheme.colors.primary,
                         modifier = Modifier.clip(FacetShapes.small).clickable { uri.openUri(link) }.padding(4.dp),
                     )
                 }
             }
             if (kind == SearchKind.SEARXNG) {
                 FacetTextField(
-                    url, { url = it.trim(); status = null }, label = "Instance URL", mono = true, keyboardType = KeyboardType.Uri,
-                    supporting = "Your SearXNG instance with the JSON format enabled in settings.yml.",
+                    url, { url = it.trim(); status = null }, label = stringResource(R.string.tools_searxng_url), mono = true, keyboardType = KeyboardType.Uri,
+                    supporting = stringResource(R.string.tools_searxng_url_supporting),
                 )
             }
             status?.let { (ok, text) -> StatusBanner(ok, text) }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FacetButton(
-                    "Test", {
+                    stringResource(R.string.tools_test), {
                         busy = true
                         scope.launch {
                             val r = runCatching { container.webSearch.search(SearchConfig(kind, key, url), "weather in Lisbon", 3) }
-                            status = r.fold({ true to "Working. Found ${it.size} results." }, { false to (it.message ?: "That didn't work.") })
+                            status = r.fold(
+                                { true to Strings.plural(R.plurals.tools_web_search_test_ok, it.size, it.size) },
+                                { false to (it.message ?: Strings.get(R.string.tools_test_failed)) },
+                            )
                             busy = false
                         }
                     },
                     style = ButtonStyle.Tonal, loading = busy, enabled = valid, modifier = Modifier.weight(1f),
                 )
                 FacetButton(
-                    "Save", {
+                    stringResource(R.string.action_save), {
                         scope.launch {
                             container.providers.all().filter { SearchKind.isSearch(it.kind) && it.id != existing?.id }.forEach { container.providers.delete(it.id) }
                             if (existing != null) container.providers.update(existing.id, kind.displayName, url, key, emptyMap(), true)
@@ -213,24 +217,21 @@ private fun SearchSetupSheet(container: AppContainer, kind: SearchKind, existing
 fun McpServersScreen(container: AppContainer, onBack: () -> Unit, onEdit: (String?) -> Unit) {
     val servers by container.mcp.observeAll().collectAsStateWithLifecycle(emptyList())
     val scope = rememberCoroutineScope()
-    SettingsPage("MCP servers", onBack) {
-        Intro(
-            "Connect apps and data sources through the Model Context Protocol. Their tools work with any model that supports tools, in every chat, " +
-                "on all your devices. Connection details and sign-ins are end-to-end encrypted.",
-        )
-        FacetButton("Add a server", { onEdit(null) }, icon = R.drawable.ic_plus, modifier = Modifier.fillMaxWidth())
+    SettingsPage(stringResource(R.string.tools_mcp_title), onBack) {
+        Intro(stringResource(R.string.tools_mcp_intro))
+        FacetButton(stringResource(R.string.tools_mcp_add), { onEdit(null) }, icon = R.drawable.ic_plus, modifier = Modifier.fillMaxWidth())
         if (servers.isNotEmpty()) {
-            SettingsGroup(title = "Connected") {
+            SettingsGroup(title = stringResource(R.string.tools_mcp_connected)) {
                 servers.forEachIndexed { i, s ->
                     if (i > 0) GroupDivider()
                     val tools = container.mcp.tools(s).size
                     SettingsRow(
                         s.name,
                         subtitle = when {
-                            !s.enabled -> "Off"
+                            !s.enabled -> stringResource(R.string.common_off)
                             s.status != null -> s.status
-                            s.toolsFetchedAt == 0L -> "Connecting…"
-                            else -> "$tools tool" + (if (tools == 1) "" else "s") + " · " + container.mcp.approval(s).label
+                            s.toolsFetchedAt == 0L -> stringResource(R.string.tools_mcp_connecting)
+                            else -> pluralStringResource(R.plurals.tools_mcp_tool_count, tools, tools) + " · " + container.mcp.approval(s).label
                         },
                         icon = R.drawable.ic_server,
                         iconTint = if (s.status != null) FacetTheme.colors.warning else FacetTheme.colors.textSecondary,
@@ -252,7 +253,7 @@ fun McpServersScreen(container: AppContainer, onBack: () -> Unit, onEdit: (Strin
             }
         }
         Text(
-            "Only remote servers (Streamable HTTP or SSE) can run from a phone. Tools that change things ask before running unless you allow them.",
+            stringResource(R.string.tools_mcp_footer),
             style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = FacetTheme.colors.textTertiary,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
@@ -274,15 +275,16 @@ private fun McpDirectorySection(servers: List<io.dtsoftware.facet.data.db.McpSer
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Add from the directory", style = FacetTheme.type.labelM, color = c.textTertiary, modifier = Modifier.padding(start = 12.dp))
-        SearchField(query, { query = it }, "Search ${McpDirectory.entries.size} servers")
+        Text(stringResource(R.string.tools_mcp_directory_title), style = FacetTheme.type.labelM, color = c.textTertiary, modifier = Modifier.padding(start = 12.dp))
+        val total = McpDirectory.entries.size
+        SearchField(query, { query = it }, pluralStringResource(R.plurals.tools_mcp_directory_search, total, total))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FacetChip("Popular", category == null && q.isEmpty(), { category = null; query = "" })
+            FacetChip(stringResource(R.string.tools_mcp_popular), category == null && q.isEmpty(), { category = null; query = "" })
             McpCategory.entries.forEach { cat -> FacetChip(cat.label, category == cat && q.isEmpty(), { category = cat; query = "" }) }
         }
         if (list.isEmpty()) {
             Text(
-                if (q.isNotEmpty()) "No matches. You can add any remote server by its address with Add a server." else "You've added everything here.",
+                stringResource(if (q.isNotEmpty()) R.string.tools_mcp_directory_no_matches else R.string.tools_mcp_directory_all_added),
                 style = FacetTheme.type.body, color = c.textTertiary, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             )
         } else {
@@ -300,9 +302,9 @@ private fun McpDirectorySection(servers: List<io.dtsoftware.facet.data.db.McpSer
 private fun AuthTag(auth: McpAuthMode) {
     val c = FacetTheme.colors
     val (label, color) = when (auth) {
-        McpAuthMode.NONE -> "Open" to c.primary
-        McpAuthMode.OAUTH -> "Sign in" to c.textSecondary
-        McpAuthMode.HEADERS -> "Token" to c.warning
+        McpAuthMode.NONE -> stringResource(R.string.tools_mcp_auth_open) to c.primary
+        McpAuthMode.OAUTH -> stringResource(R.string.tools_mcp_auth_sign_in) to c.textSecondary
+        McpAuthMode.HEADERS -> stringResource(R.string.tools_mcp_auth_token) to c.warning
     }
     Text(
         label, style = FacetTheme.type.labelS, color = color,
@@ -345,34 +347,40 @@ fun McpServerEditScreen(container: AppContainer, serverId: String?, onDone: () -
         scope.launch {
             runCatching { container.mcp.beginSignIn(id) }
                 .onSuccess { link -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
-                .onFailure { status = false to (it.message ?: "Couldn't start sign-in.") }
+                .onFailure { status = false to (it.message ?: Strings.get(R.string.tools_mcp_sign_in_failed)) }
             busy = false
         }
     }
 
     val valid = url.startsWith("http") && url.length > 10
-    SettingsPage(existing?.name ?: "Add MCP server", onDone) {
+    SettingsPage(existing?.name ?: stringResource(R.string.tools_mcp_add_title), onDone) {
         if (!loaded) return@SettingsPage
-        FacetTextField(url, { url = it.trim(); status = null }, label = "Server URL", mono = true, keyboardType = KeyboardType.Uri, supporting = "The server's Streamable HTTP or SSE endpoint, e.g. https://example.com/mcp")
-        FacetTextField(name, { name = it }, label = "Name", placeholder = McpManager.hostOf(url))
+        FacetTextField(
+            url, { url = it.trim(); status = null }, label = stringResource(R.string.tools_mcp_url), mono = true, keyboardType = KeyboardType.Uri,
+            supporting = stringResource(R.string.tools_mcp_url_supporting),
+        )
+        FacetTextField(name, { name = it }, label = stringResource(R.string.common_name), placeholder = McpManager.hostOf(url))
         Column {
-            Text("Authentication", style = FacetTheme.type.labelM, color = FacetTheme.colors.textSecondary, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+            Text(stringResource(R.string.tools_mcp_authentication), style = FacetTheme.type.labelM, color = FacetTheme.colors.textSecondary, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+            val noneLabel = stringResource(R.string.common_none)
+            val tokenLabel = stringResource(R.string.tools_mcp_auth_token)
+            val signInLabel = stringResource(R.string.tools_mcp_auth_sign_in)
             Segmented(
                 listOf(McpAuthMode.NONE, McpAuthMode.HEADERS, McpAuthMode.OAUTH), auth,
-                { when (it) { McpAuthMode.NONE -> "None"; McpAuthMode.HEADERS -> "Token"; McpAuthMode.OAUTH -> "Sign in" } },
+                { when (it) { McpAuthMode.NONE -> noneLabel; McpAuthMode.HEADERS -> tokenLabel; McpAuthMode.OAUTH -> signInLabel } },
                 { auth = it; status = null },
             )
         }
         if (auth == McpAuthMode.HEADERS) {
             FacetTextField(
-                headers, { headers = it }, label = "Headers", placeholder = "Authorization: Bearer …",
+                headers, { headers = it }, label = stringResource(R.string.tools_mcp_headers), placeholder = "Authorization: Bearer …",
                 singleLine = false, minLines = 2, maxLines = 6, mono = true, imeAction = ImeAction.Default,
-                supporting = "One per line. Stored encrypted.",
+                supporting = stringResource(R.string.tools_mcp_headers_supporting),
             )
         }
         status?.let { (ok, text) -> StatusBanner(ok, text) }
         FacetButton(
-            if (existing == null) "Save and connect" else "Save and reconnect",
+            stringResource(if (existing == null) R.string.tools_mcp_save_connect else R.string.tools_mcp_save_reconnect),
             {
                 busy = true
                 status = null
@@ -384,19 +392,20 @@ fun McpServerEditScreen(container: AppContainer, serverId: String?, onDone: () -
                     val r = container.mcp.refreshTools(id)
                     busy = false
                     if (r.isSuccess) {
-                        status = true to "Connected. ${r.getOrThrow().size} tools available."
+                        val count = r.getOrThrow().size
+                        status = true to Strings.plural(R.plurals.tools_mcp_connected_tools, count, count)
                         if (existing == null) onDone()
                     } else if (r.exceptionOrNull() is io.dtsoftware.facet.mcp.McpAuthRequiredException) {
                         if (auth == McpAuthMode.OAUTH || auth == McpAuthMode.NONE) {
                             if (existing == null) container.mcp.update(id, name, url, McpAuthMode.OAUTH, null)
                             auth = McpAuthMode.OAUTH
-                            status = false to "This server needs you to sign in."
+                            status = false to Strings.get(R.string.tools_mcp_needs_sign_in)
                             openSignIn(id)
                         } else {
-                            status = false to "The server rejected these headers. Check the token."
+                            status = false to Strings.get(R.string.tools_mcp_headers_rejected)
                         }
                     } else {
-                        status = false to (r.exceptionOrNull()?.message ?: "Couldn't connect.")
+                        status = false to (r.exceptionOrNull()?.message ?: Strings.get(R.string.tools_mcp_connect_failed))
                     }
                 }
             },
@@ -405,23 +414,29 @@ fun McpServerEditScreen(container: AppContainer, serverId: String?, onDone: () -
 
         existing?.let { e ->
             if (auth == McpAuthMode.OAUTH) {
-                SettingsGroup(title = "Account") {
+                SettingsGroup(title = stringResource(R.string.tools_mcp_account)) {
                     if (container.mcp.isSignedIn(e)) {
-                        SettingsRow("Signed in", subtitle = "Tokens refresh automatically and sync to your devices.", icon = R.drawable.ic_circle_check, showChevron = false)
+                        SettingsRow(
+                            stringResource(R.string.tools_mcp_signed_in), subtitle = stringResource(R.string.tools_mcp_signed_in_subtitle),
+                            icon = R.drawable.ic_circle_check, showChevron = false,
+                        )
                         GroupDivider()
-                        SettingsRow("Sign out", icon = R.drawable.ic_log_out, onClick = { scope.launch { container.mcp.signOut(e.id) } })
+                        SettingsRow(stringResource(R.string.action_sign_out), icon = R.drawable.ic_log_out, onClick = { scope.launch { container.mcp.signOut(e.id) } })
                     } else {
-                        SettingsRow("Sign in to ${e.name}", subtitle = "Opens your browser.", icon = R.drawable.ic_log_in, onClick = { openSignIn(e.id) })
+                        SettingsRow(
+                            stringResource(R.string.tools_mcp_sign_in_to, e.name), subtitle = stringResource(R.string.tools_mcp_opens_browser),
+                            icon = R.drawable.ic_log_in, onClick = { openSignIn(e.id) },
+                        )
                     }
                 }
             }
             Column {
-                Text("Approvals", style = FacetTheme.type.labelM, color = FacetTheme.colors.textTertiary, modifier = Modifier.padding(start = 12.dp, bottom = 8.dp))
+                Text(stringResource(R.string.tools_mcp_approvals), style = FacetTheme.type.labelM, color = FacetTheme.colors.textTertiary, modifier = Modifier.padding(start = 12.dp, bottom = 8.dp))
                 val approval = container.mcp.approval(e)
                 Segmented(ToolApproval.entries, approval, { it.label }, { a -> scope.launch { container.mcp.setApproval(e.id, a) } })
                 val yolo = container.settings.synced.collectAsStateWithLifecycle().value.yoloMode
                 Text(
-                    if (yolo) "YOLO mode is on, so these tools run without asking. Turn it off in Settings to use approvals." else approval.blurb,
+                    if (yolo) stringResource(R.string.tools_mcp_yolo_on) else approval.blurb,
                     style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal),
                     color = if (yolo) FacetTheme.colors.warning else FacetTheme.colors.textTertiary,
                     modifier = Modifier.padding(start = 12.dp, top = 6.dp),
@@ -431,41 +446,45 @@ fun McpServerEditScreen(container: AppContainer, serverId: String?, onDone: () -
             if (tools.isNotEmpty()) {
                 val disabled = container.mcp.disabledTools(e)
                 val auto = container.mcp.autoApproved(e)
-                SettingsGroup(title = "Tools (${tools.size})") {
+                SettingsGroup(title = stringResource(R.string.tools_mcp_tools_count, tools.size)) {
                     tools.forEachIndexed { i, t ->
                         if (i > 0) GroupDivider()
+                        val hint = when {
+                            t.name in auto -> stringResource(R.string.tools_mcp_tool_always_allowed)
+                            t.readOnlyHint == true -> stringResource(R.string.tools_mcp_tool_read_only)
+                            t.destructiveHint == true -> stringResource(R.string.tools_mcp_tool_destructive)
+                            else -> null
+                        }
                         SwitchRow(
                             t.title ?: t.name, t.name !in disabled, { v -> scope.launch { container.mcp.setToolEnabled(e.id, t.name, v) } },
-                            subtitle = listOfNotNull(
-                                t.description?.lineSequence()?.firstOrNull()?.take(120),
-                                when {
-                                    t.name in auto -> "Always allowed"
-                                    t.readOnlyHint == true -> "Read-only"
-                                    t.destructiveHint == true -> "Can delete or overwrite data"
-                                    else -> null
-                                },
-                            ).joinToString(" · ").ifBlank { null },
+                            subtitle = listOfNotNull(t.description?.lineSequence()?.firstOrNull()?.take(120), hint).joinToString(" · ").ifBlank { null },
                         )
                     }
                 }
             }
             SettingsGroup {
-                SettingsRow("Refresh tools", icon = R.drawable.ic_sync, onClick = {
+                SettingsRow(stringResource(R.string.tools_mcp_refresh), icon = R.drawable.ic_sync, onClick = {
                     busy = true
                     scope.launch {
                         val r = container.mcp.refreshTools(e.id)
-                        status = r.fold({ true to "Found ${it.size} tools." }, { false to (it.message ?: "Couldn't connect.") })
+                        status = r.fold(
+                            { true to Strings.plural(R.plurals.tools_mcp_found_tools, it.size, it.size) },
+                            { false to (it.message ?: Strings.get(R.string.tools_mcp_connect_failed)) },
+                        )
                         busy = false
                     }
                 })
                 GroupDivider()
-                SettingsRow("Remove server", icon = R.drawable.ic_delete, iconTint = FacetTheme.colors.error, titleColor = FacetTheme.colors.error, onClick = { confirmDelete = true })
+                SettingsRow(
+                    stringResource(R.string.tools_mcp_remove), icon = R.drawable.ic_delete, iconTint = FacetTheme.colors.error,
+                    titleColor = FacetTheme.colors.error, onClick = { confirmDelete = true },
+                )
             }
         }
     }
     if (confirmDelete) {
         ConfirmDialog(
-            "Remove ${existing?.name}?", "Its tools and sign-in are removed from all your devices.", "Remove",
+            stringResource(R.string.tools_mcp_remove_title, existing?.name.orEmpty()), stringResource(R.string.tools_mcp_remove_body), stringResource(R.string.action_remove),
             onConfirm = { existing?.let { e -> scope.launch { container.mcp.delete(e.id); onDone() } } },
             onDismiss = { confirmDelete = false }, danger = true,
         )
@@ -485,34 +504,32 @@ fun SkillsScreen(container: AppContainer, onBack: () -> Unit, onEdit: (String?) 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             message = runCatching {
-                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("Couldn't read the file.")
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error(Strings.get(R.string.tools_skill_read_failed))
                 val name = uri.lastPathSegment.orEmpty()
                 val s = if (name.endsWith(".zip", true) || (bytes.size > 2 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte())) {
                     container.skills.importZip(bytes)
                 } else {
                     container.skills.importMarkdown(bytes.toString(Charsets.UTF_8), fallbackName = name.substringAfterLast('/').substringBeforeLast('.'))
                 }
-                true to "Imported ${s.name}."
-            }.getOrElse { false to (it.message ?: "Couldn't import that file.") }
+                true to Strings.get(R.string.tools_skill_imported, s.name)
+            }.getOrElse { false to (it.message ?: Strings.get(R.string.tools_skill_import_failed)) }
         }
     }
-    SettingsPage("Skills", onBack) {
-        Intro(
-            "Skills are reusable instructions a model loads when a task calls for them, like a checklist for code review or a format for meeting notes. " +
-                "They work with any model that supports tools and sync to all your devices. Compatible with SKILL.md files.",
-        )
+    SettingsPage(stringResource(R.string.tools_skills_title), onBack) {
+        Intro(stringResource(R.string.tools_skills_intro))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FacetButton("New skill", { onEdit(null) }, icon = R.drawable.ic_plus, modifier = Modifier.weight(1f))
-            FacetButton("Import", { importMenu = true }, style = ButtonStyle.Tonal, icon = R.drawable.ic_download, modifier = Modifier.weight(1f))
+            FacetButton(stringResource(R.string.tools_skill_new), { onEdit(null) }, icon = R.drawable.ic_plus, modifier = Modifier.weight(1f))
+            FacetButton(stringResource(R.string.tools_skill_import), { importMenu = true }, style = ButtonStyle.Tonal, icon = R.drawable.ic_download, modifier = Modifier.weight(1f))
         }
         message?.let { (ok, text) -> StatusBanner(ok, text) }
         if (skills.isNotEmpty()) {
-            SettingsGroup(title = "Your skills") {
+            val alwaysOn = stringResource(R.string.tools_skill_always_on)
+            SettingsGroup(title = stringResource(R.string.tools_skills_yours)) {
                 skills.forEachIndexed { i, s ->
                     if (i > 0) GroupDivider()
                     SettingsRow(
                         s.name,
-                        subtitle = (if (s.alwaysOn) "Always on · " else "") + s.description.take(140),
+                        subtitle = (if (s.alwaysOn) "$alwaysOn · " else "") + s.description.take(140),
                         icon = R.drawable.ic_wand,
                         onClick = { onEdit(s.id) },
                         trailing = {
@@ -527,44 +544,59 @@ fun SkillsScreen(container: AppContainer, onBack: () -> Unit, onEdit: (String?) 
         }
         val examples = SkillRepository.EXAMPLES.filter { ex -> skills.none { it.name == ex.name } }
         if (examples.isNotEmpty()) {
-            SettingsGroup(title = "Examples") {
+            SettingsGroup(title = stringResource(R.string.tools_skills_examples)) {
                 examples.forEachIndexed { i, ex ->
                     if (i > 0) GroupDivider()
+                    // The example's description is written for models; show the translated summary when there is one.
+                    val blurb = ExampleSkillBlurbs[ex.name]?.let { stringResource(it) } ?: ex.description.substringBefore(". Use when").take(120)
                     SettingsRow(
-                        ex.name, subtitle = ex.description.substringBefore(". Use when").take(120), icon = R.drawable.ic_plus,
+                        ex.name, subtitle = blurb, icon = R.drawable.ic_plus,
                         onClick = { scope.launch { container.skills.save(null, ex.name, ex.description, ex.body) } },
                     )
                 }
             }
         }
         if (skills.isEmpty() && examples.isEmpty()) {
-            EmptyState("No skills yet", "Create one, or import a SKILL.md or .zip.", icon = R.drawable.ic_wand, modifier = Modifier.fillMaxWidth())
+            EmptyState(
+                stringResource(R.string.tools_skills_empty_title), stringResource(R.string.tools_skills_empty_body),
+                icon = R.drawable.ic_wand, modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
     if (importMenu) {
         MenuSheet(
-            "Import a skill",
+            stringResource(R.string.tools_skill_import_title),
             listOf(
-                MenuEntry(R.drawable.ic_files, "From a file (.md or .zip)") { picker.launch(arrayOf("text/*", "application/zip", "application/octet-stream")) },
-                MenuEntry(R.drawable.ic_link, "From a link") { importUrl = true },
+                MenuEntry(R.drawable.ic_files, stringResource(R.string.tools_skill_import_file)) { picker.launch(arrayOf("text/*", "application/zip", "application/octet-stream")) },
+                MenuEntry(R.drawable.ic_link, stringResource(R.string.tools_skill_import_link)) { importUrl = true },
             ),
             onDismiss = { importMenu = false },
         )
     }
     if (importUrl) {
         TextInputDialog(
-            "Import from a link", "", "Import",
+            stringResource(R.string.tools_skill_import_link_title), "", stringResource(R.string.tools_skill_import),
             onConfirm = { link ->
                 scope.launch {
                     message = runCatching { container.skills.importUrl(link) }
-                        .fold({ true to "Imported ${it.name}." }, { false to (it.message ?: "Couldn't import from that link.") })
+                        .fold(
+                            { true to Strings.get(R.string.tools_skill_imported, it.name) },
+                            { false to (it.message ?: Strings.get(R.string.tools_skill_import_link_failed)) },
+                        )
                 }
             },
             onDismiss = { importUrl = false },
-            placeholder = "https://…/SKILL.md or .zip",
+            placeholder = stringResource(R.string.tools_skill_import_link_placeholder),
         )
     }
 }
+
+/** Interface summaries of [SkillRepository.EXAMPLES], by skill name (their descriptions are written for models). */
+private val ExampleSkillBlurbs = mapOf(
+    "meeting-notes" to R.string.tools_skill_example_meeting_notes,
+    "code-review" to R.string.tools_skill_example_code_review,
+    "trip-planner" to R.string.tools_skill_example_trip_planner,
+)
 
 @Composable
 fun SkillEditScreen(container: AppContainer, skillId: String?, onDone: () -> Unit) {
@@ -587,42 +619,56 @@ fun SkillEditScreen(container: AppContainer, skillId: String?, onDone: () -> Uni
         sourceUrl = s.sourceUrl
         loaded = true
     }
-    SettingsPage(if (skillId == null) "New skill" else "Edit skill", onDone) {
+    SettingsPage(stringResource(if (skillId == null) R.string.tools_skill_new else R.string.tools_skill_edit_title), onDone) {
         if (!loaded) return@SettingsPage
-        FacetTextField(name, { name = it }, label = "Name", placeholder = "e.g. meeting-notes", supporting = "Lowercase words joined by hyphens. Models refer to the skill by this name.")
         FacetTextField(
-            description, { description = it }, label = "When to use it",
-            placeholder = "Turn rough notes into structured meeting notes. Use when the user shares notes or a transcript.",
-            singleLine = false, minLines = 2, maxLines = 5,
-            supporting = "Models read this to decide when to load the skill. Be specific.",
+            name, { name = it }, label = stringResource(R.string.common_name), placeholder = stringResource(R.string.tools_skill_name_placeholder, "meeting-notes"),
+            supporting = stringResource(R.string.tools_skill_name_supporting),
         )
         FacetTextField(
-            instructions, { instructions = it }, label = "Instructions",
-            placeholder = "Step-by-step instructions, formats, checklists, examples…",
+            description, { description = it }, label = stringResource(R.string.tools_skill_description),
+            placeholder = stringResource(R.string.tools_skill_description_placeholder),
+            singleLine = false, minLines = 2, maxLines = 5,
+            supporting = stringResource(R.string.tools_skill_description_supporting),
+        )
+        FacetTextField(
+            instructions, { instructions = it }, label = stringResource(R.string.tools_skill_instructions),
+            placeholder = stringResource(R.string.tools_skill_instructions_placeholder),
             singleLine = false, minLines = 8, maxLines = 24, imeAction = ImeAction.Default,
         )
         SettingsGroup {
             SwitchRow(
-                "Always on", alwaysOn, { alwaysOn = it },
-                subtitle = "Include the full instructions in every chat instead of loading them when needed. Uses more tokens.",
+                stringResource(R.string.tools_skill_always_on), alwaysOn, { alwaysOn = it },
+                subtitle = stringResource(R.string.tools_skill_always_on_subtitle),
                 icon = R.drawable.ic_infinity,
             )
         }
         if (resources.isNotEmpty()) {
-            SettingsGroup(title = "Bundled files") {
+            SettingsGroup(title = stringResource(R.string.tools_skill_bundled_files)) {
                 resources.forEachIndexed { i, r ->
                     if (i > 0) GroupDivider()
-                    SettingsRow(r.path, subtitle = "${r.content.length} characters", icon = R.drawable.ic_file_text, showChevron = false, trailing = {
-                        io.dtsoftware.facet.ui.components.FacetIconButton(R.drawable.ic_close, "Remove", { resources = resources - r }, tint = FacetTheme.colors.textTertiary, size = 16.dp)
-                    })
+                    val length = r.content.length
+                    SettingsRow(
+                        r.path, subtitle = pluralStringResource(R.plurals.tools_skill_characters, length, Format.number(length.toLong())),
+                        icon = R.drawable.ic_file_text, showChevron = false,
+                        trailing = {
+                            io.dtsoftware.facet.ui.components.FacetIconButton(
+                                R.drawable.ic_close, stringResource(R.string.action_remove), { resources = resources - r },
+                                tint = FacetTheme.colors.textTertiary, size = 16.dp,
+                            )
+                        },
+                    )
                 }
             }
         }
         sourceUrl?.let {
-            Text("Imported from $it", style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = FacetTheme.colors.textTertiary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp))
+            Text(
+                stringResource(R.string.tools_skill_imported_from, it), style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal),
+                color = FacetTheme.colors.textTertiary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp),
+            )
         }
         FacetButton(
-            "Save skill",
+            stringResource(R.string.tools_skill_save),
             {
                 scope.launch {
                     val existing = skillId?.let { container.skills.get(it) }
@@ -633,11 +679,11 @@ fun SkillEditScreen(container: AppContainer, skillId: String?, onDone: () -> Uni
             enabled = name.isNotBlank() && description.isNotBlank() && instructions.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
         )
-        if (skillId != null) FacetButton("Delete skill", { confirmDelete = true }, style = ButtonStyle.Danger, modifier = Modifier.fillMaxWidth())
+        if (skillId != null) FacetButton(stringResource(R.string.tools_skill_delete), { confirmDelete = true }, style = ButtonStyle.Danger, modifier = Modifier.fillMaxWidth())
     }
     if (confirmDelete && skillId != null) {
         ConfirmDialog(
-            "Delete this skill?", "It's removed from all your devices.", "Delete",
+            stringResource(R.string.tools_skill_delete_title), stringResource(R.string.tools_skill_delete_body), stringResource(R.string.action_delete),
             onConfirm = { scope.launch { container.skills.delete(skillId); onDone() } }, onDismiss = { confirmDelete = false }, danger = true,
         )
     }

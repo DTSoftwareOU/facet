@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import io.dtsoftware.facet.core.i18n.AppLanguage
+import io.dtsoftware.facet.core.i18n.Strings
 
 class FacetApp : Application() {
     lateinit var container: AppContainer
@@ -11,6 +13,8 @@ class FacetApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        Strings.init(this)
+        AppLanguage.migrate(this)
         container = AppContainer(this)
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {

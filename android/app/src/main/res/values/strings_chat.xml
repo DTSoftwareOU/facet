@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Chat screen: top bar -->
+    <!-- Content description of the button that opens the list of chats -->
+    <string name="chat_open_chats">Open chats</string>
+    <!-- Top bar title when no model is selected; tapping it opens the model list -->
+    <string name="chat_choose_model">Choose a model</string>
+    <!-- Content description of the button that opens this chat's settings (noun) -->
+    <string name="chat_settings">Chat settings</string>
+    <!-- Menu item: exports the chat as a Markdown document and shares it -->
+    <string name="chat_share_markdown">Share as Markdown</string>
+    <!-- Content description of the round button that scrolls to the latest message -->
+    <string name="chat_scroll_to_bottom">Scroll to bottom</string>
+
+    <!-- Chat screen: empty chat -->
+    <!-- Title shown before any provider is set up: you use your own API keys -->
+    <string name="chat_empty_byok_title">Bring your own keys</string>
+    <string name="chat_empty_byok_body">Add an API key from OpenAI, Anthropic, Google, OpenRouter or any OpenAI-compatible service. Your keys stay encrypted on your devices.</string>
+    <!-- Button -->
+    <string name="chat_empty_add_key">Add an API key</string>
+    <!-- Greeting in a new, empty chat -->
+    <string name="chat_empty_title">What can I help with?</string>
+
+    <!-- Message box (composer) -->
+    <!-- Placeholder in the empty message box -->
+    <string name="chat_placeholder_default">Ask anything</string>
+    <!-- Placeholder in the empty message box; "Message" is a verb (write to). %1$s: an assistant's name such as Writing coach -->
+    <string name="chat_placeholder_assistant">Message %1$s</string>
+    <!-- Content description of the + button -->
+    <string name="chat_add_attachment">Add attachment</string>
+    <!-- Content description of the remove button on a file attached to the draft. %1$s: the file name -->
+    <string name="chat_remove_attachment">Remove %1$s</string>
+    <!-- Chip that turns web search on or off for the next reply -->
+    <string name="chat_web_search">Search</string>
+    <!-- Heading of the menu where you pick how hard the model thinks -->
+    <string name="chat_reasoning_effort">Reasoning effort</string>
+    <!-- Menu item: use the model's own default reasoning effort -->
+    <string name="chat_model_default">Model default</string>
+    <!-- Menu item: use the model's own default reasoning effort. %1$s: that effort level, such as Medium -->
+    <string name="chat_model_default_with">Model default (%1$s)</string>
+    <!-- Content description of the badge shown while YOLO mode (tools run without asking) is on -->
+    <string name="chat_yolo_on">YOLO mode is on</string>
+    <!-- Accessibility action of that badge -->
+    <string name="chat_yolo_turn_off">Turn off YOLO mode</string>
+    <!-- Snackbar after tapping the YOLO badge -->
+    <string name="chat_yolo_turned_off">YOLO mode is off. Facet will ask before tools that change things.</string>
+
+    <!-- Slash commands: descriptions under /new, /model, /folder, /pc, /resume-from-claude, /resume-from-codex -->
+    <string name="chat_slash_new">Start a new chat</string>
+    <string name="chat_slash_model">Choose the model</string>
+    <string name="chat_slash_folder">Choose the chat\'s working folder on your PC</string>
+    <string name="chat_slash_pc">Choose which PC the chat uses, or none</string>
+    <string name="chat_slash_resume_claude">Continue a Claude Code session from the chat\'s folder</string>
+    <string name="chat_slash_resume_codex">Continue a Codex session from the chat\'s folder</string>
+
+    <!-- Dictation (speech to text in the message box) -->
+    <!-- Content description of the microphone button (verb) -->
+    <string name="chat_dictate">Dictate</string>
+    <!-- Content description of the microphone button while dictating -->
+    <string name="chat_dictation_stop">Stop dictation</string>
+    <!-- Shown in the message box while the phone listens -->
+    <string name="chat_dictation_listening">Listening…</string>
+    <!-- Shown in the message box while recording for a transcription model -->
+    <string name="chat_dictation_listening_tap_to_finish">Listening… tap the mic to finish</string>
+    <!-- Shown in the message box while the recording is turned into text -->
+    <string name="chat_dictation_transcribing">Transcribing…</string>
+    <string name="chat_dictation_unavailable">Speech recognition isn\'t available on this device.</string>
+    <string name="chat_dictation_permission">Allow microphone access to dictate.</string>
+    <string name="chat_dictation_mic_failed">Couldn\'t start the microphone.</string>
+    <string name="chat_dictation_no_match">Didn\'t catch that. Try again.</string>
+    <string name="chat_dictation_offline">Speech recognition needs a connection.</string>
+    <string name="chat_dictation_stopped">Dictation stopped.</string>
+    <string name="chat_dictation_failed">Transcription failed.</string>
+
+    <!-- Read aloud -->
+    <string name="chat_read_aloud_failed">Couldn\'t create the voice.</string>
+    <!-- Spoken aloud in place of a code block when a reply is read aloud -->
+    <string name="chat_read_aloud_code_omitted">Code omitted.</string>
+    <!-- Spoken aloud in place of a math formula when a reply is read aloud -->
+    <string name="chat_read_aloud_equation">An equation.</string>
+
+    <!-- Attach sheet (buttons) -->
+    <string name="chat_attach_camera">Camera</string>
+    <string name="chat_attach_photos">Photos</string>
+    <string name="chat_attach_files">Files</string>
+
+    <!-- Message menu (long press on a message) -->
+    <string name="chat_menu_select_text">Select text</string>
+    <string name="chat_menu_edit_resend">Edit and resend</string>
+    <string name="chat_menu_regenerate_other">Regenerate with another model</string>
+    <string name="chat_menu_read_aloud">Read aloud</string>
+    <string name="chat_menu_stop_reading">Stop reading</string>
+    <!-- Opens token usage and price of a reply -->
+    <string name="chat_menu_usage">Usage and cost</string>
+    <string name="chat_menu_delete_message">Delete message</string>
+
+    <!-- Rename and delete a chat -->
+    <!-- Dialog title -->
+    <string name="chat_rename_title">Rename chat</string>
+    <!-- Dialog title -->
+    <string name="chat_delete_title">Delete this chat?</string>
+    <string name="chat_delete_body">It will be removed from all your devices.</string>
+
+    <!-- Snackbars and errors -->
+    <!-- After "Make default" in the chat settings -->
+    <string name="chat_settings_saved_default">New chats will use these settings.</string>
+    <!-- After continuing a long Claude Code or Codex session in a chat -->
+    <string name="chat_resume_truncated">The session was long, so only its latest part came over.</string>
+    <string name="chat_error_load_models">Couldn\'t load models.</string>
+    <!-- "Providers" is the settings screen where API keys are added -->
+    <string name="chat_error_no_model">Add an API key in Providers to start chatting.</string>
+    <string name="chat_error_send">Couldn\'t send.</string>
+    <string name="chat_error_attach">Couldn\'t attach that file.</string>
+    <string name="chat_error_generic">Something went wrong.</string>
+
+    <!-- Images, videos and audio in replies (accessibility actions, verbs) -->
+    <string name="chat_media_play_video">Play video</string>
+    <string name="chat_media_open_image">Open image</string>
+    <string name="chat_media_play">Play</string>
+    <string name="chat_media_pause">Pause</string>
+
+    <!-- Chat shared as Markdown: who wrote each message -->
+    <!-- Label above the person's own messages -->
+    <string name="chat_export_you">You</string>
+    <!-- Label above a reply when the model's name isn't known -->
+    <string name="chat_export_assistant">Assistant</string>
+</resources>

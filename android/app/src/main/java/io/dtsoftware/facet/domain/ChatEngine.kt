@@ -1,5 +1,8 @@
 package io.dtsoftware.facet.domain
 
+import androidx.annotation.StringRes
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.core.util.Clock
 import io.dtsoftware.facet.core.util.Ids
@@ -187,8 +190,8 @@ class ChatEngine(
                     spec.computerHost, spec.computerFolder,
                 )
             }
-            ?: throw ChatException("Choose a model to start chatting.")
-        if (isGenerating(conv.id)) throw ChatException("Wait for the current reply to finish, or stop it.")
+            ?: throw ChatException(Strings.get(R.string.engine_choose_model_to_start))
+        if (isGenerating(conv.id)) throw ChatException(Strings.get(R.string.engine_wait_for_reply))
         val tree = MessageTree(conversations.messages(conv.id))
         val parent = tree.activePath(conv.currentLeafId).lastOrNull()
         val refs = attachmentIds.mapNotNull { attachments.get(it) }.map { AttachmentStore.ref(it) }
@@ -206,7 +209,8 @@ class ChatEngine(
         )
         conversations.insertMessage(user)
         if (!conv.titleSet && parent == null) {
-            val provisional = text.trim().lineSequence().firstOrNull().orEmpty().take(48).ifBlank { refs.firstOrNull()?.name ?: "New chat" }
+            val provisional = text.trim().lineSequence().firstOrNull().orEmpty().take(48)
+                .ifBlank { refs.firstOrNull()?.name ?: Strings.get(R.string.shortcut_new_chat) }
             conversations.update(conv.id) { it.copy(title = provisional) }
         }
         startReply(conv.id, user)
@@ -225,7 +229,7 @@ class ChatEngine(
     /** Replaces a user message with an edited copy (a new branch) and generates a reply. */
     suspend fun editAndResend(userMessageId: String, newText: String) {
         val original = conversations.message(userMessageId) ?: return
-        if (isGenerating(original.conversationId)) throw ChatException("Wait for the current reply to finish, or stop it.")
+        if (isGenerating(original.conversationId)) throw ChatException(Strings.get(R.string.engine_wait_for_reply))
         val now = Clock.now()
         val edited = original.copy(id = Ids.new(), content = newText.trim(), createdAt = now, updatedAt = now, dirty = true)
         conversations.insertMessage(edited)
@@ -292,8 +296,8 @@ class ChatEngine(
 
     private suspend fun resolveModel(conv: ConversationEntity): Pair<ProviderEntity, ModelInfo> {
         val provider = conv.providerId?.let { providers.get(it) }?.takeIf { !it.deleted && it.enabled }
-            ?: throw ChatException("The provider for this chat was removed. Pick another model.")
-        val modelId = conv.modelId ?: throw ChatException("Choose a model to continue.")
+            ?: throw ChatException(Strings.get(R.string.engine_provider_removed))
+        val modelId = conv.modelId ?: throw ChatException(Strings.get(R.string.engine_choose_model_to_continue))
         return provider to providers.modelInfo(provider, modelId)
     }
 
@@ -430,7 +434,7 @@ class ChatEngine(
                 if (st.error != null || st.stop != StopReason.TOOL_USE || calls.isEmpty()) break
                 val roundLimit = if (settings.synced.value.yoloMode) ToolRegistry.YOLO_TOOL_ROUNDS else ToolRegistry.MAX_TOOL_ROUNDS
                 if (round >= roundLimit) {
-                    publish { it.copy(notice = "Stopped after $roundLimit rounds of tool use.") }
+                    publish { it.copy(notice = Strings.plural(R.plurals.engine_stopped_after_rounds, roundLimit, roundLimit)) }
                     st.stop = StopReason.END
                     break
                 }
@@ -454,13 +458,13 @@ class ChatEngine(
             withContext(NonCancellable) { finish(reply, st, provider, model, MessageStatus.STOPPED, includeFinalBlocks = false) }
             throw e
         } catch (e: ChatException) {
-            st.error = LlmError(ErrorKind.BAD_REQUEST, e.message ?: "Couldn't send this message.")
+            st.error = LlmError(ErrorKind.BAD_REQUEST, e.message ?: Strings.get(R.string.engine_send_failed))
         } catch (e: LlmException) {
             st.error = e.error
         } catch (e: IOException) {
-            st.error = LlmError(ErrorKind.NETWORK, "Couldn't reach ${provider.label}. Check your connection and try again.")
+            st.error = LlmError(ErrorKind.NETWORK, Strings.get(R.string.engine_unreachable, provider.label))
         } catch (e: Exception) {
-            st.error = LlmError(ErrorKind.UNKNOWN, "Something went wrong: ${e.message ?: e.javaClass.simpleName}")
+            st.error = LlmError(ErrorKind.UNKNOWN, Strings.get(R.string.engine_unknown_error, e.message ?: e.javaClass.simpleName))
         }
         st.endThinking()
         val status = when {
@@ -542,30 +546,39 @@ class ChatEngine(
     }
 
     private fun preparingLabel(kind: ToolKind?, serverName: String?, name: String) = when (kind) {
-        ToolKind.SEARCH -> "Searching the web"
-        ToolKind.FETCH -> "Reading a page"
-        ToolKind.SKILL -> "Loading a skill"
+        ToolKind.SEARCH -> Strings.get(R.string.toolrun_searching_web)
+        ToolKind.FETCH -> Strings.get(R.string.toolrun_reading_page)
+        ToolKind.SKILL -> Strings.get(R.string.toolrun_loading_skill)
         ToolKind.COMPUTER -> io.dtsoftware.facet.domain.tools.PcTools.label(name, "{}", done = false)
         else -> if (serverName != null) "$serverName: $name" else name
     }
 
+    /** The UI line for a tool call while it runs, or once done (before the tool's own label arrives). */
     private fun runningLabel(def: io.dtsoftware.facet.domain.tools.ToolDef?, args: String, done: Boolean = false): String {
         val obj = runCatching { AppJson.parseToJsonElement(args).let { it as kotlinx.serialization.json.JsonObject } }.getOrNull()
         fun s(k: String) = (obj?.get(k) as? kotlinx.serialization.json.JsonPrimitive)?.content.orEmpty()
+        fun pick(@StringRes running: Int, @StringRes finished: Int, vararg values: Any) =
+            Strings.get(if (done) finished else running, *values)
         return when (def?.kind) {
-            ToolKind.SEARCH -> (if (done) "Searched" else "Searching") + " “${s("query").take(60)}”"
-            ToolKind.FETCH -> (if (done) "Read " else "Reading ") + (runCatching { java.net.URI(s("url")).host?.removePrefix("www.") }.getOrNull() ?: "a page")
-            ToolKind.SKILL -> if (s("name").isNotBlank()) (if (done) "Used skill " else "Using skill ") + s("name") else (if (done) "Read " else "Reading ") + s("path")
+            ToolKind.SEARCH -> pick(R.string.toolrun_searching, R.string.toolrun_searched, s("query").take(60))
+            ToolKind.FETCH -> {
+                val host = runCatching { java.net.URI(s("url")).host?.removePrefix("www.") }.getOrNull()
+                if (host == null) pick(R.string.toolrun_reading_page, R.string.toolrun_read_page)
+                else pick(R.string.toolrun_reading_host, R.string.toolrun_read_host, host)
+            }
+            ToolKind.SKILL ->
+                if (s("name").isNotBlank()) pick(R.string.toolrun_using_skill, R.string.toolrun_used_skill, s("name"))
+                else pick(R.string.toolrun_reading_path, R.string.toolrun_read_path, s("path"))
             ToolKind.MCP -> "${def.serverName}: ${def.remoteName}"
-            ToolKind.MEDIA -> (if (done) "Created " else "Creating ") + when (def.output) {
-                io.dtsoftware.facet.llm.ModelOutput.IMAGE -> "an image"
-                io.dtsoftware.facet.llm.ModelOutput.VIDEO -> "a video"
-                io.dtsoftware.facet.llm.ModelOutput.SPEECH -> "speech"
-                io.dtsoftware.facet.llm.ModelOutput.MUSIC -> "music"
-                else -> "media"
+            ToolKind.MEDIA -> when (def.output) {
+                io.dtsoftware.facet.llm.ModelOutput.IMAGE -> pick(R.string.toolrun_creating_an_image, R.string.toolrun_created_an_image)
+                io.dtsoftware.facet.llm.ModelOutput.VIDEO -> pick(R.string.toolrun_creating_a_video, R.string.toolrun_created_a_video)
+                io.dtsoftware.facet.llm.ModelOutput.SPEECH -> pick(R.string.toolrun_creating_speech, R.string.toolrun_created_speech)
+                io.dtsoftware.facet.llm.ModelOutput.MUSIC -> pick(R.string.toolrun_creating_music, R.string.toolrun_created_music)
+                else -> pick(R.string.toolrun_creating_media, R.string.toolrun_created_media)
             }
             ToolKind.COMPUTER -> io.dtsoftware.facet.domain.tools.PcTools.label(def.remoteName ?: def.spec.name, args, done)
-            null -> "Tool"
+            null -> Strings.get(R.string.toolrun_tool)
         }
     }
 
@@ -615,10 +628,10 @@ class ChatEngine(
 
     /** Builds the provider request from the visible branch ending at [reply]'s parent. */
     private suspend fun buildRequest(conversationId: String, reply: MessageEntity, model: ModelInfo): ChatRequest {
-        val conv = conversations.get(conversationId) ?: throw ChatException("This chat no longer exists.")
+        val conv = conversations.get(conversationId) ?: throw ChatException(Strings.get(R.string.engine_chat_gone))
         val all = conversations.messages(conversationId)
         val tree = MessageTree(all)
-        val path = tree.pathTo(reply.parentId ?: throw ChatException("Nothing to reply to."))
+        val path = tree.pathTo(reply.parentId ?: throw ChatException(Strings.get(R.string.engine_nothing_to_reply)))
         val messages = ArrayList<ChatMessage>()
         fun add(msg: ChatMessage) {
             val last = messages.lastOrNull()

@@ -30,6 +30,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -38,9 +40,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dtsoftware.facet.AppContainer
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.Dates
 import io.dtsoftware.facet.data.db.ProviderEntity
 import io.dtsoftware.facet.llm.ApiStyle
+import io.dtsoftware.facet.llm.ErrorKind
+import io.dtsoftware.facet.llm.LlmException
 import io.dtsoftware.facet.llm.ModelCatalog
 import io.dtsoftware.facet.llm.ModelInfo
 import io.dtsoftware.facet.llm.ProviderKind
@@ -82,24 +87,26 @@ fun ProvidersScreen(container: AppContainer, onBack: () -> Unit, onEdit: (String
     val allProviders by container.providers.observeAll().collectAsStateWithLifecycle(emptyList())
     val providers = allProviders.filterNot { io.dtsoftware.facet.domain.tools.SearchKind.isSearch(it.kind) }
     val c = FacetTheme.colors
-    SettingsPage("Providers and keys", onBack) {
+    SettingsPage(stringResource(R.string.providers_title), onBack) {
         if (providers.isEmpty()) {
             Text(
-                "Facet talks to AI providers directly with your own API keys. Pick one to get started; you can add as many as you like.",
+                stringResource(R.string.providers_intro),
                 style = FacetTheme.type.body, color = c.textSecondary, modifier = Modifier.padding(horizontal = 4.dp),
             )
         } else {
-            SettingsGroup(title = "Connected") {
+            val off = stringResource(R.string.common_off)
+            SettingsGroup(title = stringResource(R.string.providers_connected)) {
                 providers.forEachIndexed { i, p ->
                     if (i > 0) GroupDivider()
                     val kind = ProviderKind.fromId(p.kind)
                     val count = remember(p.modelsJson, p.customModelsJson) { container.providers.models(p).size }
+                    val countText = pluralStringResource(R.plurals.providers_model_count, count, count)
                     SettingsRow(
                         p.label,
                         subtitle = buildString {
                             if (p.label != kind.displayName) append(kind.displayName).append(" · ")
-                            append(if (count == 1) "1 model" else "$count models")
-                            if (!p.enabled) append(" · Off")
+                            append(countText)
+                            if (!p.enabled) append(" · ").append(off)
                         },
                         leading = { ProviderBadge(kind, size = 34.dp) },
                         onClick = { onEdit(p.id) },
@@ -107,7 +114,7 @@ fun ProvidersScreen(container: AppContainer, onBack: () -> Unit, onEdit: (String
                 }
             }
         }
-        SettingsGroup(title = if (providers.isEmpty()) "Chat" else "Add chat models") {
+        SettingsGroup(title = stringResource(if (providers.isEmpty()) R.string.providers_section_chat else R.string.providers_section_add_chat)) {
             ProviderOrder.forEachIndexed { i, kind ->
                 if (i > 0) GroupDivider()
                 SettingsRow(
@@ -118,7 +125,7 @@ fun ProvidersScreen(container: AppContainer, onBack: () -> Unit, onEdit: (String
                 )
             }
         }
-        SettingsGroup(title = "Media only") {
+        SettingsGroup(title = stringResource(R.string.providers_section_media_only)) {
             MediaProviderOrder.forEachIndexed { i, kind ->
                 if (i > 0) GroupDivider()
                 SettingsRow(
@@ -190,12 +197,13 @@ fun ProviderEditScreen(container: AppContainer, providerId: String?, kindId: Str
             if (result.isSuccess) {
                 onDone()
             } else {
-                status = false to ((result.exceptionOrNull()?.message ?: "Couldn't load models.") + " The provider was saved; you can add model IDs manually.")
+                val reason = result.exceptionOrNull()?.message ?: Strings.get(R.string.providers_models_load_failed)
+                status = false to Strings.get(R.string.providers_saved_add_manually, reason)
             }
         }
     }
 
-    SettingsPage(if (existing == null) "Add ${kind.displayName}" else existing!!.label, onDone) {
+    SettingsPage(if (existing == null) stringResource(R.string.providers_add_title, kind.displayName) else existing!!.label, onDone) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
             ProviderBadge(kind, size = 44.dp)
             Spacer(Modifier.width(14.dp))
@@ -208,13 +216,18 @@ fun ProviderEditScreen(container: AppContainer, providerId: String?, kindId: Str
 
         FacetTextField(
             key, { key = it.trim(); keyChanged = true; status = null },
-            label = if (needsKey) "API key" else "API key (optional)",
-            placeholder = kind.keyHint,
+            label = stringResource(if (needsKey) R.string.providers_api_key else R.string.providers_api_key_optional),
+            // Key hints like "sk-…" stay as they are; providers without a required key get a translated word instead.
+            placeholder = when {
+                needsKey -> kind.keyHint
+                kind == ProviderKind.CUSTOM -> stringResource(R.string.providers_key_optional)
+                else -> stringResource(R.string.providers_key_not_needed)
+            },
             password = true,
             mono = true,
-            supporting = "Encrypted on this device and synced end-to-end. Facet's server can't read it.",
+            supporting = stringResource(R.string.providers_api_key_supporting),
             trailing = {
-                FacetIconButton(R.drawable.ic_clipboard, "Paste", {
+                FacetIconButton(R.drawable.ic_clipboard, stringResource(R.string.providers_paste), {
                     scope.launch {
                         val clip = clipboard.getClipEntry()?.clipData
                         val text = clip?.takeIf { it.description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) || it.itemCount > 0 }
@@ -229,31 +242,39 @@ fun ProviderEditScreen(container: AppContainer, providerId: String?, kindId: Str
                 Modifier.clip(FacetShapes.small).clickable { uri.openUri(url) }.padding(horizontal = 4.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(if (kind.requiresKey) "Get an API key from ${kind.displayName}" else "About ${kind.displayName}", style = FacetTheme.type.labelM, color = c.primary)
+                Text(
+                    if (kind.requiresKey) stringResource(R.string.providers_get_key, kind.displayName) else stringResource(R.string.providers_about, kind.displayName),
+                    style = FacetTheme.type.labelM, color = c.primary,
+                )
                 Spacer(Modifier.width(4.dp))
                 FacetIcon(R.drawable.ic_external, null, tint = c.primary, size = 14.dp)
             }
         }
-        FacetTextField(label, { label = it }, label = "Name", placeholder = kind.displayName, supporting = "Useful when you add more than one key, e.g. Work or Personal.")
+        FacetTextField(
+            label, { label = it }, label = stringResource(R.string.common_name), placeholder = kind.displayName,
+            supporting = stringResource(R.string.providers_name_supporting),
+        )
 
         if (!advanced) {
             Text(
-                "Advanced settings", style = FacetTheme.type.labelM, color = c.textSecondary,
+                stringResource(R.string.providers_advanced), style = FacetTheme.type.labelM, color = c.textSecondary,
                 modifier = Modifier.clip(FacetShapes.small).clickable { advanced = true }.padding(4.dp),
             )
         } else {
             FacetTextField(
-                baseUrl, { baseUrl = it.trim() }, label = "Base URL", mono = true, keyboardType = KeyboardType.Uri,
-                supporting = when (kind) {
-                    ProviderKind.OLLAMA, ProviderKind.LMSTUDIO -> "Your computer's address on the local network, e.g. http://192.168.1.20:11434/v1"
-                    ProviderKind.CUSTOM -> "Any OpenAI-compatible endpoint, ending before /chat/completions."
-                    else -> "Change only for a proxy or a compatible gateway."
-                },
+                baseUrl, { baseUrl = it.trim() }, label = stringResource(R.string.providers_base_url), mono = true, keyboardType = KeyboardType.Uri,
+                supporting = stringResource(
+                    when (kind) {
+                        ProviderKind.OLLAMA, ProviderKind.LMSTUDIO -> R.string.providers_base_url_local
+                        ProviderKind.CUSTOM -> R.string.providers_base_url_custom
+                        else -> R.string.providers_base_url_default
+                    },
+                ),
             )
             FacetTextField(
-                headers, { headers = it }, label = "Extra headers", placeholder = "Header-Name: value",
+                headers, { headers = it }, label = stringResource(R.string.providers_headers), placeholder = "Header-Name: value",
                 singleLine = false, minLines = 2, maxLines = 6, mono = true, imeAction = ImeAction.Default,
-                supporting = "One per line. Sent with every request to this provider.",
+                supporting = stringResource(R.string.providers_headers_supporting),
             )
         }
 
@@ -270,32 +291,43 @@ fun ProviderEditScreen(container: AppContainer, providerId: String?, kindId: Str
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             FacetButton(
-                "Test", {
+                stringResource(R.string.providers_test), {
                     testing = true
                     status = null
                     scope.launch {
                         val r = container.providers.verify(kind, baseUrl, key, parsedHeaders())
                         testing = false
                         status = if (r.isSuccess) {
-                            true to if (key.isBlank()) "Connected." else "Connected. This key works."
+                            true to Strings.get(if (key.isBlank()) R.string.providers_test_connected else R.string.providers_test_key_works)
                         } else {
-                            false to (r.exceptionOrNull()?.message?.removeSuffix(" Check it in Providers.") ?: "That didn't work.")
+                            val e = r.exceptionOrNull()
+                            // This page is Providers already, so the rejected-key message drops its "Check it in Providers." advice.
+                            val message = if (e is LlmException && e.error.kind == ErrorKind.AUTH) Strings.get(R.string.providers_key_rejected, kind.displayName)
+                            else (e?.message ?: Strings.get(R.string.providers_test_failed))
+                            false to message
                         }
                     }
                 },
                 style = ButtonStyle.Tonal, loading = testing, enabled = canSave, modifier = Modifier.weight(1f),
             )
-            FacetButton(if (existing == null) "Save" else "Save changes", ::save, loading = saving, enabled = canSave, modifier = Modifier.weight(1f))
+            FacetButton(
+                stringResource(if (existing == null) R.string.action_save else R.string.providers_save_changes), ::save,
+                loading = saving, enabled = canSave, modifier = Modifier.weight(1f),
+            )
         }
 
         existing?.let { p ->
             SettingsGroup {
-                SwitchRow("Enabled", enabled, { v -> enabled = v; scope.launch { container.providers.update(p.id, label, baseUrl, null, parsedHeaders(), v) } }, subtitle = "Turn off to hide its models without deleting the key.", icon = R.drawable.ic_activity)
+                SwitchRow(
+                    stringResource(R.string.providers_enabled), enabled,
+                    { v -> enabled = v; scope.launch { container.providers.update(p.id, label, baseUrl, null, parsedHeaders(), v) } },
+                    subtitle = stringResource(R.string.providers_enabled_subtitle), icon = R.drawable.ic_activity,
+                )
             }
             ModelsSection(container, p, onAdd = { addModel = true })
             SettingsGroup {
                 SettingsRow(
-                    "Remove provider", subtitle = "Deletes this key from all your devices.",
+                    stringResource(R.string.providers_remove), subtitle = stringResource(R.string.providers_remove_subtitle),
                     icon = R.drawable.ic_delete, iconTint = c.error, titleColor = c.error, onClick = { confirmDelete = true },
                 )
             }
@@ -304,14 +336,14 @@ fun ProviderEditScreen(container: AppContainer, providerId: String?, kindId: Str
 
     if (confirmDelete) {
         ConfirmDialog(
-            "Remove ${existing?.label}?", "The key is deleted from all your devices. Chats that used it stay, but need another model to continue.",
-            "Remove", onConfirm = { existing?.let { p -> scope.launch { container.providers.delete(p.id); onDone() } } },
+            stringResource(R.string.providers_remove_title, existing?.label.orEmpty()), stringResource(R.string.providers_remove_body),
+            stringResource(R.string.action_remove), onConfirm = { existing?.let { p -> scope.launch { container.providers.delete(p.id); onDone() } } },
             onDismiss = { confirmDelete = false }, danger = true,
         )
     }
     if (addModel) {
         TextInputDialog(
-            "Add a model ID", "", "Add",
+            stringResource(R.string.providers_add_model_title), "", stringResource(R.string.providers_add_model_confirm),
             onConfirm = { id ->
                 val p = existing ?: return@TextInputDialog
                 val mid = id.trim()
@@ -327,7 +359,7 @@ fun ProviderEditScreen(container: AppContainer, providerId: String?, kindId: Str
                 scope.launch { container.providers.addCustomModel(p.id, ModelInfo(mid, ModelCatalog.displayName(kind, mid), caps = caps, output = output)) }
             },
             onDismiss = { addModel = false },
-            placeholder = "e.g. gpt-5.5 or claude-opus-5-5",
+            placeholder = stringResource(R.string.providers_add_model_placeholder, "gpt-5.5", "claude-opus-5-5"),
         )
     }
 }
@@ -357,20 +389,30 @@ private fun ModelsSection(container: AppContainer, p: ProviderEntity, onAdd: () 
     Column {
         Row(Modifier.padding(start = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Models" + if (hidden.isNotEmpty()) " · ${hidden.size} hidden" else "",
+                if (hidden.isEmpty()) stringResource(R.string.providers_models)
+                else pluralStringResource(R.plurals.providers_models_hidden, hidden.size, hidden.size),
                 style = FacetTheme.type.labelM, color = c.textTertiary, modifier = Modifier.weight(1f),
             )
-            if (p.modelsFetchedAt > 0) Text("Updated " + Dates.relative(p.modelsFetchedAt).replaceFirstChar { it.lowercase() }, style = FacetTheme.type.labelS, color = c.textTertiary)
+            if (p.modelsFetchedAt > 0) {
+                Text(
+                    if (Dates.justNow(p.modelsFetchedAt)) stringResource(R.string.providers_updated_just_now)
+                    else stringResource(R.string.providers_updated, Dates.relative(p.modelsFetchedAt)),
+                    style = FacetTheme.type.labelS, color = c.textTertiary,
+                )
+            }
             if (models.isNotEmpty()) {
                 Box {
-                    FacetIconButton(R.drawable.ic_more_horiz, "Show or hide models", { menu = true }, tint = c.textTertiary, size = 18.dp)
+                    FacetIconButton(R.drawable.ic_more_horiz, stringResource(R.string.providers_models_menu), { menu = true }, tint = c.textTertiary, size = 18.dp)
                     DropdownMenu(menu, { menu = false }, containerColor = c.surface, shape = RoundedCornerShape(16.dp)) {
                         val ids = filtered.map { it.id }
-                        val what = if (query.isBlank()) "all" else "${ids.size} matching"
-                        MenuItem(R.drawable.ic_eye, "Show $what") { setHidden(ids, false) }
-                        MenuItem(R.drawable.ic_eye_off, "Hide $what") { setHidden(ids, true) }
+                        val showLabel = if (query.isBlank()) stringResource(R.string.providers_show_all)
+                        else pluralStringResource(R.plurals.providers_show_matching, ids.size, ids.size)
+                        val hideLabel = if (query.isBlank()) stringResource(R.string.providers_hide_all)
+                        else pluralStringResource(R.plurals.providers_hide_matching, ids.size, ids.size)
+                        MenuItem(R.drawable.ic_eye, showLabel) { setHidden(ids, false) }
+                        MenuItem(R.drawable.ic_eye_off, hideLabel) { setHidden(ids, true) }
                         if (query.isBlank() && favorites.isNotEmpty()) {
-                            MenuItem(R.drawable.ic_star, "Show only favorites") {
+                            MenuItem(R.drawable.ic_star, stringResource(R.string.providers_show_favorites)) {
                                 menu = false
                                 scope.launch {
                                     container.providers.setHidden(p.id, models.map { it.id }.filter { it !in favorites }, true)
@@ -383,14 +425,14 @@ private fun ModelsSection(container: AppContainer, p: ProviderEntity, onAdd: () 
             }
         }
         Text(
-            "Tap a model to rename it, change what it makes or can do, or set its price.",
+            stringResource(R.string.providers_models_hint),
             style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
             modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
         )
         Column(Modifier.fillMaxWidth().clip(FacetShapes.group).background(c.surface).padding(vertical = 8.dp)) {
             Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FacetButton(
-                    "Refresh", {
+                    stringResource(R.string.providers_refresh), {
                         refreshing = true
                         error = null
                         scope.launch {
@@ -400,13 +442,15 @@ private fun ModelsSection(container: AppContainer, p: ProviderEntity, onAdd: () 
                     },
                     style = ButtonStyle.Tonal, icon = R.drawable.ic_sync, loading = refreshing, modifier = Modifier.weight(1f),
                 )
-                FacetButton("Add model ID", onAdd, style = ButtonStyle.Tonal, icon = R.drawable.ic_plus, modifier = Modifier.weight(1f))
+                FacetButton(stringResource(R.string.providers_add_model), onAdd, style = ButtonStyle.Tonal, icon = R.drawable.ic_plus, modifier = Modifier.weight(1f))
             }
             error?.let { Text(it, style = FacetTheme.type.labelM, color = c.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
-            if (models.size > 8) SearchField(query, { query = it }, "Filter models", Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+            if (models.size > 8) SearchField(query, { query = it }, stringResource(R.string.providers_filter_models), Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
             if (models.isEmpty()) {
-                Text("No models yet. Refresh, or add a model ID.", style = FacetTheme.type.body, color = c.textTertiary, modifier = Modifier.padding(16.dp))
+                Text(stringResource(R.string.providers_models_empty), style = FacetTheme.type.body, color = c.textTertiary, modifier = Modifier.padding(16.dp))
             }
+            val hiddenLabel = stringResource(R.string.providers_model_hidden)
+            val editedLabel = stringResource(R.string.providers_model_edited)
             shown.forEach { m ->
                 val isHidden = m.id in hidden
                 val edited = prefs[m.id]?.customized == true
@@ -422,7 +466,7 @@ private fun ModelsSection(container: AppContainer, p: ProviderEntity, onAdd: () 
                         Text(m.displayName, style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             listOfNotNull(
-                                if (isHidden) "Hidden" else null, if (edited) "Edited" else null,
+                                if (isHidden) hiddenLabel else null, if (edited) editedLabel else null,
                                 m.output.takeIf { it != io.dtsoftware.facet.llm.ModelOutput.TEXT }?.label, m.id,
                             ).joinToString(" · "),
                             style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
@@ -431,12 +475,12 @@ private fun ModelsSection(container: AppContainer, p: ProviderEntity, onAdd: () 
                     }
                     FacetIconButton(
                         if (isHidden) R.drawable.ic_eye_off else R.drawable.ic_eye,
-                        if (isHidden) "Show ${m.displayName}" else "Hide ${m.displayName}",
+                        stringResource(if (isHidden) R.string.providers_show_model else R.string.providers_hide_model, m.displayName),
                         { setHidden(listOf(m.id), !isHidden) },
                         tint = c.textTertiary, size = 18.dp,
                     )
                     FacetIconButton(
-                        R.drawable.ic_star, if (m.id in favorites) "Unfavorite" else "Favorite",
+                        R.drawable.ic_star, stringResource(if (m.id in favorites) R.string.providers_unfavorite else R.string.providers_favorite),
                         { scope.launch { container.providers.toggleFavorite(p.id, m.id) } },
                         tint = if (m.id in favorites) io.dtsoftware.facet.ui.theme.GemPalette.Gold else c.textTertiary, size = 18.dp,
                     )
@@ -444,7 +488,7 @@ private fun ModelsSection(container: AppContainer, p: ProviderEntity, onAdd: () 
             }
             if (!showAll && query.isBlank() && filtered.size > shown.size) {
                 Text(
-                    "Show all ${filtered.size}", style = FacetTheme.type.labelM, color = c.primary,
+                    pluralStringResource(R.plurals.providers_show_all_count, filtered.size, filtered.size), style = FacetTheme.type.labelM, color = c.primary,
                     modifier = Modifier.clip(FacetShapes.small).clickable { showAll = true }.padding(horizontal = 16.dp, vertical = 10.dp),
                 )
             }

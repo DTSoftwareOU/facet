@@ -69,6 +69,18 @@ android {
         buildConfig = true
     }
 
+    // Settings → Appearance → Language can switch to any language, so an app bundle must keep them all.
+    bundle {
+        language { enableSplit = false }
+    }
+
+    lint {
+        // Every string needs a translation in every language (StringResourcesTest checks the details);
+        // fatal, so a release build stops on a missing one.
+        error += "MissingTranslation"
+        fatal += "MissingTranslation"
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true

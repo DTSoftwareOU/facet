@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.sync
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -194,9 +196,9 @@ class SyncApi(private val http: OkHttpClient) {
     }
 
     private fun defaultMessage(status: Int) = when (status) {
-        in 500..599 -> "The sync server had a problem. Try again in a moment."
-        404 -> "The sync server doesn't recognize this request. Check the server address."
-        else -> "The sync server returned an error ($status)."
+        in 500..599 -> Strings.get(R.string.sync_error_server_problem)
+        404 -> Strings.get(R.string.sync_error_unknown_request)
+        else -> Strings.get(R.string.sync_error_server_status, status.toString())
     }
 
     private suspend fun execute(request: Request): Response = suspendCancellableCoroutine { cont ->

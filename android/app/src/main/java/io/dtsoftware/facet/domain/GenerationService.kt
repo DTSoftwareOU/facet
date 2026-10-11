@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import io.dtsoftware.facet.FacetApp
 import io.dtsoftware.facet.MainActivity
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import kotlinx.coroutines.launch
 
 /**
@@ -64,14 +65,14 @@ object Notifications {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_PROGRESS, "Replies in progress", NotificationManager.IMPORTANCE_MIN).apply {
-                description = "Shown while Facet finishes a reply in the background."
+            NotificationChannel(CHANNEL_PROGRESS, Strings.get(R.string.notification_channel_progress), NotificationManager.IMPORTANCE_MIN).apply {
+                description = Strings.get(R.string.notification_channel_progress_description)
                 setShowBadge(false)
             },
         )
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_READY, "Finished replies", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Tells you when a reply finishes while Facet is in the background."
+            NotificationChannel(CHANNEL_READY, Strings.get(R.string.notification_channel_ready), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = Strings.get(R.string.notification_channel_ready_description)
             },
         )
     }
@@ -90,8 +91,8 @@ object Notifications {
     fun progress(context: Context): Notification =
         NotificationCompat.Builder(context, CHANNEL_PROGRESS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Finishing your reply")
-            .setContentText("Facet keeps working while you're away.")
+            .setContentTitle(Strings.get(R.string.notification_progress_title))
+            .setContentText(Strings.get(R.string.notification_progress_text))
             .setOngoing(true)
             .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
@@ -104,7 +105,7 @@ object Notifications {
         ) return
         val n = NotificationCompat.Builder(context, CHANNEL_READY)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title.ifBlank { "Reply ready" })
+            .setContentTitle(title.ifBlank { Strings.get(R.string.notification_reply_ready) })
             .setContentText(preview.replace(Regex("[#*`>_]"), "").trim())
             .setStyle(NotificationCompat.BigTextStyle().bigText(preview.replace(Regex("[#*`>_]"), "").trim()))
             .setAutoCancel(true)

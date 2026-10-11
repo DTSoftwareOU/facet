@@ -1,7 +1,9 @@
 package io.dtsoftware.facet.data.repo
 
 import androidx.room.withTransaction
+import io.dtsoftware.facet.R
 import io.dtsoftware.facet.core.crypto.SecretBox
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.core.util.Clock
 import io.dtsoftware.facet.core.util.Ids
@@ -196,7 +198,7 @@ class ProviderRepository(
     }
 
     suspend fun refreshModels(id: String): Result<List<ModelInfo>> = runCatching {
-        val p = dao.get(id) ?: error("Provider not found")
+        val p = dao.get(id) ?: error(Strings.get(R.string.data_error_provider_not_found))
         val models = client(p).listModels().sortedWith(compareByDescending<ModelInfo> { it.createdAt ?: 0 }.thenBy { it.displayName })
         dao.setModels(id, AppJson.encodeToString(models), Clock.now())
         models

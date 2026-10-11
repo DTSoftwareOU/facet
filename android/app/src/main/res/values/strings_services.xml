@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Account and sign-in errors (shown on the sign-in, sign-up, recovery and account screens) -->
+    <string name="sync_error_password_key">Your encryption key couldn\'t be unlocked with this password.</string>
+    <string name="sync_error_recovery_code_invalid">That recovery code isn\'t valid. It has 32 letters and digits.</string>
+    <string name="sync_error_recovery_code_mismatch">That recovery code doesn\'t match this account.</string>
+    <string name="sync_error_sign_in_to_change_password">Sign in again to change your password.</string>
+    <string name="sync_error_sign_in_to_create_recovery_code">Sign in again to create a recovery code.</string>
+    <string name="sync_error_not_signed_in">You\'re not signed in.</string>
+    <string name="sync_error_session_ended">Your session ended. Sign in again to keep syncing.</string>
+    <string name="sync_error_invalid_credentials">That email and password don\'t match an account.</string>
+    <string name="sync_error_email_taken">An account with this email already exists. Sign in instead.</string>
+    <string name="sync_error_registration_closed">This server isn\'t accepting new accounts.</string>
+    <string name="sync_error_rate_limited">Too many attempts. Wait a few minutes and try again.</string>
+    <string name="sync_error_email_disabled">This server can\'t send email. Use your recovery code instead.</string>
+    <string name="sync_error_unreachable">Couldn\'t reach the sync server. Check your connection and the server address.</string>
+
+    <!-- Sync server errors (shown in account settings and on the auth screens) -->
+    <string name="sync_error_server">The sync server returned an error.</string>
+    <string name="sync_error_server_problem">The sync server had a problem. Try again in a moment.</string>
+    <string name="sync_error_unknown_request">The sync server doesn\'t recognize this request. Check the server address.</string>
+    <!-- %1$s: an HTTP status code such as 403 -->
+    <string name="sync_error_server_status">The sync server returned an error (%1$s).</string>
+
+    <!-- Sync status messages (Settings, Account) -->
+    <string name="sync_status_sign_in_to_resume">Sign in again to resume sync.</string>
+    <string name="sync_status_offline">Offline. Changes will sync when you\'re back online.</string>
+    <string name="sync_status_failed">Sync failed. It will retry automatically.</string>
+    <string name="sync_status_storage_full">Your sync storage is full. New changes and files are kept on this device until you free up space in Settings → Data and storage.</string>
+
+    <!-- MCP server connection errors (shown in Settings → MCP servers and when a tool call fails). %1$s is always the server's name unless noted. -->
+    <plurals name="mcp_error_timeout">
+        <item quantity="one">%1$s didn\'t answer within %2$d second.</item>
+        <item quantity="other">%1$s didn\'t answer within %2$d seconds.</item>
+    </plurals>
+    <string name="mcp_error_session_ending">%1$s keeps ending the session. Try again in a moment.</string>
+    <string name="mcp_error_connection_closed">This connection to %1$s was closed.</string>
+    <string name="mcp_error_unreachable">Couldn\'t reach %1$s. Check the address and your connection.</string>
+    <!-- %2$s: the error message the server sent (often English) -->
+    <string name="mcp_error_session_refused">%1$s refused to start a session: %2$s</string>
+    <string name="mcp_error_session_failed">Couldn\'t start a session with %1$s.</string>
+    <!-- %1$s: an HTTP status code such as 405 -->
+    <string name="mcp_error_no_server_status">No MCP server answered at this address (HTTP %1$s).</string>
+    <string name="mcp_error_no_server">No MCP server answered at this address.</string>
+    <string name="mcp_error_no_version">%1$s didn\'t say which MCP version it speaks.</string>
+    <!-- %2$s: a protocol version such as 2030-01-01 -->
+    <string name="mcp_error_unsupported_version">%1$s uses MCP version %2$s, which Facet doesn\'t support yet.</string>
+    <string name="mcp_error_forbidden">%1$s refused access (HTTP 403).</string>
+    <string name="mcp_error_not_found">No MCP server was found at this address (HTTP 404).</string>
+    <string name="mcp_error_rate_limited">%1$s is rate limiting requests. Try again shortly.</string>
+    <!-- %2$s: an HTTP status code such as 502 -->
+    <string name="mcp_error_server">%1$s had a server error (HTTP %2$s).</string>
+    <!-- %2$s: an HTTP status code such as 400 -->
+    <string name="mcp_error_rejected">%1$s rejected the request (HTTP %2$s).</string>
+    <string name="mcp_error_stream_closed">%1$s closed the stream before answering.</string>
+    <string name="mcp_error_no_answer">%1$s accepted the request but sent no answer.</string>
+    <string name="mcp_error_not_mcp">The address answered, but not as an MCP server.</string>
+    <string name="mcp_error_wrong_answer">%1$s answered a different request.</string>
+    <string name="mcp_error_connection_ended">%1$s closed the connection.</string>
+    <!-- "message endpoint": the address an MCP server gives for sending it messages -->
+    <string name="mcp_error_no_endpoint">%1$s didn\'t send its message endpoint.</string>
+    <!-- "initialize": the name of the first MCP request -->
+    <string name="mcp_error_no_initialize">%1$s didn\'t answer the initialize request.</string>
+    <!-- Fallback when an MCP server reports an error without a message -->
+    <string name="mcp_error_unknown">Unknown error</string>
+    <string name="mcp_sign_in_required">This server needs you to sign in.</string>
+
+    <!-- MCP server sign-in (OAuth) errors -->
+    <string name="mcp_oauth_no_pkce">This server\'s sign-in doesn\'t support PKCE (S256), so Facet can\'t sign in safely.</string>
+    <string name="mcp_oauth_invalid_address">This server advertised an invalid sign-in address.</string>
+    <!-- %1$s: the reason the sign-in server gave (often English) -->
+    <string name="mcp_oauth_incomplete">Sign-in didn\'t complete: %1$s</string>
+    <string name="mcp_oauth_no_token">The sign-in server didn\'t return an access token.</string>
+    <string name="mcp_oauth_invalid_url">That server address isn\'t a valid URL.</string>
+    <string name="mcp_oauth_registration_required">This server requires an app that was registered in advance, and it doesn\'t allow automatic registration. Facet can\'t sign in to it yet; use a server that supports dynamic client registration, or connect with an access token in headers.</string>
+    <string name="mcp_oauth_unreachable">Couldn\'t reach the server\'s sign-in service.</string>
+    <!-- %1$s: the reason the server gave (often English), or an HTTP status such as "HTTP 400" -->
+    <string name="mcp_oauth_registration_refused">The server didn\'t accept Facet\'s sign-in registration: %1$s</string>
+    <string name="mcp_oauth_no_client_id">The server\'s sign-in registration didn\'t return a client id.</string>
+
+    <!-- Using a PC from this device (Facet for Windows). %1$s is always the PC's name unless noted. -->
+    <!-- Name shown for a PC that didn't send its name -->
+    <string name="remote_your_pc">Your PC</string>
+    <!-- “Let your other devices use this PC” and “Computer access” are the names of a switch and a settings page in Facet for Windows -->
+    <string name="remote_turn_on_hint">Turn on “Let your other devices use this PC” in Facet on %1$s: Settings → Computer access.</string>
+    <string name="remote_error_pc_failed">The PC couldn\'t do that.</string>
+    <string name="remote_error_restarted">%1$s restarted. Try again.</string>
+    <string name="remote_error_went_offline">%1$s went offline.</string>
+    <string name="remote_error_pc_went_offline">The PC went offline.</string>
+    <string name="remote_error_offline">%1$s is offline.</string>
+    <string name="remote_error_pc_offline">The PC is offline.</string>
+    <string name="remote_error_your_pc_offline">Your PC is offline.</string>
+    <string name="remote_error_signed_out">You\'re signed out.</string>
+    <string name="remote_error_sign_in">Sign in to use your PC from here.</string>
+    <string name="remote_error_relay_failed">The sync server couldn\'t pass this on.</string>
+    <string name="remote_error_unreachable">Couldn\'t reach the sync server. Check your connection.</string>
+    <string name="remote_error_no_answer">%1$s didn\'t answer. Check that Facet is running there.</string>
+    <string name="remote_error_bad_response">The PC sent an answer this version of Facet doesn\'t understand.</string>
+
+    <!-- Continuing a Claude Code or Codex session from a PC as a new chat -->
+    <!-- Default chat title. %1$s: the coding agent, Claude Code or Codex -->
+    <string name="remote_import_title">%1$s session</string>
+    <string name="remote_import_empty">This session has no messages to continue.</string>
+
+    <!-- App updates (errors shown in the update card and the update settings) -->
+    <string name="updater_error_check">Couldn\'t check for updates. Check your connection and try again.</string>
+    <string name="updater_error_bad_manifest">Couldn\'t read the update information. Try again later.</string>
+    <string name="updater_error_download">Couldn\'t download the update. Check your connection and try again.</string>
+    <string name="updater_error_no_space">There isn\'t enough free space for the update. Free up some space and try again.</string>
+    <string name="updater_error_corrupt">The download was incomplete or damaged, so it wasn\'t installed. Try again.</string>
+    <string name="updater_error_not_facet">The download isn\'t the expected version of Facet, so it wasn\'t installed.</string>
+    <string name="updater_error_install">Android couldn\'t install the update. Try again.</string>
+    <string name="updater_error_install_conflict">Android refused the update because this copy of Facet is signed with a different key. Install Facet from facet.dtsoftware.io to get updates.</string>
+    <string name="updater_error_install_storage">There isn\'t enough storage to install the update. Free up some space and try again.</string>
+
+    <!-- Attaching files to a message (errors). %1$s is always the file's name. -->
+    <string name="data_attach_unsupported">Facet can attach images, PDFs and text files. \"%1$s\" isn\'t one of those.</string>
+    <string name="data_attach_image_unreadable">That image couldn\'t be read.</string>
+    <string name="data_attach_unreadable">\"%1$s\" couldn\'t be read.</string>
+    <!-- %2$d: the size limit in megabytes, such as 32 -->
+    <string name="data_attach_too_large">\"%1$s\" is larger than %2$d MB.</string>
+
+    <!-- Error when loading the models of an AI provider that was removed -->
+    <string name="data_error_provider_not_found">Provider not found</string>
+</resources>

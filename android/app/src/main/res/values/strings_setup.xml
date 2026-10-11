@@ -1,0 +1,498 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings > Web search -->
+    <string name="tools_web_search_title">Web search</string>
+    <string name="tools_web_search_intro">Claude, GPT and Gemini models can search on their own. For every other model, add a search key here and Facet gives the model a search tool and a page reader. Searches go straight from your phone to the service you pick.</string>
+    <!-- Section title: the search service that is set up now -->
+    <string name="tools_web_search_in_use">In use</string>
+    <!-- Status of the search service: set up and on -->
+    <string name="tools_web_search_ready">Ready</string>
+    <!-- Section title -->
+    <string name="tools_web_search_choose">Choose a search service</string>
+    <!-- Section title: pick a different search service -->
+    <string name="tools_web_search_switch">Switch service</string>
+    <string name="tools_web_search_prefer_native">Prefer built-in search</string>
+    <string name="tools_web_search_prefer_native_subtitle">When a model can search on its own, let it. Turn off to always use your search service.</string>
+    <string name="tools_web_search_remove_title">Remove web search?</string>
+    <string name="tools_web_search_remove_body">Models without built-in search won\'t be able to search the web.</string>
+
+    <!-- Web search setup sheet -->
+    <string name="tools_api_key">API key</string>
+    <!-- Link. %1$s: a search service name such as Brave Search -->
+    <string name="tools_get_api_key">Get an API key from %1$s</string>
+    <!-- Label of the field with the address of your own SearXNG server -->
+    <string name="tools_searxng_url">Instance URL</string>
+    <string name="tools_searxng_url_supporting">Your SearXNG instance with the JSON format enabled in settings.yml.</string>
+    <!-- Button: checks that the search service works -->
+    <string name="tools_test">Test</string>
+    <plurals name="tools_web_search_test_ok">
+        <item quantity="one">Working. Found %1$d result.</item>
+        <item quantity="other">Working. Found %1$d results.</item>
+    </plurals>
+    <string name="tools_test_failed">That didn\'t work.</string>
+
+    <!-- Settings > MCP servers -->
+    <string name="tools_mcp_title">MCP servers</string>
+    <string name="tools_mcp_intro">Connect apps and data sources through the Model Context Protocol. Their tools work with any model that supports tools, in every chat, on all your devices. Connection details and sign-ins are end-to-end encrypted.</string>
+    <!-- Button -->
+    <string name="tools_mcp_add">Add a server</string>
+    <!-- Section title: servers you added -->
+    <string name="tools_mcp_connected">Connected</string>
+    <string name="tools_mcp_connecting">Connecting…</string>
+    <!-- Under a server's name, followed by " · " and how its tools ask for approval -->
+    <plurals name="tools_mcp_tool_count">
+        <item quantity="one">%1$d tool</item>
+        <item quantity="other">%1$d tools</item>
+    </plurals>
+    <string name="tools_mcp_footer">Only remote servers (Streamable HTTP or SSE) can run from a phone. Tools that change things ask before running unless you allow them.</string>
+    <!-- Section title: a built-in list of known MCP servers -->
+    <string name="tools_mcp_directory_title">Add from the directory</string>
+    <!-- Placeholder of the search field. %1$d: how many servers the directory lists -->
+    <plurals name="tools_mcp_directory_search">
+        <item quantity="one">Search %1$d server</item>
+        <item quantity="other">Search %1$d servers</item>
+    </plurals>
+    <!-- Filter chip: the most used servers -->
+    <string name="tools_mcp_popular">Popular</string>
+    <!-- "Add a server" is the button at the top of the page (tools_mcp_add) -->
+    <string name="tools_mcp_directory_no_matches">No matches. You can add any remote server by its address with Add a server.</string>
+    <string name="tools_mcp_directory_all_added">You\'ve added everything here.</string>
+    <!-- Tag on a directory server: works without signing in -->
+    <string name="tools_mcp_auth_open">Open</string>
+    <!-- Tag and option: you sign in to the server with your account (OAuth) -->
+    <string name="tools_mcp_auth_sign_in">Sign in</string>
+    <!-- Tag and option: the server needs an access token from the service -->
+    <string name="tools_mcp_auth_token">Token</string>
+
+    <!-- MCP server details -->
+    <!-- Page title -->
+    <string name="tools_mcp_add_title">Add MCP server</string>
+    <string name="tools_mcp_url">Server URL</string>
+    <string name="tools_mcp_url_supporting">The server\'s Streamable HTTP or SSE endpoint, e.g. https://example.com/mcp</string>
+    <!-- Label above the sign-in options: None, Token, Sign in -->
+    <string name="tools_mcp_authentication">Authentication</string>
+    <!-- Label of a field with HTTP headers, one "Name: value" per line -->
+    <string name="tools_mcp_headers">Headers</string>
+    <string name="tools_mcp_headers_supporting">One per line. Stored encrypted.</string>
+    <!-- Button -->
+    <string name="tools_mcp_save_connect">Save and connect</string>
+    <!-- Button -->
+    <string name="tools_mcp_save_reconnect">Save and reconnect</string>
+    <plurals name="tools_mcp_connected_tools">
+        <item quantity="one">Connected. %1$d tool available.</item>
+        <item quantity="other">Connected. %1$d tools available.</item>
+    </plurals>
+    <string name="tools_mcp_needs_sign_in">This server needs you to sign in.</string>
+    <string name="tools_mcp_headers_rejected">The server rejected these headers. Check the token.</string>
+    <string name="tools_mcp_connect_failed">Couldn\'t connect.</string>
+    <string name="tools_mcp_sign_in_failed">Couldn\'t start sign-in.</string>
+    <!-- Section title: your sign-in with the server -->
+    <string name="tools_mcp_account">Account</string>
+    <string name="tools_mcp_signed_in">Signed in</string>
+    <string name="tools_mcp_signed_in_subtitle">Tokens refresh automatically and sync to your devices.</string>
+    <!-- %1$s: an MCP server name such as GitHub -->
+    <string name="tools_mcp_sign_in_to">Sign in to %1$s</string>
+    <string name="tools_mcp_opens_browser">Opens your browser.</string>
+    <!-- Section title: when tools ask before they run -->
+    <string name="tools_mcp_approvals">Approvals</string>
+    <string name="tools_mcp_yolo_on">YOLO mode is on, so these tools run without asking. Turn it off in Settings to use approvals.</string>
+    <!-- Section title. %1$d: how many tools the server offers -->
+    <string name="tools_mcp_tools_count">Tools (%1$d)</string>
+    <!-- Under a tool's name: it runs without asking -->
+    <string name="tools_mcp_tool_always_allowed">Always allowed</string>
+    <!-- Under a tool's name: it only reads data -->
+    <string name="tools_mcp_tool_read_only">Read-only</string>
+    <string name="tools_mcp_tool_destructive">Can delete or overwrite data</string>
+    <string name="tools_mcp_refresh">Refresh tools</string>
+    <plurals name="tools_mcp_found_tools">
+        <item quantity="one">Found %1$d tool.</item>
+        <item quantity="other">Found %1$d tools.</item>
+    </plurals>
+    <string name="tools_mcp_remove">Remove server</string>
+    <!-- Dialog title. %1$s: an MCP server name -->
+    <string name="tools_mcp_remove_title">Remove %1$s?</string>
+    <string name="tools_mcp_remove_body">Its tools and sign-in are removed from all your devices.</string>
+
+    <!-- Settings > Skills -->
+    <string name="tools_skills_title">Skills</string>
+    <string name="tools_skills_intro">Skills are reusable instructions a model loads when a task calls for them, like a checklist for code review or a format for meeting notes. They work with any model that supports tools and sync to all your devices. Compatible with SKILL.md files.</string>
+    <!-- Button and page title -->
+    <string name="tools_skill_new">New skill</string>
+    <!-- Button (verb): opens the import options -->
+    <string name="tools_skill_import">Import</string>
+    <!-- Section title -->
+    <string name="tools_skills_yours">Your skills</string>
+    <!-- Switch title, and a status under a skill: its instructions are in every chat -->
+    <string name="tools_skill_always_on">Always on</string>
+    <!-- Section title: example skills you can add with one tap -->
+    <string name="tools_skills_examples">Examples</string>
+    <!-- Description of the example skill "meeting-notes" -->
+    <string name="tools_skill_example_meeting_notes">Turn rough notes or a transcript into clear meeting notes with decisions and action items.</string>
+    <!-- Description of the example skill "code-review" -->
+    <string name="tools_skill_example_code_review">Review code changes for bugs, security issues and maintainability, with concrete fixes.</string>
+    <!-- Description of the example skill "trip-planner" -->
+    <string name="tools_skill_example_trip_planner">Plan trips day by day with realistic travel times, budgets and booking tips.</string>
+    <string name="tools_skills_empty_title">No skills yet</string>
+    <string name="tools_skills_empty_body">Create one, or import a SKILL.md or .zip.</string>
+    <!-- Menu title -->
+    <string name="tools_skill_import_title">Import a skill</string>
+    <string name="tools_skill_import_file">From a file (.md or .zip)</string>
+    <string name="tools_skill_import_link">From a link</string>
+    <!-- Dialog title -->
+    <string name="tools_skill_import_link_title">Import from a link</string>
+    <!-- Placeholder of the link field: a link to a SKILL.md file, or to a .zip file -->
+    <string name="tools_skill_import_link_placeholder">https://…/SKILL.md or .zip</string>
+    <!-- %1$s: a skill name such as meeting-notes -->
+    <string name="tools_skill_imported">Imported %1$s.</string>
+    <string name="tools_skill_read_failed">Couldn\'t read the file.</string>
+    <string name="tools_skill_import_failed">Couldn\'t import that file.</string>
+    <string name="tools_skill_import_link_failed">Couldn\'t import from that link.</string>
+
+    <!-- Skill editor -->
+    <!-- Page title -->
+    <string name="tools_skill_edit_title">Edit skill</string>
+    <!-- Placeholder. %1$s: an example skill name (meeting-notes) that stays as it is -->
+    <string name="tools_skill_name_placeholder">e.g. %1$s</string>
+    <string name="tools_skill_name_supporting">Lowercase words joined by hyphens. Models refer to the skill by this name.</string>
+    <!-- Label of the skill's description field -->
+    <string name="tools_skill_description">When to use it</string>
+    <!-- Placeholder: an example description -->
+    <string name="tools_skill_description_placeholder">Turn rough notes into structured meeting notes. Use when the user shares notes or a transcript.</string>
+    <string name="tools_skill_description_supporting">Models read this to decide when to load the skill. Be specific.</string>
+    <!-- Label of the skill's instructions field -->
+    <string name="tools_skill_instructions">Instructions</string>
+    <string name="tools_skill_instructions_placeholder">Step-by-step instructions, formats, checklists, examples…</string>
+    <string name="tools_skill_always_on_subtitle">Include the full instructions in every chat instead of loading them when needed. Uses more tokens.</string>
+    <!-- Section title: files that came with the skill -->
+    <string name="tools_skill_bundled_files">Bundled files</string>
+    <!-- Size of a bundled file. %1$s: a number, already formatted (e.g. 12,480) -->
+    <plurals name="tools_skill_characters">
+        <item quantity="one">%1$s character</item>
+        <item quantity="other">%1$s characters</item>
+    </plurals>
+    <!-- %1$s: the web address the skill was imported from -->
+    <string name="tools_skill_imported_from">Imported from %1$s</string>
+    <!-- Button -->
+    <string name="tools_skill_save">Save skill</string>
+    <!-- Button -->
+    <string name="tools_skill_delete">Delete skill</string>
+    <string name="tools_skill_delete_title">Delete this skill?</string>
+    <string name="tools_skill_delete_body">It\'s removed from all your devices.</string>
+
+    <!-- Settings > Providers and keys -->
+    <string name="providers_title">Providers and keys</string>
+    <string name="providers_intro">Facet talks to AI providers directly with your own API keys. Pick one to get started; you can add as many as you like.</string>
+    <!-- Section title: providers you added -->
+    <string name="providers_connected">Connected</string>
+    <!-- Under a provider's name: how many models it has -->
+    <plurals name="providers_model_count">
+        <item quantity="one">%1$d model</item>
+        <item quantity="other">%1$d models</item>
+    </plurals>
+    <!-- Section title (before any provider is added): providers with chat models -->
+    <string name="providers_section_chat">Chat</string>
+    <!-- Section title -->
+    <string name="providers_section_add_chat">Add chat models</string>
+    <!-- Section title: providers that only make images, video, speech, music or transcripts -->
+    <string name="providers_section_media_only">Media only</string>
+
+    <!-- Provider details -->
+    <!-- Page title. %1$s: a provider name such as OpenAI -->
+    <string name="providers_add_title">Add %1$s</string>
+    <string name="providers_api_key">API key</string>
+    <string name="providers_api_key_optional">API key (optional)</string>
+    <!-- Placeholder of the API key field for providers that run on your own computer -->
+    <string name="providers_key_not_needed">Not needed</string>
+    <!-- Placeholder of the API key field for a custom endpoint -->
+    <string name="providers_key_optional">Optional</string>
+    <string name="providers_api_key_supporting">Encrypted on this device and synced end-to-end. Facet\'s server can\'t read it.</string>
+    <!-- Content description of a button that pastes the key from the clipboard -->
+    <string name="providers_paste">Paste</string>
+    <!-- Link. %1$s: a provider name such as OpenAI -->
+    <string name="providers_get_key">Get an API key from %1$s</string>
+    <!-- Link to the provider's website. %1$s: a provider name such as Ollama -->
+    <string name="providers_about">About %1$s</string>
+    <string name="providers_name_supporting">Useful when you add more than one key, e.g. Work or Personal.</string>
+    <!-- Link that shows more fields -->
+    <string name="providers_advanced">Advanced settings</string>
+    <string name="providers_base_url">Base URL</string>
+    <string name="providers_base_url_local">Your computer\'s address on the local network, e.g. http://192.168.1.20:11434/v1</string>
+    <string name="providers_base_url_custom">Any OpenAI-compatible endpoint, ending before /chat/completions.</string>
+    <string name="providers_base_url_default">Change only for a proxy or a compatible gateway.</string>
+    <!-- Label of a field with extra HTTP headers -->
+    <string name="providers_headers">Extra headers</string>
+    <string name="providers_headers_supporting">One per line. Sent with every request to this provider.</string>
+    <!-- Button: checks that the key works -->
+    <string name="providers_test">Test</string>
+    <string name="providers_test_connected">Connected.</string>
+    <string name="providers_test_key_works">Connected. This key works.</string>
+    <!-- %1$s: a provider name such as OpenAI -->
+    <string name="providers_key_rejected">%1$s rejected this API key.</string>
+    <string name="providers_test_failed">That didn\'t work.</string>
+    <!-- Button -->
+    <string name="providers_save_changes">Save changes</string>
+    <string name="providers_models_load_failed">Couldn\'t load models.</string>
+    <!-- %1$s: why the model list didn't load, a full sentence such as "Couldn't load models." -->
+    <string name="providers_saved_add_manually">%1$s The provider was saved; you can add model IDs manually.</string>
+    <!-- Switch: whether the provider's models are offered -->
+    <string name="providers_enabled">Enabled</string>
+    <string name="providers_enabled_subtitle">Turn off to hide its models without deleting the key.</string>
+    <string name="providers_remove">Remove provider</string>
+    <string name="providers_remove_subtitle">Deletes this key from all your devices.</string>
+    <!-- Dialog title. %1$s: the provider's name -->
+    <string name="providers_remove_title">Remove %1$s?</string>
+    <string name="providers_remove_body">The key is deleted from all your devices. Chats that used it stay, but need another model to continue.</string>
+    <!-- Dialog title -->
+    <string name="providers_add_model_title">Add a model ID</string>
+    <!-- Button (verb): adds the typed model ID -->
+    <string name="providers_add_model_confirm">Add</string>
+    <!-- Placeholder. %1$s and %2$s: example model IDs that stay as they are -->
+    <string name="providers_add_model_placeholder">e.g. %1$s or %2$s</string>
+
+    <!-- Provider details > Models -->
+    <!-- Section title -->
+    <string name="providers_models">Models</string>
+    <!-- Section title. %1$d: how many models are hidden from the model picker -->
+    <plurals name="providers_models_hidden">
+        <item quantity="one">Models · %1$d hidden</item>
+        <item quantity="other">Models · %1$d hidden</item>
+    </plurals>
+    <!-- When the model list was loaded -->
+    <string name="providers_updated_just_now">Updated just now</string>
+    <!-- When the model list was loaded. %1$s: a relative time or date, e.g. "5 min. ago" or "Oct 3" -->
+    <string name="providers_updated">Updated %1$s</string>
+    <!-- Content description of the menu button -->
+    <string name="providers_models_menu">Show or hide models</string>
+    <!-- Menu item: shows every model in the model picker -->
+    <string name="providers_show_all">Show all</string>
+    <!-- Menu item: hides every model from the model picker -->
+    <string name="providers_hide_all">Hide all</string>
+    <!-- Menu item. %1$d: how many models match the filter -->
+    <plurals name="providers_show_matching">
+        <item quantity="one">Show %1$d matching</item>
+        <item quantity="other">Show %1$d matching</item>
+    </plurals>
+    <!-- Menu item. %1$d: how many models match the filter -->
+    <plurals name="providers_hide_matching">
+        <item quantity="one">Hide %1$d matching</item>
+        <item quantity="other">Hide %1$d matching</item>
+    </plurals>
+    <string name="providers_show_favorites">Show only favorites</string>
+    <string name="providers_models_hint">Tap a model to rename it, change what it makes or can do, or set its price.</string>
+    <!-- Button (verb): reloads the model list -->
+    <string name="providers_refresh">Refresh</string>
+    <!-- Button -->
+    <string name="providers_add_model">Add model ID</string>
+    <!-- Placeholder of a search field -->
+    <string name="providers_filter_models">Filter models</string>
+    <string name="providers_models_empty">No models yet. Refresh, or add a model ID.</string>
+    <!-- Status under a model: not shown in the model picker -->
+    <string name="providers_model_hidden">Hidden</string>
+    <!-- Status under a model: you changed its settings -->
+    <string name="providers_model_edited">Edited</string>
+    <!-- Content description. %1$s: a model name -->
+    <string name="providers_show_model">Show %1$s</string>
+    <!-- Content description. %1$s: a model name -->
+    <string name="providers_hide_model">Hide %1$s</string>
+    <!-- Content description (verb): adds the model to favorites -->
+    <string name="providers_favorite">Favorite</string>
+    <!-- Content description (verb): removes the model from favorites -->
+    <string name="providers_unfavorite">Unfavorite</string>
+    <!-- Link. %1$d: how many models the list has -->
+    <plurals name="providers_show_all_count">
+        <item quantity="one">Show all %1$d</item>
+        <item quantity="other">Show all %1$d</item>
+    </plurals>
+
+    <!-- Model settings sheet -->
+    <string name="modeledit_show_in_picker">Show in model picker</string>
+    <string name="modeledit_hidden_subtitle">Hidden. Chats that already use it keep working.</string>
+    <string name="modeledit_listed_subtitle">Listed when you choose a model.</string>
+    <!-- Section label: what the model produces (chat, images, video…) -->
+    <string name="modeledit_makes">Makes</string>
+    <!-- %1$s: the kind Facet detected, %2$s: the kind you picked; both are names such as Images or Video -->
+    <string name="modeledit_sorted_as">Sorted as “%1$s” automatically. Your choice moves it to the “%2$s” list.</string>
+    <!-- Section title -->
+    <string name="modeledit_capabilities">Capabilities</string>
+    <!-- Switch: the model accepts images -->
+    <string name="modeledit_cap_images">Images</string>
+    <string name="modeledit_cap_images_subtitle">Accepts photos and screenshots.</string>
+    <!-- Switch: the model accepts PDF files -->
+    <string name="modeledit_cap_pdfs">PDFs</string>
+    <string name="modeledit_cap_pdfs_subtitle">Reads PDF files directly.</string>
+    <!-- Switch: the model can use tools -->
+    <string name="modeledit_cap_tools">Tools</string>
+    <string name="modeledit_cap_tools_subtitle">Facet search, MCP servers and skills.</string>
+    <string name="modeledit_cap_web_search">Built-in web search</string>
+    <string name="modeledit_cap_web_search_subtitle">The provider searches the web itself.</string>
+    <!-- Switch: the model accepts the sampling temperature setting -->
+    <string name="modeledit_cap_temperature">Temperature</string>
+    <string name="modeledit_cap_temperature_subtitle">Accepts temperature and top-p.</string>
+    <!-- Switch: the model accepts a setting for how long its answers are -->
+    <string name="modeledit_cap_verbosity">Verbosity</string>
+    <string name="modeledit_cap_verbosity_subtitle">Concise, balanced or detailed answers.</string>
+    <string name="modeledit_cap_pro_mode">Pro mode</string>
+    <string name="modeledit_cap_pro_mode_subtitle">More work per answer.</string>
+    <string name="modeledit_cap_fast_mode">Fast mode</string>
+    <string name="modeledit_cap_fast_mode_subtitle">Faster output at premium pricing.</string>
+    <!-- Section label: how the model thinks before it answers -->
+    <string name="modeledit_reasoning">Reasoning</string>
+    <!-- Option: the model takes effort levels such as low, medium, high -->
+    <string name="modeledit_reasoning_effort">Effort levels</string>
+    <!-- Option: the model takes a number of tokens to think with -->
+    <string name="modeledit_reasoning_budget">Thinking budget</string>
+    <string name="modeledit_levels_accepted">Levels it accepts</string>
+    <string name="modeledit_default_level">Default level</string>
+    <string name="modeledit_shows_thinking">Shows its thinking</string>
+    <string name="modeledit_shows_thinking_subtitle">Streams readable reasoning you can expand.</string>
+    <!-- Section title: context window and output length -->
+    <string name="modeledit_limits">Limits</string>
+    <string name="modeledit_context_window">Context window (tokens)</string>
+    <string name="modeledit_max_output">Max output (tokens)</string>
+    <!-- Placeholder: the provider's own maximum applies -->
+    <string name="modeledit_provider_default">Provider default</string>
+    <!-- "128k" and "1m" are values you can type (k = thousand, m = million); keep them as they are -->
+    <string name="modeledit_max_output_supporting">Empty uses the provider\'s value. You can type 128k or 1m.</string>
+    <!-- Section title -->
+    <string name="modeledit_price_title">Price, USD per 1M tokens</string>
+    <!-- Label: price of input tokens -->
+    <string name="modeledit_price_input">Input</string>
+    <!-- Label: price of output tokens -->
+    <string name="modeledit_price_output">Output</string>
+    <!-- Button (verb): undoes all changes to this model -->
+    <string name="modeledit_reset">Reset</string>
+    <string name="modeledit_saves_on_close">Changes save when you close this.</string>
+    <string name="modeledit_remove">Remove model</string>
+    <string name="modeledit_remove_subtitle">You added this model ID by hand.</string>
+    <!-- Dialog title. %1$s: a model name -->
+    <string name="modeledit_remove_title">Remove %1$s?</string>
+    <string name="modeledit_remove_body">It disappears from the model list on all your devices. Chats that used it stay.</string>
+
+    <!-- Settings > Media models -->
+    <string name="mediasettings_title">Media models</string>
+    <string name="mediasettings_intro">Pick the model that makes each kind of media. Chat models use them when you ask for a picture, a video, a voiceover or a song, and the results are saved in the chat. Models are sorted automatically by what they make.</string>
+    <string name="mediasettings_none_images">None of your providers makes images</string>
+    <string name="mediasettings_none_video">None of your providers makes video</string>
+    <string name="mediasettings_none_speech">None of your providers makes speech</string>
+    <string name="mediasettings_none_music">None of your providers makes music</string>
+    <string name="mediasettings_none_transcripts">None of your providers makes transcripts</string>
+    <!-- Facet picks the model. %1$s: the model it uses now and its provider, e.g. "gpt-image-1 · OpenAI" -->
+    <string name="mediasettings_automatic_model">Automatic · %1$s</string>
+    <!-- Section title -->
+    <string name="mediasettings_options">Options</string>
+    <!-- Option: the aspect ratio of images -->
+    <string name="mediasettings_image_shape">Image shape</string>
+    <!-- Option: the aspect ratio of videos -->
+    <string name="mediasettings_video_shape">Video shape</string>
+    <string name="mediasettings_music_length">Music length</string>
+    <!-- Music length option (short). %1$d: minutes -->
+    <plurals name="mediasettings_music_minutes">
+        <item quantity="one">%1$d min</item>
+        <item quantity="other">%1$d min</item>
+    </plurals>
+    <!-- Title of the voice setting and of the voice picker (noun) -->
+    <string name="mediasettings_voice">Voice</string>
+    <string name="mediasettings_choose_speech_first">Choose a speech model first</string>
+    <string name="mediasettings_default_voice">Default voice</string>
+    <string name="mediasettings_chat_tools">Let chat models create media</string>
+    <string name="mediasettings_chat_tools_subtitle">Gives tool-capable chat models image, video, speech and music tools.</string>
+    <string name="mediasettings_read_aloud">Read aloud with this voice</string>
+    <!-- "Read aloud" is the name of an action in a message's menu -->
+    <string name="mediasettings_read_aloud_on">Read aloud uses your speech model instead of the phone\'s voice.</string>
+    <!-- "Read aloud" is the name of an action in a message's menu -->
+    <string name="mediasettings_read_aloud_off">Choose a speech model above to use it for Read aloud.</string>
+    <string name="mediasettings_dictation">Dictate with this model</string>
+    <string name="mediasettings_dictation_on">The mic records, then your transcription model writes it down.</string>
+    <string name="mediasettings_dictation_off">Choose a transcription model above to use it for dictation.</string>
+    <!-- Button -->
+    <string name="mediasettings_add_provider">Add a media provider</string>
+    <string name="mediasettings_footer">Media is made by the provider you pick, with your own key, and billed by them. OpenAI, Google, OpenRouter, xAI, Together and Groq keys cover several kinds; ElevenLabs, Stability AI, Black Forest Labs and Deepgram add more.</string>
+
+    <!-- Media model picker: titles -->
+    <string name="mediasettings_picker_image">Image model</string>
+    <string name="mediasettings_picker_video">Video model</string>
+    <string name="mediasettings_picker_speech">Speech model</string>
+    <string name="mediasettings_picker_music">Music &amp; sound model</string>
+    <string name="mediasettings_picker_transcription">Transcription model</string>
+    <!-- Media model picker: when no provider makes this kind of media. Followed by a sentence that lists providers that do -->
+    <string name="mediasettings_none_yet_images">None of your providers makes images yet.</string>
+    <string name="mediasettings_none_yet_video">None of your providers makes video yet.</string>
+    <string name="mediasettings_none_yet_speech">None of your providers makes speech yet.</string>
+    <string name="mediasettings_none_yet_music">None of your providers makes music yet.</string>
+    <string name="mediasettings_none_yet_transcripts">None of your providers makes transcripts yet.</string>
+    <!-- Follows "None of your providers makes images yet.": these providers make images -->
+    <string name="mediasettings_who_images">OpenAI, Google, OpenRouter, xAI, Together, Stability AI and Black Forest Labs do.</string>
+    <!-- Follows "None of your providers makes video yet.": this provider makes video -->
+    <string name="mediasettings_who_video">Google (Gemini API) does.</string>
+    <!-- Follows "None of your providers makes speech yet.": these providers make speech -->
+    <string name="mediasettings_who_speech">OpenAI, Google, Mistral, ElevenLabs and Deepgram do.</string>
+    <!-- Follows "None of your providers makes music yet.": these providers make music -->
+    <string name="mediasettings_who_music">Google, ElevenLabs and Stability AI do.</string>
+    <!-- Follows "None of your providers makes transcripts yet.": these providers make transcripts -->
+    <string name="mediasettings_who_transcripts">OpenAI, Mistral, Groq, Together, ElevenLabs and Deepgram do.</string>
+    <!-- Button -->
+    <string name="mediasettings_add_a_provider">Add a provider</string>
+    <!-- Option: Facet picks the model -->
+    <string name="mediasettings_automatic">Automatic</string>
+    <!-- %1$s: the model Automatic uses now and its provider, e.g. "gpt-image-1 · OpenAI" -->
+    <string name="mediasettings_automatic_now">Now: %1$s</string>
+    <string name="mediasettings_automatic_best">The best model you have</string>
+    <!-- Content description of the check mark on the chosen item -->
+    <string name="mediasettings_selected">Selected</string>
+    <string name="mediasettings_loading_voices">Loading voices…</string>
+
+    <!-- Settings > Assistants -->
+    <string name="library_assistants_title">Assistants</string>
+    <string name="library_assistants_intro">Assistants are reusable personas: instructions, a default model and conversation starters. Pick one when you start a chat.</string>
+    <!-- Button -->
+    <string name="library_assistant_create">Create an assistant</string>
+    <!-- Section title: assistants you made -->
+    <string name="library_assistants_yours">Yours</string>
+    <!-- Section title: assistants that come with Facet -->
+    <string name="library_assistants_builtin">Built in</string>
+    <!-- Under an assistant's name when it has no instructions -->
+    <string name="library_assistant_general">General-purpose assistant</string>
+    <!-- Page title -->
+    <string name="library_assistant_new">New assistant</string>
+    <!-- Page title -->
+    <string name="library_assistant_edit">Edit assistant</string>
+    <!-- Preview name while the name field is empty -->
+    <string name="library_assistant_default_name">Assistant</string>
+    <string name="library_assistant_name_placeholder">e.g. Travel planner</string>
+    <!-- Label of the assistant's instructions field -->
+    <string name="library_assistant_instructions">Instructions</string>
+    <string name="library_assistant_instructions_placeholder">Describe the role, tone, and anything it should always or never do.</string>
+    <!-- Section title -->
+    <string name="library_assistant_default_model">Default model</string>
+    <string name="library_assistant_current_model">Use the chat\'s current model</string>
+    <!-- Content description (verb): removes the default model -->
+    <string name="library_assistant_clear_model">Clear</string>
+    <!-- Section title: suggested first messages shown when a chat starts -->
+    <string name="library_assistant_starters">Conversation starters</string>
+    <!-- Placeholder. %1$d: the starter's number (1, 2, 3…) -->
+    <string name="library_assistant_starter">Starter %1$d</string>
+    <!-- Link: adds another conversation starter field -->
+    <string name="library_assistant_add_starter">Add another</string>
+    <!-- Button -->
+    <string name="library_assistant_save">Save assistant</string>
+    <!-- Button -->
+    <string name="library_assistant_delete">Delete assistant</string>
+    <string name="library_assistant_delete_title">Delete this assistant?</string>
+    <string name="library_assistant_delete_body">Existing chats keep working with their instructions removed.</string>
+
+    <!-- Settings > Prompt library -->
+    <string name="library_prompts_title">Prompt library</string>
+    <string name="library_prompts_intro">Save prompts you use often. In any chat, type / to search and insert one.</string>
+    <!-- Button and sheet title -->
+    <string name="library_prompt_new">New prompt</string>
+    <string name="library_prompts_empty_title">No saved prompts</string>
+    <string name="library_prompts_empty_body">Try one like “Summarize this in five bullet points”.</string>
+    <!-- Sheet title -->
+    <string name="library_prompt_edit">Edit prompt</string>
+    <!-- Label of the prompt's title field -->
+    <string name="library_prompt_title">Title</string>
+    <string name="library_prompt_title_placeholder">e.g. Five-bullet summary</string>
+    <!-- Label of the field with the prompt's text (noun) -->
+    <string name="library_prompt_body">Prompt</string>
+    <string name="library_prompt_body_placeholder">Summarize the following in five bullet points:</string>
+</resources>

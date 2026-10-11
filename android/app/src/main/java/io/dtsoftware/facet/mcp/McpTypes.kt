@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.mcp
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import kotlinx.serialization.Serializable
 
 /*
@@ -83,7 +85,7 @@ class McpAuthRequiredException(
     val serverId: String,
     /** Value of the WWW-Authenticate header from the 401, used for discovery. */
     val wwwAuthenticate: String?,
-) : Exception("This server needs you to sign in.")
+) : Exception(Strings.get(R.string.mcp_sign_in_required))
 
 /** Any other MCP failure, with a user-facing message. */
 class McpException(message: String, val httpStatus: Int? = null, cause: Throwable? = null) : Exception(message, cause)

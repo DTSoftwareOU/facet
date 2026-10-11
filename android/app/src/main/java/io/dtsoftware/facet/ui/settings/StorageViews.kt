@@ -27,11 +27,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dtsoftware.facet.AppContainer
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.Dates
 import io.dtsoftware.facet.core.util.Format
 import io.dtsoftware.facet.data.db.AttachmentEntity
@@ -45,6 +50,7 @@ import io.dtsoftware.facet.ui.components.SwitchRow
 import io.dtsoftware.facet.ui.theme.FacetTheme
 import io.dtsoftware.facet.ui.theme.GemPalette
 import java.io.File
+import java.text.NumberFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -77,46 +83,67 @@ fun StorageSection(container: AppContainer) {
 
     signedIn?.let { a ->
         val full = sync.storageFull || (a.quotaBytes > 0 && a.usedBytes >= a.quotaBytes)
-        SettingsGroup(title = "Sync storage") {
+        SettingsGroup(title = stringResource(R.string.storage_sync_title)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(Format.bytes(a.usedBytes), style = FacetTheme.type.titleL, color = c.text)
-                    Spacer(Modifier.width(6.dp))
+                    // "14.2 MB of 1 GB" is one sentence (translations may reorder it); the used amount is set large.
+                    val used = Format.bytes(a.usedBytes)
+                    val marker = Char(0xE000).toString() // a private-use character that marks where the used amount goes
+                    val template = stringResource(R.string.storage_used_of_total, marker, Format.bytes(a.quotaBytes))
+                    val large = FacetTheme.type.titleL.toSpanStyle().copy(color = c.text)
                     Text(
-                        "of ${Format.bytes(a.quotaBytes)}", style = FacetTheme.type.labelM.copy(fontWeight = FontWeight.Normal),
-                        color = c.textSecondary, modifier = Modifier.weight(1f).padding(bottom = 3.dp),
+                        buildAnnotatedString {
+                            val at = template.indexOf(marker)
+                            if (at < 0) {
+                                append(template)
+                            } else {
+                                append(template.substring(0, at))
+                                withStyle(large) { append(used) }
+                                append(template.substring(at + marker.length))
+                            }
+                        },
+                        style = FacetTheme.type.labelM.copy(fontWeight = FontWeight.Normal, lineHeight = FacetTheme.type.titleL.lineHeight),
+                        color = c.textSecondary, modifier = Modifier.weight(1f).alignByBaseline(),
                     )
                     if (a.quotaBytes > 0) {
-                        Text("${(a.usedBytes * 100 / a.quotaBytes).coerceIn(0, 100)}%", style = FacetTheme.type.labelM, color = if (full) c.warning else c.textSecondary)
+                        val percent = (a.usedBytes * 100 / a.quotaBytes).coerceIn(0, 100)
+                        Text(
+                            NumberFormat.getPercentInstance(Strings.locale).format(percent / 100.0),
+                            style = FacetTheme.type.labelM, color = if (full) c.warning else c.textSecondary,
+                            modifier = Modifier.alignByBaseline(),
+                        )
                     }
                 }
                 UsageBar(a.recordBytes, a.blobBytes, a.quotaBytes)
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Legend(c.primary, "Chats & settings", a.recordBytes)
-                    Legend(GemPalette.Flash, "Files", a.blobBytes)
+                    Legend(c.primary, stringResource(R.string.storage_chats_settings), a.recordBytes)
+                    Legend(GemPalette.Flash, stringResource(R.string.storage_files), a.blobBytes)
                 }
                 Text(
-                    when {
-                        !full -> "Everything here is end-to-end encrypted. Chats are compressed before upload; files sync until the space is used."
-                        synced.autoFreeSpace -> "Storage is full and this phone has no older files left to clear. New changes wait here until you free up space below or delete old chats."
-                        else -> "Storage is full. New changes and files wait on this device until you free up space below or delete old chats."
-                    },
+                    stringResource(
+                        when {
+                            !full -> R.string.storage_note_ok
+                            synced.autoFreeSpace -> R.string.storage_note_full_auto
+                            else -> R.string.storage_note_full
+                        },
+                    ),
                     style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal),
                     color = if (full) c.warning else c.textTertiary,
                 )
             }
             GroupDivider()
             SwitchRow(
-                "Free up space automatically",
+                stringResource(R.string.storage_auto_free),
                 synced.autoFreeSpace,
                 { on -> container.settings.updateSynced { it.copy(autoFreeSpace = on) } },
-                subtitle = "When storage is full, the oldest files leave sync storage. They stay on the devices that have them.",
+                subtitle = stringResource(R.string.storage_auto_free_subtitle),
                 icon = R.drawable.ic_cloud_off,
             )
             autoFreed?.let { f ->
+                val size = Format.bytes(f.bytes)
                 Text(
-                    "Last clean-up, ${Dates.relative(f.at).let { if (it == "Just now") "just now" else it }}: cleared " +
-                        (if (f.files == 1) "1 old file" else "${f.files} old files") + " (${Format.bytes(f.bytes)}) from sync storage.",
+                    if (Dates.justNow(f.at)) pluralStringResource(R.plurals.storage_cleanup_just_now, f.files, f.files, size)
+                    else pluralStringResource(R.plurals.storage_cleanup, f.files, f.files, size, Dates.relative(f.at)),
                     style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal),
                     color = c.textTertiary,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
@@ -125,18 +152,21 @@ fun StorageSection(container: AppContainer) {
         }
     }
 
-    SettingsGroup(title = "On this device") {
-        SettingsRow("Used on this phone", subtitle = deviceBytes?.let { Format.bytes(it) } ?: "Calculating…", icon = R.drawable.ic_phone, showChevron = false)
+    SettingsGroup(title = stringResource(R.string.storage_device_title)) {
+        SettingsRow(
+            stringResource(R.string.storage_device_used), subtitle = deviceBytes?.let { Format.bytes(it) } ?: stringResource(R.string.storage_calculating),
+            icon = R.drawable.ic_phone, showChevron = false,
+        )
         if (signedIn != null) {
             GroupDivider()
             SettingsRow(
-                "Remove downloaded copies",
-                subtitle = "Files already in your sync storage download again when you open them.",
+                stringResource(R.string.storage_remove_copies),
+                subtitle = stringResource(R.string.storage_remove_copies_subtitle),
                 icon = R.drawable.ic_download,
                 onClick = {
                     scope.launch {
                         val freed = container.sync.clearDownloadedCopies()
-                        note = if (freed > 0) "Freed ${Format.bytes(freed)} on this device." else "Nothing to remove."
+                        note = if (freed > 0) Strings.get(R.string.storage_freed, Format.bytes(freed)) else Strings.get(R.string.storage_nothing_to_remove)
                         refresh++
                     }
                 },
@@ -145,33 +175,36 @@ fun StorageSection(container: AppContainer) {
         if (deviceOnly > 0) {
             GroupDivider()
             SettingsRow(
-                if (deviceOnly == 1) "1 file is only on this device" else "$deviceOnly files are only on this device",
-                subtitle = "Cleared from sync storage to make room. Tap to upload ${if (deviceOnly == 1) "it" else "them"} again if there's space.",
+                pluralStringResource(R.plurals.storage_device_only, deviceOnly, deviceOnly),
+                // "it" or "them": exactly one file or several (plural categories can't tell 1 from 21).
+                subtitle = stringResource(if (deviceOnly == 1) R.string.storage_device_only_subtitle_one else R.string.storage_device_only_subtitle_many),
                 icon = R.drawable.ic_cloud_off,
-                onClick = { scope.launch { container.sync.retryDeviceOnlyFiles(); note = "Trying again. Files upload while there's space." } },
+                onClick = { scope.launch { container.sync.retryDeviceOnlyFiles(); note = Strings.get(R.string.storage_retrying) } },
             )
         }
     }
 
     if (largest.isNotEmpty()) {
-        SettingsGroup(title = "Largest files") {
+        SettingsGroup(title = stringResource(R.string.storage_largest)) {
             largest.forEachIndexed { i, f ->
                 if (i > 0) GroupDivider()
                 SettingsRow(
                     f.name,
-                    subtitle = Format.bytes(f.sizeBytes) + " · " + when {
-                        f.localOnly -> "This device only"
-                        f.uploaded -> "Synced"
-                        else -> "Waiting to sync"
-                    },
+                    subtitle = Format.bytes(f.sizeBytes) + " · " + stringResource(
+                        when {
+                            f.localOnly -> R.string.storage_status_device_only
+                            f.uploaded -> R.string.storage_status_synced
+                            else -> R.string.storage_status_waiting
+                        },
+                    ),
                     icon = kindIcon(f),
                     showChevron = false,
                     trailing = if (signedIn != null && f.uploaded && !f.localOnly) ({
-                        FacetButton("Free up", {
+                        FacetButton(stringResource(R.string.storage_free_up), {
                             scope.launch {
                                 runCatching { container.sync.keepOnDeviceOnly(f.id) }
-                                    .onSuccess { note = "${f.name} is now kept on this device only." }
-                                    .onFailure { note = "Couldn't free that file. Check your connection." }
+                                    .onSuccess { note = Strings.get(R.string.storage_kept_on_device, f.name) }
+                                    .onFailure { note = Strings.get(R.string.storage_free_failed) }
                             }
                         }, style = ButtonStyle.Tonal)
                     }) else null,

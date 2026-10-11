@@ -44,10 +44,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.dtsoftware.facet.AppContainer
@@ -72,7 +74,7 @@ private fun AuthLayout(onBack: (() -> Unit)?, content: @Composable ColumnScope.(
     Column(Modifier.fillMaxSize().background(FacetTheme.colors.background).statusBarsPadding().navigationBarsPadding().imePadding()) {
         // Fixed top bar so scrolled content never slides under the back button.
         Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 6.dp), contentAlignment = Alignment.CenterStart) {
-            if (onBack != null) FacetIconButton(R.drawable.ic_arrow_left, "Back", onBack)
+            if (onBack != null) FacetIconButton(R.drawable.ic_arrow_left, stringResource(R.string.action_back), onBack)
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Column(
@@ -111,6 +113,7 @@ fun AuthScreen(
     var server by remember { mutableStateOf(container.auth.serverUrl) }
     var editServer by remember { mutableStateOf(false) }
     LaunchedEffect(server) { runCatching { container.auth.meta() }.onSuccess { registrationOpen = it.registrationOpen } }
+    val genericError = stringResource(R.string.auth_error_generic)
 
     val emailOk = email.contains('@') && email.substringAfter('@').contains('.')
     val canSubmit = emailOk && !busy && if (signUp) passwordOk(password) && password == confirm else password.isNotEmpty()
@@ -123,7 +126,7 @@ fun AuthScreen(
             try {
                 if (signUp) onSignedUp(container.auth.register(email, password, name)) else { container.auth.login(email, password); onSignedIn() }
             } catch (e: Exception) {
-                error = e.message ?: "Something went wrong."
+                error = e.message ?: genericError
             } finally {
                 busy = false
             }
@@ -135,28 +138,36 @@ fun AuthScreen(
         Spacer(Modifier.height(4.dp))
         AnimatedContent(signUp, label = "authTitle") { up ->
             Column {
-                Text(if (up) "Create your account" else "Welcome back", style = FacetTheme.type.display, color = c.text)
+                Text(stringResource(if (up) R.string.auth_create_title else R.string.auth_welcome_back), style = FacetTheme.type.display, color = c.text)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    if (up) "Your chats, assistants and keys are encrypted on this device before they sync. Not even we can read them."
-                    else "Sign in to sync your encrypted chats to this device.",
+                    stringResource(if (up) R.string.auth_create_subtitle else R.string.auth_sign_in_subtitle),
                     style = FacetTheme.type.body, color = c.textSecondary,
                 )
             }
         }
         Spacer(Modifier.height(6.dp))
-        if (signUp) FacetTextField(name, { name = it }, label = "Name (optional)", placeholder = "What should we call you?")
-        FacetTextField(email, { email = it.trim(); error = null }, label = "Email", placeholder = "you@example.com", keyboardType = KeyboardType.Email)
+        if (signUp) {
+            FacetTextField(
+                name, { name = it },
+                label = stringResource(R.string.auth_name_label), placeholder = stringResource(R.string.auth_name_placeholder),
+            )
+        }
         FacetTextField(
-            password, { password = it; error = null }, label = "Password", password = true,
+            email, { email = it.trim(); error = null },
+            label = stringResource(R.string.auth_email), placeholder = "you@example.com", keyboardType = KeyboardType.Email,
+        )
+        FacetTextField(
+            password, { password = it; error = null }, label = stringResource(R.string.auth_password), password = true,
             supporting = if (signUp) passwordHint(password) else null,
             imeAction = if (signUp) ImeAction.Next else ImeAction.Done, onIme = { if (!signUp) submit() },
         )
         if (signUp) {
             FacetTextField(
-                confirm, { confirm = it }, label = "Confirm password", password = true, imeAction = ImeAction.Done, onIme = ::submit,
+                confirm, { confirm = it }, label = stringResource(R.string.auth_confirm_password), password = true,
+                imeAction = ImeAction.Done, onIme = ::submit,
                 isError = confirm.isNotEmpty() && confirm != password,
-                supporting = if (confirm.isNotEmpty() && confirm != password) "Passwords don't match." else null,
+                supporting = if (confirm.isNotEmpty() && confirm != password) stringResource(R.string.auth_passwords_mismatch) else null,
             )
             Row(
                 Modifier.fillMaxWidth().clip(FacetShapes.group).background(c.surface).padding(14.dp),
@@ -165,25 +176,27 @@ fun AuthScreen(
                 FacetIcon(R.drawable.ic_key, null, tint = c.warning, size = 18.dp, modifier = Modifier.padding(top = 2.dp))
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    "Because your data is end-to-end encrypted, we can't reset your password for you. You'll get a recovery code next. Keep it somewhere safe.",
+                    stringResource(R.string.auth_no_reset_warning),
                     style = FacetTheme.type.labelM.copy(fontWeight = FontWeight.Normal), color = c.textSecondary,
                 )
             }
-            if (!registrationOpen) Text("This server isn't accepting new accounts.", style = FacetTheme.type.labelM, color = c.error)
+            if (!registrationOpen) Text(stringResource(R.string.auth_registration_closed), style = FacetTheme.type.labelM, color = c.error)
         }
         error?.let { Text(it, style = FacetTheme.type.labelM, color = c.error) }
         FacetButton(
-            when {
-                busy && signUp -> "Securing your account…"
-                busy -> "Unlocking…"
-                signUp -> "Create account"
-                else -> "Sign in"
-            },
+            stringResource(
+                when {
+                    busy && signUp -> R.string.auth_securing
+                    busy -> R.string.auth_unlocking
+                    signUp -> R.string.auth_create_account
+                    else -> R.string.action_sign_in
+                },
+            ),
             ::submit, loading = busy, enabled = canSubmit && (!signUp || registrationOpen), modifier = Modifier.fillMaxWidth(),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             Text(
-                if (signUp) "Already have an account? Sign in" else "New to Facet? Create an account",
+                stringResource(if (signUp) R.string.auth_switch_to_sign_in else R.string.auth_switch_to_sign_up),
                 style = FacetTheme.type.labelM, color = c.primary,
                 modifier = Modifier.clip(FacetShapes.small).clickable { signUp = !signUp; error = null }.padding(8.dp),
             )
@@ -191,13 +204,13 @@ fun AuthScreen(
         if (!signUp) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Text(
-                    "Forgot password?", style = FacetTheme.type.labelM, color = c.textSecondary,
+                    stringResource(R.string.auth_forgot_password), style = FacetTheme.type.labelM, color = c.textSecondary,
                     modifier = Modifier.clip(FacetShapes.small).clickable(onClick = onForgot).padding(8.dp),
                 )
             }
         }
         Text(
-            "Sync server: " + server.removePrefix("https://") + " · Change",
+            stringResource(R.string.auth_sync_server, server.removePrefix("https://")),
             style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().clip(FacetShapes.small).clickable { editServer = true }.padding(8.dp),
@@ -216,11 +229,14 @@ fun RecoveryCodeScreen(code: String, reason: String, onDone: () -> Unit) {
     val scope = rememberCoroutineScope()
     var saved by rememberSaveable { mutableStateOf(false) }
     var copied by remember { mutableStateOf(false) }
+    val fileTitle = stringResource(R.string.auth_recovery_file_title)
+    val fileBody = stringResource(R.string.auth_recovery_file_body)
+    val shareText = stringResource(R.string.auth_recovery_share_text, code)
     val saver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri != null) {
             runCatching {
                 context.contentResolver.openOutputStream(uri)?.use {
-                    it.write("Facet recovery code\n\n$code\n\nKeep this somewhere safe. It unlocks your encrypted data if you forget your password.\n".toByteArray())
+                    it.write("$fileTitle\n\n$code\n\n$fileBody\n".toByteArray())
                 }
                 saved = true
             }
@@ -228,13 +244,15 @@ fun RecoveryCodeScreen(code: String, reason: String, onDone: () -> Unit) {
     }
     AuthLayout(onBack = null) {
         Gem(size = 40.dp)
-        Text("Save your recovery code", style = FacetTheme.type.display, color = c.text)
+        Text(stringResource(R.string.auth_recovery_title), style = FacetTheme.type.display, color = c.text)
         Text(
-            when (reason) {
-                "reset" -> "Your password was reset. Here is your new recovery code. Any older code no longer works."
-                "regenerated" -> "Here is your new recovery code. Your previous code no longer works."
-                else -> "If you forget your password, this code is the only way to unlock your encrypted data. We can't recover it for you."
-            },
+            stringResource(
+                when (reason) {
+                    "reset" -> R.string.auth_recovery_after_reset
+                    "regenerated" -> R.string.auth_recovery_regenerated
+                    else -> R.string.auth_recovery_new
+                },
+            ),
             style = FacetTheme.type.body, color = c.textSecondary,
         )
         Column(
@@ -250,21 +268,23 @@ fun RecoveryCodeScreen(code: String, reason: String, onDone: () -> Unit) {
             groups.chunked(4).forEach { row ->
                 Text(
                     row.joinToString("  "),
-                    style = FacetTheme.type.code.copy(fontSize = 19.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Medium),
+                    style = FacetTheme.type.code.copy(
+                        fontSize = 19.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Medium, textDirection = TextDirection.Ltr,
+                    ),
                     color = c.text,
                     modifier = Modifier.padding(vertical = 4.dp),
                 )
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            FacetButton(if (copied) "Copied" else "Copy", {
-                scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Facet recovery code", code))) }
+            FacetButton(stringResource(if (copied) R.string.common_copied else R.string.action_copy), {
+                scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(fileTitle, code))) }
                 copied = true
             }, style = ButtonStyle.Tonal, icon = if (copied) R.drawable.ic_check else R.drawable.ic_copy, modifier = Modifier.weight(1f))
-            FacetButton("Save file", { saver.launch("facet-recovery-code.txt") }, style = ButtonStyle.Tonal, icon = R.drawable.ic_download, modifier = Modifier.weight(1f))
+            FacetButton(stringResource(R.string.auth_recovery_save_file), { saver.launch("facet-recovery-code.txt") }, style = ButtonStyle.Tonal, icon = R.drawable.ic_download, modifier = Modifier.weight(1f))
         }
-        FacetButton("Share to a password manager", {
-            val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, "Facet recovery code: $code") }
+        FacetButton(stringResource(R.string.auth_recovery_share), {
+            val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, shareText) }
             context.startActivity(Intent.createChooser(intent, null))
         }, style = ButtonStyle.Text, modifier = Modifier.fillMaxWidth())
         Row(
@@ -275,9 +295,9 @@ fun RecoveryCodeScreen(code: String, reason: String, onDone: () -> Unit) {
                 saved, { saved = it },
                 colors = CheckboxDefaults.colors(checkedColor = c.primary, uncheckedColor = c.textTertiary, checkmarkColor = c.onPrimary),
             )
-            Text("I saved my recovery code somewhere safe", style = FacetTheme.type.body, color = c.text)
+            Text(stringResource(R.string.auth_recovery_saved), style = FacetTheme.type.body, color = c.text)
         }
-        FacetButton("Continue", onDone, enabled = saved, modifier = Modifier.fillMaxWidth())
+        FacetButton(stringResource(R.string.action_continue), onDone, enabled = saved, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -296,33 +316,42 @@ fun ForgotPasswordScreen(container: AppContainer, onBack: () -> Unit, onDone: (n
     var error by remember { mutableStateOf<String?>(null) }
     var emailEnabled by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(Unit) { emailEnabled = runCatching { container.auth.meta().emailEnabled }.getOrDefault(false) }
+    val genericError = stringResource(R.string.auth_error_generic)
+    val recoveryCodeLabel = stringResource(R.string.auth_recovery_code)
+    val emailLabel = stringResource(R.string.auth_email)
 
     fun run(block: suspend () -> Unit) {
         busy = true
         error = null
         scope.launch {
-            try { block() } catch (e: Exception) { error = e.message ?: "Something went wrong." } finally { busy = false }
+            try { block() } catch (e: Exception) { error = e.message ?: genericError } finally { busy = false }
         }
     }
 
     AuthLayout(onBack) {
-        Text("Reset your password", style = FacetTheme.type.display, color = c.text)
-        Segmented(listOf("code", "email"), mode, { if (it == "code") "Recovery code" else "Email" }, { mode = it; error = null })
-        FacetTextField(email, { email = it.trim() }, label = "Email", keyboardType = KeyboardType.Email)
+        Text(stringResource(R.string.auth_reset_title), style = FacetTheme.type.display, color = c.text)
+        Segmented(listOf("code", "email"), mode, { if (it == "code") recoveryCodeLabel else emailLabel }, { mode = it; error = null })
+        FacetTextField(email, { email = it.trim() }, label = emailLabel, keyboardType = KeyboardType.Email)
         if (mode == "code") {
-            Text("Your data stays intact. You'll get a new recovery code afterwards.", style = FacetTheme.type.body, color = c.textSecondary)
-            FacetTextField(recovery, { recovery = it }, label = "Recovery code", placeholder = "XXXX-XXXX-XXXX-XXXX-…", mono = true)
-            FacetTextField(password, { password = it }, label = "New password", password = true, supporting = passwordHint(password))
-            FacetTextField(confirm, { confirm = it }, label = "Confirm new password", password = true, imeAction = ImeAction.Done, isError = confirm.isNotEmpty() && confirm != password)
+            Text(stringResource(R.string.auth_reset_keeps_data), style = FacetTheme.type.body, color = c.textSecondary)
+            FacetTextField(recovery, { recovery = it }, label = recoveryCodeLabel, placeholder = "XXXX-XXXX-XXXX-XXXX-…", mono = true)
+            FacetTextField(
+                password, { password = it }, label = stringResource(R.string.auth_new_password), password = true,
+                supporting = passwordHint(password),
+            )
+            FacetTextField(
+                confirm, { confirm = it }, label = stringResource(R.string.auth_confirm_new_password), password = true,
+                imeAction = ImeAction.Done, isError = confirm.isNotEmpty() && confirm != password,
+            )
             error?.let { Text(it, style = FacetTheme.type.labelM, color = c.error) }
             FacetButton(
-                "Reset password", { run { onDone(container.auth.recoverWithCode(email, recovery, password)) } },
+                stringResource(R.string.auth_reset_password), { run { onDone(container.auth.recoverWithCode(email, recovery, password)) } },
                 loading = busy, enabled = email.contains('@') && recovery.isNotBlank() && passwordOk(password) && password == confirm,
                 modifier = Modifier.fillMaxWidth(),
             )
         } else if (emailEnabled == false) {
             Text(
-                "This sync server can't send email. Use your recovery code instead, or ask the server's operator.",
+                stringResource(R.string.auth_no_email),
                 style = FacetTheme.type.body, color = c.textSecondary,
             )
         } else {
@@ -333,21 +362,27 @@ fun ForgotPasswordScreen(container: AppContainer, onBack: () -> Unit, onDone: (n
                 FacetIcon(R.drawable.ic_warning, null, tint = c.error, size = 18.dp, modifier = Modifier.padding(top = 2.dp))
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    "Without your recovery code, your encrypted data on the server can't be unlocked, so it will be deleted. Chats on this device are uploaded again afterwards.",
+                    stringResource(R.string.auth_email_reset_warning),
                     style = FacetTheme.type.labelM.copy(fontWeight = FontWeight.Normal), color = c.text,
                 )
             }
             if (!codeSent) {
                 error?.let { Text(it, style = FacetTheme.type.labelM, color = c.error) }
-                FacetButton("Email me a code", { run { container.auth.requestEmailReset(email); codeSent = true } }, loading = busy, enabled = email.contains('@'), modifier = Modifier.fillMaxWidth())
+                FacetButton(stringResource(R.string.auth_email_me_code), { run { container.auth.requestEmailReset(email); codeSent = true } }, loading = busy, enabled = email.contains('@'), modifier = Modifier.fillMaxWidth())
             } else {
-                Text("If an account exists for $email, we sent an 8-digit code. It expires in 30 minutes.", style = FacetTheme.type.body, color = c.textSecondary)
-                FacetTextField(emailCode, { emailCode = it.filter(Char::isDigit).take(8) }, label = "Code from the email", keyboardType = KeyboardType.Number, mono = true)
-                FacetTextField(password, { password = it }, label = "New password", password = true, supporting = passwordHint(password))
-                FacetTextField(confirm, { confirm = it }, label = "Confirm new password", password = true, imeAction = ImeAction.Done, isError = confirm.isNotEmpty() && confirm != password)
+                Text(stringResource(R.string.auth_email_code_sent, email), style = FacetTheme.type.body, color = c.textSecondary)
+                FacetTextField(emailCode, { emailCode = it.filter(Char::isDigit).take(8) }, label = stringResource(R.string.auth_email_code_label), keyboardType = KeyboardType.Number, mono = true)
+                FacetTextField(
+                password, { password = it }, label = stringResource(R.string.auth_new_password), password = true,
+                supporting = passwordHint(password),
+            )
+                FacetTextField(
+                confirm, { confirm = it }, label = stringResource(R.string.auth_confirm_new_password), password = true,
+                imeAction = ImeAction.Done, isError = confirm.isNotEmpty() && confirm != password,
+            )
                 error?.let { Text(it, style = FacetTheme.type.labelM, color = c.error) }
                 FacetButton(
-                    "Reset password and data", { run { onDone(container.auth.confirmEmailReset(email, emailCode, password)) } },
+                    stringResource(R.string.auth_reset_password_and_data), { run { onDone(container.auth.confirmEmailReset(email, emailCode, password)) } },
                     style = ButtonStyle.Danger, loading = busy, enabled = emailCode.length == 8 && passwordOk(password) && password == confirm,
                     modifier = Modifier.fillMaxWidth(),
                 )

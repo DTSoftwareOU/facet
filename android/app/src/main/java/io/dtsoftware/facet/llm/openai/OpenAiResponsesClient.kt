@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.llm.openai
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.net.HttpStatusException
 import io.dtsoftware.facet.core.net.fetchString
 import io.dtsoftware.facet.core.net.sseFlow
@@ -8,10 +10,8 @@ import io.dtsoftware.facet.llm.ApiStyle
 import io.dtsoftware.facet.llm.ChatMessage
 import io.dtsoftware.facet.llm.ChatRequest
 import io.dtsoftware.facet.llm.Effort
-import io.dtsoftware.facet.llm.ErrorKind
 import io.dtsoftware.facet.llm.HealAction
 import io.dtsoftware.facet.llm.LlmClient
-import io.dtsoftware.facet.llm.LlmError
 import io.dtsoftware.facet.llm.LlmErrors
 import io.dtsoftware.facet.llm.LlmException
 import io.dtsoftware.facet.llm.ModelCaps
@@ -78,7 +78,6 @@ internal class OpenAiResponsesClient(
         .callTimeout(0, TimeUnit.MILLISECONDS)
         .build()
     private val base = config.baseUrl.trimBaseUrl().ifBlank { "https://api.openai.com/v1" }
-    private val provider get() = LlmErrors.providerName(config)
 
     private fun requestBuilder(path: String) = Request.Builder()
         .url("$base/$path")
@@ -190,7 +189,7 @@ internal class OpenAiResponsesClient(
     }.catch { e ->
         if (e is CancellationException) throw e
         if (e is IOException) emit(StreamEvent.Failed(LlmErrors.fromIo(config, e)))
-        else emit(StreamEvent.Failed(LlmError(ErrorKind.UNKNOWN, "Something went wrong reading the response from $provider.", detail = e.message)))
+        else emit(StreamEvent.Failed(LlmErrors.readFailed(config, e.message)))
     }.flowOn(Dispatchers.Default)
 
     private class StreamState(val request: ChatRequest) {
@@ -313,7 +312,7 @@ internal class OpenAiResponsesClient(
                         s.toolCalls > 0 || response?.arr("output")?.any { (it as? JsonObject)?.str("type") == "function_call" } == true -> StopReason.TOOL_USE
                         else -> StopReason.END
                     }
-                    if (stop == StopReason.REFUSAL) emit(StreamEvent.Notice("${s.model} declined to answer this request."))
+                    if (stop == StopReason.REFUSAL) emit(StreamEvent.Notice(Strings.get(R.string.llm_declined, s.model)))
                     val items = response?.arr("output")?.takeIf { it.isNotEmpty() } ?: JsonArray(s.outputItems)
                     s.finished = true
                     emit(StreamEvent.Completed(stop, ProviderBlocks(ApiStyle.OPENAI_RESPONSES, response?.str("model") ?: s.model, items.toString())))

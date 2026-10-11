@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.domain.tools
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.core.util.Clock
 import io.dtsoftware.facet.core.util.Ids
@@ -33,7 +35,7 @@ object SkillParser {
         val name = slug(fields["name"] ?: heading ?: fallbackName)
         val description = (fields["description"] ?: body.lineSequence().firstOrNull { it.isNotBlank() && !it.startsWith("#") }.orEmpty())
             .trim().take(1024)
-        if (body.isBlank()) throw SkillImportException("The skill has no instructions.")
+        if (body.isBlank()) throw SkillImportException(Strings.get(R.string.skills_no_instructions))
         return ParsedSkill(name, description.ifBlank { "Use when the task matches $name." }, body.trim())
     }
 
@@ -147,12 +149,12 @@ class SkillRepository(private val db: FacetDatabase, private val http: OkHttpCli
                 val data = zip.readBytes()
                 if (data.size > MAX_FILE || !isText(path, data)) continue
                 total += data.size
-                if (total > MAX_TOTAL) throw SkillImportException("The skill is larger than ${MAX_TOTAL / 1024} KB of text.")
+                if (total > MAX_TOTAL) throw SkillImportException(Strings.get(R.string.skills_too_large, MAX_TOTAL / 1024))
                 files[path] = data.toString(Charsets.UTF_8)
             }
         }
         val skillPath = files.keys.filter { it.substringAfterLast('/').equals("SKILL.md", ignoreCase = true) }.minByOrNull { it.count { c -> c == '/' } }
-            ?: throw SkillImportException("No SKILL.md found in that archive.")
+            ?: throw SkillImportException(Strings.get(R.string.skills_no_skill_md))
         val root = skillPath.substringBeforeLast('/', "")
         val prefix = if (root.isEmpty()) "" else "$root/"
         val p = SkillParser.parse(files.getValue(skillPath), root.substringAfterLast('/').ifBlank { "skill" })
@@ -166,9 +168,9 @@ class SkillRepository(private val db: FacetDatabase, private val http: OkHttpCli
         val raw = toRaw(url.trim())
         val req = Request.Builder().url(raw).header("User-Agent", "Facet").build()
         val bytes = http.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) throw SkillImportException("Couldn't download the skill (HTTP ${resp.code}).")
+            if (!resp.isSuccessful) throw SkillImportException(Strings.get(R.string.skills_download_failed, resp.code))
             val body = resp.body.bytes()
-            if (body.size > MAX_TOTAL * 4) throw SkillImportException("That file is too large to be a skill.")
+            if (body.size > MAX_TOTAL * 4) throw SkillImportException(Strings.get(R.string.skills_file_too_large))
             body
         }
         if (raw.endsWith(".zip", ignoreCase = true) || (bytes.size > 4 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte())) {

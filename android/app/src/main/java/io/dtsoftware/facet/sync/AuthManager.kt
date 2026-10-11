@@ -5,10 +5,12 @@ import android.content.SharedPreferences
 import android.os.Build
 import android.provider.Settings
 import io.dtsoftware.facet.BuildConfig
+import io.dtsoftware.facet.R
 import io.dtsoftware.facet.core.crypto.DecryptionException
 import io.dtsoftware.facet.core.crypto.FacetCrypto
 import io.dtsoftware.facet.core.crypto.RecoveryCode
 import io.dtsoftware.facet.core.crypto.SecretBox
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.Clock
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -140,7 +142,7 @@ class AuthManager(
         val vaultKey = try {
             FacetCrypto.unwrapVaultKey(keys.wrapKey, FacetCrypto.unb64(res.wrappedVaultKey))
         } catch (e: DecryptionException) {
-            throw AuthException("Your encryption key couldn't be unlocked with this password.")
+            throw AuthException(Strings.get(R.string.sync_error_password_key))
         }
         val previousUser = prefs.getString(K_USER, null)
         saveSession(res.user, res.tokens, vaultKey)
@@ -152,13 +154,13 @@ class AuthManager(
     /** Resets the password with a recovery code. Keeps all data. Returns the new recovery code. */
     suspend fun recoverWithCode(email: String, code: String, newPassword: String): String = withContext(Dispatchers.Default) {
         val cleanEmail = email.trim().lowercase()
-        val codeBytes = RecoveryCode.parse(code) ?: throw AuthException("That recovery code isn't valid. It has 32 letters and digits.")
+        val codeBytes = RecoveryCode.parse(code) ?: throw AuthException(Strings.get(R.string.sync_error_recovery_code_invalid))
         val recKeys = FacetCrypto.deriveFromRecovery(codeBytes)
         val start = mapErrors { api.recoverStart(serverUrl, cleanEmail, FacetCrypto.b64(recKeys.authHash)) }
         val vaultKey = try {
             FacetCrypto.unwrapVaultKey(recKeys.wrapKey, FacetCrypto.unb64(start.recoveryWrappedVaultKey), recovery = true)
         } catch (e: DecryptionException) {
-            throw AuthException("That recovery code doesn't match this account.")
+            throw AuthException(Strings.get(R.string.sync_error_recovery_code_mismatch))
         }
         val (kdf, authHash, wrapped) = passwordMaterial(newPassword, vaultKey)
         val (newCode, recovery) = recoveryMaterial(vaultKey)
@@ -191,7 +193,7 @@ class AuthManager(
     // ---- Account management ----
 
     suspend fun changePassword(current: String, newPassword: String) = withContext(Dispatchers.Default) {
-        val vaultKey = vaultKey() ?: throw AuthException("Sign in again to change your password.")
+        val vaultKey = vaultKey() ?: throw AuthException(Strings.get(R.string.sync_error_sign_in_to_change_password))
         val currentHash = currentAuthHash(current)
         val (kdf, authHash, wrapped) = passwordMaterial(newPassword, vaultKey)
         val tokens = authed { base, token -> api.changePassword(base, token, ChangePasswordReq(currentHash, kdf, authHash, wrapped)) }
@@ -200,7 +202,7 @@ class AuthManager(
 
     /** Creates a new recovery code (the old one stops working). */
     suspend fun regenerateRecoveryCode(password: String): String = withContext(Dispatchers.Default) {
-        val vaultKey = vaultKey() ?: throw AuthException("Sign in again to create a recovery code.")
+        val vaultKey = vaultKey() ?: throw AuthException(Strings.get(R.string.sync_error_sign_in_to_create_recovery_code))
         val currentHash = currentAuthHash(password)
         val (code, recovery) = recoveryMaterial(vaultKey)
         authed { base, token -> api.setRecovery(base, token, currentHash, recovery) }
@@ -252,12 +254,12 @@ class AuthManager(
     }
 
     private suspend fun accessToken(forceRefresh: Boolean = false): String = refreshMutex.withLock {
-        if (_state.value !is AccountState.SignedIn) throw AuthException("You're not signed in.")
+        if (_state.value !is AccountState.SignedIn) throw AuthException(Strings.get(R.string.sync_error_not_signed_in))
         val current = prefs.getString(K_ACCESS, null)?.let { runCatching { secrets.openString(it) }.getOrNull() }
         val expiresAt = prefs.getLong(K_ACCESS_EXP, 0)
         if (!forceRefresh && current != null && expiresAt - Clock.now() > 60_000) return current
         val refresh = prefs.getString(K_REFRESH, null)?.let { runCatching { secrets.openString(it) }.getOrNull() }
-            ?: run { markExpired(); throw AuthException("Your session ended. Sign in again to keep syncing.") }
+            ?: run { markExpired(); throw AuthException(Strings.get(R.string.sync_error_session_ended)) }
         try {
             val tokens = api.refresh(serverUrl, refresh)
             saveTokens(tokens)
@@ -265,7 +267,7 @@ class AuthManager(
         } catch (e: ApiException) {
             if (e.status == 401) {
                 markExpired()
-                throw AuthException("Your session ended. Sign in again to keep syncing.")
+                throw AuthException(Strings.get(R.string.sync_error_session_ended))
             }
             throw e
         }
@@ -274,7 +276,7 @@ class AuthManager(
     // ---- helpers ----
 
     private suspend fun currentAuthHash(password: String): String {
-        val email = prefs.getString(K_EMAIL, null) ?: throw AuthException("You're not signed in.")
+        val email = prefs.getString(K_EMAIL, null) ?: throw AuthException(Strings.get(R.string.sync_error_not_signed_in))
         val kdf = mapErrors { api.prelogin(serverUrl, email) }
         val keys = FacetCrypto.deriveFromPassword(password, FacetCrypto.unb64(kdf.salt), kdf.iterations)
         return FacetCrypto.b64(keys.authHash)
@@ -366,18 +368,18 @@ class AuthManager(
     } catch (e: ApiException) {
         throw AuthException(
             when (e.code) {
-                "invalid_credentials" -> "That email and password don't match an account."
-                "email_taken" -> "An account with this email already exists. Sign in instead."
-                "registration_closed" -> "This server isn't accepting new accounts."
-                "rate_limited" -> "Too many attempts. Wait a few minutes and try again."
-                "email_disabled" -> "This server can't send email. Use your recovery code instead."
-                else -> e.message ?: "The sync server returned an error."
+                "invalid_credentials" -> Strings.get(R.string.sync_error_invalid_credentials)
+                "email_taken" -> Strings.get(R.string.sync_error_email_taken)
+                "registration_closed" -> Strings.get(R.string.sync_error_registration_closed)
+                "rate_limited" -> Strings.get(R.string.sync_error_rate_limited)
+                "email_disabled" -> Strings.get(R.string.sync_error_email_disabled)
+                else -> e.message ?: Strings.get(R.string.sync_error_server)
             },
         )
     } catch (e: AuthException) {
         throw e
     } catch (e: IOException) {
-        throw AuthException("Couldn't reach the sync server. Check your connection and the server address.")
+        throw AuthException(Strings.get(R.string.sync_error_unreachable))
     }
 
     private companion object {

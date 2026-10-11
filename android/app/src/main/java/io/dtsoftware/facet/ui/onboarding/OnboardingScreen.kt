@@ -38,7 +38,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.dtsoftware.facet.AppContainer
@@ -68,12 +71,14 @@ fun OnboardingScreen(
     val account by container.auth.state.collectAsStateWithLifecycle()
     val providers by container.providers.observeAll().collectAsStateWithLifecycle(emptyList())
     BackHandler(step > 0) { step-- }
+    // Steps move forward in reading direction: from the right in left-to-right languages, from the left in RTL.
+    val forward = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1 else 1
 
     Box(Modifier.fillMaxSize().background(FacetTheme.colors.background).statusBarsPadding().navigationBarsPadding()) {
         AnimatedContent(
             targetState = step,
             transitionSpec = {
-                val dir = if (targetState > initialState) 1 else -1
+                val dir = if (targetState > initialState) forward else -forward
                 (slideInHorizontally(tween(380, easing = FacetMotion.Emphasized)) { it / 5 * dir } + fadeIn(tween(300))) togetherWith
                     (slideOutHorizontally(tween(380, easing = FacetMotion.Emphasized)) { -it / 8 * dir } + fadeOut(tween(200)))
             },
@@ -124,19 +129,19 @@ private fun Welcome(onNext: () -> Unit) {
     Column(horizontalAlignment = Alignment.Start) {
         AssemblingGem(size = 92.dp)
         Spacer(Modifier.height(36.dp))
-        Text("Every model.\nOne home.", style = FacetTheme.type.display, color = c.text)
+        Text(stringResource(R.string.onboarding_welcome_title), style = FacetTheme.type.display, color = c.text)
         Spacer(Modifier.height(14.dp))
         Text(
-            "Facet is a private, open-source chat app for your own OpenAI, Anthropic, Google and other API keys.",
+            stringResource(R.string.onboarding_welcome_body),
             style = FacetTheme.type.body.copy(fontSize = FacetTheme.type.chat.fontSize, lineHeight = FacetTheme.type.chat.lineHeight),
             color = c.textSecondary,
         )
         Spacer(Modifier.height(28.dp))
-        Point(R.drawable.ic_key, "Your keys, your bill", "Pay providers directly. See the cost of every reply.")
-        Point(R.drawable.ic_shield, "Encrypted end to end", "Chats and keys are locked on your device before they sync.")
-        Point(R.drawable.ic_brain, "Full control", "Reasoning effort, web search, and every model a provider offers.")
+        Point(R.drawable.ic_key, stringResource(R.string.onboarding_keys_point_title), stringResource(R.string.onboarding_keys_point_body))
+        Point(R.drawable.ic_shield, stringResource(R.string.onboarding_encrypted_point_title), stringResource(R.string.onboarding_encrypted_point_body))
+        Point(R.drawable.ic_brain, stringResource(R.string.onboarding_control_point_title), stringResource(R.string.onboarding_control_point_body))
         Spacer(Modifier.height(32.dp))
-        FacetButton("Get started", onNext, modifier = Modifier.fillMaxWidth())
+        FacetButton(stringResource(R.string.onboarding_get_started), onNext, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -161,23 +166,23 @@ private fun AccountStep(signedIn: Boolean, onCreate: () -> Unit, onSignIn: () ->
     Column {
         Gem(size = 40.dp)
         Spacer(Modifier.height(24.dp))
-        Text("Sync, privately", style = FacetTheme.type.display, color = c.text)
+        Text(stringResource(R.string.onboarding_sync_title), style = FacetTheme.type.display, color = c.text)
         Spacer(Modifier.height(12.dp))
         Text(
-            "A free account keeps your chats, assistants and keys in step across your phone, tablet and future devices. Everything is encrypted with a key only you hold.",
+            stringResource(R.string.onboarding_sync_body),
             style = FacetTheme.type.body, color = c.textSecondary,
         )
         Spacer(Modifier.height(28.dp))
         if (signedIn) {
-            FacetButton("Continue", onSkip, modifier = Modifier.fillMaxWidth())
+            FacetButton(stringResource(R.string.action_continue), onSkip, modifier = Modifier.fillMaxWidth())
         } else {
-            FacetButton("Create an account", onCreate, modifier = Modifier.fillMaxWidth())
+            FacetButton(stringResource(R.string.onboarding_create_account), onCreate, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(10.dp))
-            FacetButton("I already have an account", onSignIn, style = ButtonStyle.Tonal, modifier = Modifier.fillMaxWidth())
+            FacetButton(stringResource(R.string.onboarding_have_account), onSignIn, style = ButtonStyle.Tonal, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(10.dp))
-            FacetButton("Use without an account", onSkip, style = ButtonStyle.Text, modifier = Modifier.fillMaxWidth())
+            FacetButton(stringResource(R.string.onboarding_skip_account), onSkip, style = ButtonStyle.Text, modifier = Modifier.fillMaxWidth())
             Text(
-                "Without an account, everything stays on this device. You can create one later in Settings.",
+                stringResource(R.string.onboarding_skip_account_note),
                 style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -190,10 +195,10 @@ private fun KeysStep(connected: Set<ProviderKind>, onAdd: (String) -> Unit, onFi
     val c = FacetTheme.colors
     var showAll by rememberSaveable { mutableStateOf(false) }
     Column {
-        Text("Add a key", style = FacetTheme.type.display, color = c.text)
+        Text(stringResource(R.string.onboarding_keys_title), style = FacetTheme.type.display, color = c.text)
         Spacer(Modifier.height(12.dp))
         Text(
-            "Paste an API key from any provider. You can add more, and switch between all their models, any time.",
+            stringResource(R.string.onboarding_keys_body),
             style = FacetTheme.type.body, color = c.textSecondary,
         )
         Spacer(Modifier.height(22.dp))
@@ -223,11 +228,14 @@ private fun KeysStep(connected: Set<ProviderKind>, onAdd: (String) -> Unit, onFi
         }
         if (!showAll) {
             Text(
-                "More providers", style = FacetTheme.type.labelM, color = c.primary,
+                stringResource(R.string.onboarding_more_providers), style = FacetTheme.type.labelM, color = c.primary,
                 modifier = Modifier.padding(top = 8.dp).clip(FacetShapes.small).clickable { showAll = true }.padding(8.dp),
             )
         }
         Spacer(Modifier.height(24.dp))
-        FacetButton(if (connected.isEmpty()) "Skip for now" else "Start chatting", onFinish, style = if (connected.isEmpty()) ButtonStyle.Tonal else ButtonStyle.Primary, modifier = Modifier.fillMaxWidth())
+        FacetButton(
+            stringResource(if (connected.isEmpty()) R.string.onboarding_skip_for_now else R.string.onboarding_start_chatting), onFinish,
+            style = if (connected.isEmpty()) ButtonStyle.Tonal else ButtonStyle.Primary, modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

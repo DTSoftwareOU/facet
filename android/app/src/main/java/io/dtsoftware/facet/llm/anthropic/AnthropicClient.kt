@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.llm.anthropic
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.net.HttpStatusException
 import io.dtsoftware.facet.core.net.fetchString
 import io.dtsoftware.facet.core.net.sseFlow
@@ -8,10 +10,8 @@ import io.dtsoftware.facet.llm.ApiStyle
 import io.dtsoftware.facet.llm.ChatMessage
 import io.dtsoftware.facet.llm.ChatRequest
 import io.dtsoftware.facet.llm.Effort
-import io.dtsoftware.facet.llm.ErrorKind
 import io.dtsoftware.facet.llm.HealAction
 import io.dtsoftware.facet.llm.LlmClient
-import io.dtsoftware.facet.llm.LlmError
 import io.dtsoftware.facet.llm.LlmErrors
 import io.dtsoftware.facet.llm.LlmException
 import io.dtsoftware.facet.llm.ModelCatalog
@@ -83,7 +83,6 @@ internal class AnthropicClient(
         .callTimeout(0, TimeUnit.MILLISECONDS)
         .build()
     private val base = config.baseUrl.trimBaseUrl().removeSuffix("/v1").ifBlank { "https://api.anthropic.com" }
-    private val provider get() = LlmErrors.providerName(config)
 
     private fun requestBuilder(path: String) = Request.Builder()
         .url("$base/v1/$path")
@@ -217,7 +216,7 @@ internal class AnthropicClient(
     }.catch { e ->
         if (e is kotlinx.coroutines.CancellationException) throw e
         if (e is IOException) emit(StreamEvent.Failed(LlmErrors.fromIo(config, e)))
-        else emit(StreamEvent.Failed(LlmError(ErrorKind.UNKNOWN, "Something went wrong reading the response from $provider.", detail = e.message)))
+        else emit(StreamEvent.Failed(LlmErrors.readFailed(config, e.message)))
     }.flowOn(Dispatchers.Default)
 
     private fun applyHeal(action: HealAction, dropped: MutableSet<String>) {
@@ -303,7 +302,7 @@ internal class AnthropicClient(
                         turn.emittedAnything = true
                         emit(StreamEvent.Started(turn.servedModel))
                         if (model != null && !sameModel(model, turn.request.model)) {
-                            emit(StreamEvent.Notice("Answered by $model instead of ${turn.request.model} (automatic fallback)."))
+                            emit(StreamEvent.Notice(Strings.get(R.string.llm_notice_fallback, model, turn.request.model)))
                         }
                     }
                     msg?.obj("usage")?.let { turn.usageRound = parseUsage(it, turn.usageRound); emit(StreamEvent.UsageUpdate(turn.usage)) }
@@ -340,8 +339,8 @@ internal class AnthropicClient(
                             val to = block.obj("to")?.str("model")
                             if (to != null) turn.servedModel = to
                             emit(StreamEvent.Notice(
-                                if (from != null && to != null) "$from declined this request; $to answered instead."
-                                else "Another model answered after the requested model declined.",
+                                if (from != null && to != null) Strings.get(R.string.llm_notice_declined_switch, from, to)
+                                else Strings.get(R.string.llm_notice_declined_other),
                             ))
                         }
                     }
@@ -431,14 +430,11 @@ internal class AnthropicClient(
         emit(StreamEvent.Completed(turn.stopReason, ProviderBlocks(ApiStyle.ANTHROPIC, turn.servedModel, JsonArray(blocks).toString())))
     }
 
-    private fun refusalNotice(model: String, category: String?): String {
-        val why = when (category) {
-            null -> ""
-            "cyber" -> " (cybersecurity safeguard)"
-            "bio" -> " (biology safeguard)"
-            else -> " ($category safeguard)"
-        }
-        return "$model declined to answer this request$why. Rephrase it or try another model."
+    private fun refusalNotice(model: String, category: String?): String = when (category) {
+        null -> Strings.get(R.string.llm_refusal, model)
+        "cyber" -> Strings.get(R.string.llm_refusal_cyber, model)
+        "bio" -> Strings.get(R.string.llm_refusal_bio, model)
+        else -> Strings.get(R.string.llm_refusal_category, model, category)
     }
 
     private fun sameModel(a: String, b: String) = ModelCatalog.normalizeId(a) == ModelCatalog.normalizeId(b)

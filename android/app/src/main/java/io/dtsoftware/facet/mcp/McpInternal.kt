@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.mcp
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -157,7 +159,7 @@ internal fun wellKnown(url: HttpUrl, name: String, includePath: Boolean): String
 
 /** Pulls `message (code)` out of a JSON-RPC error object. */
 internal fun rpcErrorText(error: JsonObject): String {
-    val message = error.str("message") ?: "Unknown error"
+    val message = error.str("message") ?: Strings.get(R.string.mcp_error_unknown)
     val code = (error["code"] as? JsonPrimitive)?.contentOrNull
     return if (code != null) "$message ($code)" else message
 }

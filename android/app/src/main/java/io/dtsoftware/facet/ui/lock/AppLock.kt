@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -112,15 +113,16 @@ fun AppLockGate(enabled: Boolean, content: @Composable () -> Unit) {
         content()
         return
     }
-    val unlock = { DeviceAuth.authenticate(context, "Unlock Facet") { ok -> if (ok) locked = false } }
+    val promptTitle = stringResource(R.string.lock_prompt_title)
+    val unlock = { DeviceAuth.authenticate(context, promptTitle) { ok -> if (ok) locked = false } }
     LaunchedEffect(Unit) { unlock() }
     Box(Modifier.fillMaxSize().background(FacetTheme.colors.background), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Gem(size = 56.dp)
             Spacer(Modifier.height(20.dp))
-            Text("Facet is locked", style = FacetTheme.type.headline, color = FacetTheme.colors.text)
+            Text(stringResource(R.string.lock_locked), style = FacetTheme.type.headline, color = FacetTheme.colors.text)
             Spacer(Modifier.height(24.dp))
-            FacetButton("Unlock", { unlock() }, icon = R.drawable.ic_fingerprint)
+            FacetButton(stringResource(R.string.lock_unlock), { unlock() }, icon = R.drawable.ic_fingerprint)
         }
     }
 }

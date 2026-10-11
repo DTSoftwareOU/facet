@@ -59,10 +59,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.dtsoftware.facet.R
 import io.dtsoftware.facet.core.util.Clock
@@ -187,8 +191,14 @@ fun FileChip(a: AttachmentRef, onClick: () -> Unit, trailing: (@Composable () ->
         Spacer(Modifier.width(10.dp))
         Column(Modifier.widthIn(max = 180.dp)) {
             Text(a.name, style = FacetTheme.type.labelM, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val ext = a.name.substringAfterLast('.', "")
+            val type = when {
+                a.kind == "pdf" -> "PDF"
+                ext.isNotEmpty() -> ext.uppercase()
+                else -> stringResource(R.string.msg_file)
+            }
             Text(
-                (if (a.kind == "pdf") "PDF" else a.name.substringAfterLast('.', "File").uppercase()) + " · " + Format.bytes(a.sizeBytes),
+                type + " · " + Format.bytes(a.sizeBytes),
                 style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
             )
         }
@@ -225,7 +235,7 @@ fun AssistantMessage(
             Gem(size = 18.dp, thinking = streaming && text.isEmpty() && !hasThinking && live?.searching != true)
             Spacer(Modifier.width(8.dp))
             Text(
-                m.modelName ?: m.modelId ?: "Assistant",
+                m.modelName ?: m.modelId ?: stringResource(R.string.msg_assistant),
                 style = FacetTheme.type.labelM,
                 color = c.textSecondary,
                 maxLines = 1,
@@ -278,21 +288,21 @@ fun AssistantMessage(
             when (status) {
                 MessageStatus.ERROR -> m.error()?.let { err ->
                     Spacer(Modifier.height(8.dp))
-                    StatusCard(R.drawable.ic_alert, err.message, c.error, "Retry") { actions.onRegenerate(m.id) }
+                    StatusCard(R.drawable.ic_alert, err.message, c.error, stringResource(R.string.msg_retry)) { actions.onRegenerate(m.id) }
                 }
                 MessageStatus.REFUSED -> {
                     Spacer(Modifier.height(8.dp))
-                    StatusCard(R.drawable.ic_shield, "The model declined to answer this. You can rephrase, or try another model.", c.warning, "Try another model") {
+                    StatusCard(R.drawable.ic_shield, stringResource(R.string.msg_refused), c.warning, stringResource(R.string.msg_try_another_model)) {
                         actions.onRegenerateWith(m.id)
                     }
                 }
                 MessageStatus.TRUNCATED -> if (isLast) {
                     Spacer(Modifier.height(8.dp))
-                    StatusCard(R.drawable.ic_timer, "This reply reached the output limit.", c.textSecondary, "Continue") { actions.onContinue() }
+                    StatusCard(R.drawable.ic_timer, stringResource(R.string.msg_truncated), c.textSecondary, stringResource(R.string.action_continue)) { actions.onContinue() }
                 }
                 MessageStatus.STOPPED -> {
                     Spacer(Modifier.height(6.dp))
-                    Text("Stopped", style = FacetTheme.type.labelS, color = c.textTertiary)
+                    Text(stringResource(R.string.msg_stopped), style = FacetTheme.type.labelS, color = c.textTertiary)
                 }
                 else -> Unit
             }
@@ -327,11 +337,14 @@ private fun ThinkingPanel(text: String, active: Boolean, startedAt: Long?, durat
             delay(250)
         }
     }
-    val rotation by animateFloatAsState(if (expanded) 90f else 0f, label = "chev")
+    // The chevron points to the end (left in Arabic and Urdu, where the icon is mirrored) and turns down when open.
+    val down = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -90f else 90f
+    val rotation by animateFloatAsState(if (expanded) down else 0f, label = "chev")
     val label = when {
-        active -> "Thinking" + (startedAt?.let { " · " + Format.seconds(now - it) } ?: "")
-        durationMs > 0 -> "Thought for ${Format.seconds(durationMs)}"
-        else -> "Reasoning"
+        active && startedAt != null -> stringResource(R.string.msg_thinking_for, Format.seconds(now - startedAt))
+        active -> stringResource(R.string.msg_thinking)
+        durationMs > 0 -> stringResource(R.string.msg_thought_for, Format.seconds(durationMs))
+        else -> stringResource(R.string.msg_reasoning)
     }
     Column(
         Modifier
@@ -357,7 +370,7 @@ private fun ThinkingPanel(text: String, active: Boolean, startedAt: Long?, durat
             }
             if (text.isNotBlank()) {
                 Spacer(Modifier.width(4.dp))
-                FacetIcon(R.drawable.ic_chevron_right, if (expanded) "Collapse" else "Expand", tint = c.textTertiary, size = 15.dp, modifier = Modifier.rotate(rotation))
+                FacetIcon(R.drawable.ic_chevron_right, stringResource(if (expanded) R.string.msg_collapse else R.string.msg_expand), tint = c.textTertiary, size = 15.dp, modifier = Modifier.rotate(rotation))
             }
         }
         AnimatedVisibility(expanded && text.isNotBlank(), enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
@@ -381,7 +394,11 @@ private fun ThinkingPanel(text: String, active: Boolean, startedAt: Long?, durat
                 modifier = Modifier
                     .padding(top = 6.dp, start = 7.dp)
                     .then(if (active) Modifier.heightIn(max = 420.dp) else Modifier)
-                    .drawBehind { drawLine(lineColor, Offset(0f, 0f), Offset(0f, size.height), strokeWidth = 2.dp.toPx()) }
+                    .drawBehind {
+                        // The line runs along the start edge: on the right in Arabic and Urdu.
+                        val x = if (layoutDirection == LayoutDirection.Rtl) size.width else 0f
+                        drawLine(lineColor, Offset(x, 0f), Offset(x, size.height), strokeWidth = 2.dp.toPx())
+                    }
                     .then(if (active) Modifier.verticalScroll(scroll) else Modifier)
                     .padding(start = 14.dp, end = 4.dp),
             )
@@ -398,6 +415,8 @@ private fun ShimmerText(text: String) {
     }
     val t = rememberInfiniteTransition(label = "shimmer")
     val x by t.animateFloat(-1f, 2f, infiniteRepeatable(tween(1600, easing = LinearEasing)), label = "x")
+    // The highlight moves in reading direction: right to left in Arabic and Urdu.
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Text(
         text,
         style = FacetTheme.type.labelM.copy(
@@ -407,7 +426,7 @@ private fun ShimmerText(text: String) {
                 x.coerceIn(0f, 1f) to c.text,
                 (x + 0.3f).coerceIn(0f, 1f) to c.textTertiary,
                 1f to c.textTertiary,
-                start = Offset.Zero, end = Offset(400f, 0f),
+                start = if (rtl) Offset(400f, 0f) else Offset.Zero, end = if (rtl) Offset.Zero else Offset(400f, 0f),
             ),
         ),
     )
@@ -420,9 +439,10 @@ private fun SearchStatus(query: String?, searching: Boolean, count: Int) {
         FacetIcon(R.drawable.ic_globe, null, tint = if (searching) c.primary else c.textTertiary, size = 15.dp)
         Spacer(Modifier.width(8.dp))
         val label = when {
-            searching && !query.isNullOrBlank() -> "Searching “$query”"
-            searching -> "Searching the web"
-            else -> "Searched the web" + if (count > 1) " $count times" else ""
+            searching && !query.isNullOrBlank() -> stringResource(R.string.msg_searching_query, query)
+            searching -> stringResource(R.string.msg_searching_web)
+            count > 1 -> pluralStringResource(R.plurals.msg_searched_web_times, count, count)
+            else -> stringResource(R.string.msg_searched_web)
         }
         if (searching) ShimmerText(label) else Text(label, style = FacetTheme.type.labelM, color = c.textSecondary)
     }
@@ -499,20 +519,21 @@ private fun ActionRow(item: ThreadItem, actions: MessageActions, showUsage: Bool
     val usage = remember(m.usageJson) { m.usage() }
     Row(Modifier.fillMaxWidth().padding(top = 4.dp).height(40.dp), verticalAlignment = Alignment.CenterVertically) {
         if (m.content.isNotBlank()) {
-            SmallAction(R.drawable.ic_copy, "Copy") { actions.onCopy(m.content) }
+            SmallAction(R.drawable.ic_copy, stringResource(R.string.action_copy)) { actions.onCopy(m.content) }
         }
-        SmallAction(R.drawable.ic_regenerate, "Regenerate") { actions.onRegenerate(m.id) }
+        SmallAction(R.drawable.ic_regenerate, stringResource(R.string.msg_regenerate)) { actions.onRegenerate(m.id) }
         if (m.content.isNotBlank()) {
-            SmallAction(R.drawable.ic_speak, "Read aloud") { actions.onSpeak(m.id, m.content) }
-            SmallAction(R.drawable.ic_share, "Share") { actions.onShare(m.content) }
+            SmallAction(R.drawable.ic_speak, stringResource(R.string.msg_read_aloud)) { actions.onSpeak(m.id, m.content) }
+            SmallAction(R.drawable.ic_share, stringResource(R.string.action_share)) { actions.onShare(m.content) }
         }
-        SmallAction(R.drawable.ic_more_horiz, "More") { actions.onMore(item) }
+        SmallAction(R.drawable.ic_more_horiz, stringResource(R.string.action_more)) { actions.onMore(item) }
         if (item.siblingIds.size > 1) BranchSwitcher(item, actions)
         Spacer(Modifier.weight(1f))
+        val tokens = if (showUsage && usage != null && (usage.inputTokens + usage.outputTokens) > 0) {
+            stringResource(R.string.msg_usage_tokens, Format.tokens(usage.inputTokens), Format.tokens(usage.outputTokens))
+        } else null
         val parts = buildList {
-            if (showUsage && usage != null && (usage.inputTokens + usage.outputTokens) > 0) {
-                add("${Format.tokens(usage.inputTokens)} in · ${Format.tokens(usage.outputTokens)} out")
-            }
+            if (tokens != null) add(tokens)
             if (showCost && m.costUsd != null) add(Format.cost(m.costUsd))
         }
         if (parts.isNotEmpty()) {
@@ -538,12 +559,12 @@ private fun BranchSwitcher(item: ThreadItem, actions: MessageActions) {
     val count = item.siblingIds.size
     Row(verticalAlignment = Alignment.CenterVertically) {
         FacetIconButton(
-            R.drawable.ic_chevron_left, "Previous version", { if (idx > 0) actions.onSwitchBranch(item.siblingIds[idx - 1]) },
+            R.drawable.ic_chevron_left, stringResource(R.string.msg_previous_version), { if (idx > 0) actions.onSwitchBranch(item.siblingIds[idx - 1]) },
             enabled = idx > 0, tint = c.textSecondary, size = 16.dp, modifier = Modifier.size(32.dp),
         )
         Text("${idx + 1} / $count", style = FacetTheme.type.labelS, color = c.textSecondary)
         FacetIconButton(
-            R.drawable.ic_chevron_right, "Next version", { if (idx < count - 1) actions.onSwitchBranch(item.siblingIds[idx + 1]) },
+            R.drawable.ic_chevron_right, stringResource(R.string.msg_next_version), { if (idx < count - 1) actions.onSwitchBranch(item.siblingIds[idx + 1]) },
             enabled = idx < count - 1, tint = c.textSecondary, size = 16.dp, modifier = Modifier.size(32.dp),
         )
     }

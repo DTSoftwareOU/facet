@@ -131,7 +131,8 @@ internal fun TableView(block: MdBlock.Table, env: MdEnv) {
                     for (r in 0 until rowCount) {
                         var x = 0
                         for (c in 0 until cols) {
-                            placeables[r * cols + c].place(x, y)
+                            // Columns run in reading direction: the first one is on the right in RTL languages.
+                            placeables[r * cols + c].placeRelative(x, y)
                             x += widths[c]
                         }
                         y += heights[r]

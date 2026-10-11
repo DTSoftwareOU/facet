@@ -1,5 +1,6 @@
 package io.dtsoftware.facet.ui.chat
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,10 +39,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.Format
 import io.dtsoftware.facet.data.prefs.ModelRef
 import io.dtsoftware.facet.data.repo.ProviderModels
@@ -86,17 +90,17 @@ fun ModelPickerSheet(
     FacetSheet(onDismiss) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f).imePadding()) {
             Row(Modifier.padding(horizontal = 20.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Choose a model", style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.weight(1f))
-                FacetIconButton(R.drawable.ic_key, "Manage providers", onManageProviders, tint = c.textSecondary)
+                Text(stringResource(R.string.sheet_model_picker_title), style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.weight(1f))
+                FacetIconButton(R.drawable.ic_key, stringResource(R.string.sheet_manage_providers), onManageProviders, tint = c.textSecondary)
             }
-            SearchField(query, { query = it }, "Search models", Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            SearchField(query, { query = it }, stringResource(R.string.sheet_search_models), Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             if (catalog.isEmpty()) {
                 Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("No providers yet", style = FacetTheme.type.titleM, color = c.text)
+                    Text(stringResource(R.string.sheet_no_providers_title), style = FacetTheme.type.titleM, color = c.text)
                     Spacer(Modifier.height(6.dp))
-                    Text("Add an API key to see its models here.", style = FacetTheme.type.body, color = c.textSecondary)
+                    Text(stringResource(R.string.sheet_no_providers_body), style = FacetTheme.type.body, color = c.textSecondary)
                     Spacer(Modifier.height(16.dp))
-                    FacetButton("Add a provider", onManageProviders, icon = R.drawable.ic_plus)
+                    FacetButton(stringResource(R.string.sheet_add_provider), onManageProviders, icon = R.drawable.ic_plus)
                 }
                 return@Column
             }
@@ -105,7 +109,7 @@ fun ModelPickerSheet(
                 val favorites = catalog.flatMap { pm -> pm.models.filter { it.id in pm.favorites && it.id !in pm.hidden }.map { pm to it } }
                     .filter { (_, m) -> q.isEmpty() || m.displayName.lowercase().contains(q) || m.id.lowercase().contains(q) }
                 if (favorites.isNotEmpty()) {
-                    item(key = "fav-header") { SectionLabel("Favorites", Modifier.padding(start = 20.dp, top = 12.dp)) }
+                    item(key = "fav-header") { SectionLabel(stringResource(R.string.sheet_favorites), Modifier.padding(start = 20.dp, top = 12.dp)) }
                     items(favorites, key = { (pm, m) -> "fav/${pm.provider.id}/${m.id}" }) { (pm, m) ->
                         ModelRow(
                             pm, m, selected, true, showProvider = true, onSelect = { onSelect(ModelRef(pm.provider.id, m.id)) },
@@ -126,13 +130,13 @@ fun ModelPickerSheet(
                             ProviderBadge(pm.kind, size = 22.dp)
                             Spacer(Modifier.width(10.dp))
                             Text(pm.provider.label, style = FacetTheme.type.labelM, color = c.textSecondary, modifier = Modifier.weight(1f))
-                            FacetIconButton(R.drawable.ic_sync, "Refresh models", { onRefresh(pm.provider.id) }, tint = c.textTertiary, size = 16.dp)
+                            FacetIconButton(R.drawable.ic_sync, stringResource(R.string.sheet_refresh_models), { onRefresh(pm.provider.id) }, tint = c.textTertiary, size = 16.dp)
                         }
                     }
                     if (models.isEmpty() && hiddenMatches.isEmpty()) {
                         item(key = "empty/${pm.provider.id}") {
                             Text(
-                                if (q.isEmpty()) "No models loaded. Tap refresh, or add a model ID in Providers." else "No matches.",
+                                stringResource(if (q.isEmpty()) R.string.sheet_no_models_loaded else R.string.sheet_no_matches),
                                 style = FacetTheme.type.labelM.copy(fontWeight = FontWeight.Normal),
                                 color = c.textTertiary,
                                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
@@ -149,7 +153,10 @@ fun ModelPickerSheet(
                     if (hiddenMatches.isNotEmpty()) {
                         item(key = "hidden/${pm.provider.id}") {
                             Text(
-                                if (showHidden) "Hide ${hiddenMatches.size} hidden" else "${hiddenMatches.size} hidden · Show",
+                                pluralStringResource(
+                                    if (showHidden) R.plurals.sheet_hide_hidden_models else R.plurals.sheet_show_hidden_models,
+                                    hiddenMatches.size, hiddenMatches.size,
+                                ),
                                 style = FacetTheme.type.labelM, color = c.textTertiary,
                                 modifier = Modifier
                                     .padding(horizontal = 12.dp)
@@ -185,7 +192,7 @@ private fun ModelRow(
             .padding(horizontal = 8.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(if (isSelected) c.primaryContainer else androidx.compose.ui.graphics.Color.Transparent)
-            .combinedClickable(onClick = onSelect, onLongClick = onLongClick, onLongClickLabel = if (onLongClick != null) "Edit model" else null)
+            .combinedClickable(onClick = onSelect, onLongClick = onLongClick, onLongClickLabel = if (onLongClick != null) stringResource(R.string.sheet_edit_model) else null)
             .alpha(if (dimmed) 0.5f else 1f)
             .padding(start = 12.dp, end = 2.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -199,11 +206,9 @@ private fun ModelRow(
                 Spacer(Modifier.width(8.dp))
                 CapIcons(m.caps)
             }
-            val details = buildList {
-                if (showProvider) add(pm.provider.label)
-                m.contextWindow?.let { add("${Format.contextWindow(it)} context") }
-                m.pricing?.let { add("\$${trimPrice(it.input)} / \$${trimPrice(it.output)} per 1M") }
-            }
+            val contextLabel = m.contextWindow?.let { stringResource(R.string.sheet_model_context, Format.contextWindow(it)) }
+            val pricing = m.pricing?.let { stringResource(R.string.sheet_model_price, price(it.input), price(it.output)) }
+            val details = listOfNotNull(pm.provider.label.takeIf { showProvider }, contextLabel, pricing)
             if (details.isNotEmpty()) {
                 Text(
                     details.joinToString(" · "),
@@ -214,23 +219,36 @@ private fun ModelRow(
             }
         }
         FacetIconButton(
-            R.drawable.ic_star, if (favorite) "Remove from favorites" else "Add to favorites", onFavorite,
+            R.drawable.ic_star, stringResource(if (favorite) R.string.sheet_remove_favorite else R.string.sheet_add_favorite), onFavorite,
             tint = if (favorite) io.dtsoftware.facet.ui.theme.GemPalette.Gold else c.textTertiary, size = 18.dp,
         )
     }
 }
 
-private fun trimPrice(v: Double): String = if (v >= 1) String.format(java.util.Locale.US, "%.2f", v).removeSuffix(".00") else
-    String.format(java.util.Locale.US, "%.3f", v).trimEnd('0').trimEnd('.')
+/** A price in US dollars per million tokens, in the app's language: "$3", "$2.50", "$0.075". */
+private fun price(usd: Double): String = java.text.NumberFormat.getCurrencyInstance(Strings.locale).apply {
+    currency = java.util.Currency.getInstance("USD")
+    val whole = usd >= 1 && Math.round(usd * 100) % 100 == 0L
+    minimumFractionDigits = if (usd >= 1 && !whole) 2 else 0
+    maximumFractionDigits = if (usd >= 1) (if (whole) 0 else 2) else 3
+    roundingMode = java.math.RoundingMode.HALF_UP
+}.format(usd)
+
+/** A temperature with two decimals, in the app's language ("0.70"). */
+private fun temperature(t: Float): String = java.text.NumberFormat.getNumberInstance(Strings.locale).apply {
+    minimumFractionDigits = 2
+    maximumFractionDigits = 2
+    roundingMode = java.math.RoundingMode.HALF_UP
+}.format(t.toDouble())
 
 @Composable
 private fun CapIcons(caps: ModelCaps) {
     val c = FacetTheme.colors
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        if (caps.vision) FacetIcon(R.drawable.ic_eye, "Sees images", tint = c.textTertiary, size = 14.dp)
-        if (caps.reasoning.kind != ReasoningKind.NONE) FacetIcon(R.drawable.ic_brain, "Reasoning", tint = c.textTertiary, size = 14.dp)
-        if (caps.webSearch) FacetIcon(R.drawable.ic_globe, "Web search", tint = c.textTertiary, size = 14.dp)
-        if (caps.pdf) FacetIcon(R.drawable.ic_file_text, "Reads PDFs", tint = c.textTertiary, size = 14.dp)
+        if (caps.vision) FacetIcon(R.drawable.ic_eye, stringResource(R.string.sheet_cap_vision), tint = c.textTertiary, size = 14.dp)
+        if (caps.reasoning.kind != ReasoningKind.NONE) FacetIcon(R.drawable.ic_brain, stringResource(R.string.sheet_cap_reasoning), tint = c.textTertiary, size = 14.dp)
+        if (caps.webSearch) FacetIcon(R.drawable.ic_globe, stringResource(R.string.sheet_web_search), tint = c.textTertiary, size = 14.dp)
+        if (caps.pdf) FacetIcon(R.drawable.ic_file_text, stringResource(R.string.sheet_cap_pdf), tint = c.textTertiary, size = 14.dp)
     }
 }
 
@@ -257,7 +275,7 @@ fun SearchField(value: String, onChange: (String) -> Unit, placeholder: String, 
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        if (value.isNotEmpty()) FacetIconButton(R.drawable.ic_close, "Clear", { onChange("") }, tint = c.textTertiary, size = 16.dp, modifier = Modifier.size(36.dp))
+        if (value.isNotEmpty()) FacetIconButton(R.drawable.ic_close, stringResource(R.string.sheet_clear_search), { onChange("") }, tint = c.textTertiary, size = 16.dp, modifier = Modifier.size(36.dp))
     }
 }
 
@@ -284,6 +302,7 @@ fun ChatSettingsSheet(
     val c = FacetTheme.colors
     val caps = model?.model?.caps ?: ModelCaps()
     var instructions by remember { mutableStateOf(systemPrompt.orEmpty()) }
+    val auto = stringResource(R.string.common_auto)
     FacetSheet({ if (canEditInstructions && instructions != systemPrompt.orEmpty()) onSystemPrompt(instructions); onDismiss() }) {
         Column(
             Modifier
@@ -293,10 +312,10 @@ fun ChatSettingsSheet(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            Text("Chat settings", style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 14.dp))
+            Text(stringResource(R.string.sheet_chat_settings_title), style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 14.dp))
             SettingsGroup {
                 io.dtsoftware.facet.ui.components.SettingsRow(
-                    title = model?.model?.displayName ?: "No model selected",
+                    title = model?.model?.displayName ?: stringResource(R.string.sheet_no_model_selected),
                     subtitle = model?.providerLabel,
                     leading = { model?.let { ProviderBadge(it.kind, size = 30.dp) } },
                     onClick = {
@@ -308,28 +327,28 @@ fun ChatSettingsSheet(
             Spacer(Modifier.height(16.dp))
 
             if (caps.reasoning.kind != ReasoningKind.NONE) {
-                SectionLabel("Reasoning", Modifier.padding(start = 12.dp))
+                SectionLabel(stringResource(R.string.sheet_reasoning), Modifier.padding(start = 12.dp))
                 Segmented(
                     options = listOf<Effort?>(null) + caps.reasoning.efforts,
                     selected = params.effort,
-                    label = { it?.label ?: "Auto" },
+                    label = { it?.label ?: auto },
                     onSelect = { onParams(params.copy(effort = it)) },
                 )
                 Text(
-                    effortHint(params.effort),
+                    stringResource(effortHint(params.effort)),
                     style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
                     modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 10.dp),
                 )
                 SettingsGroup {
                     SwitchRow(
-                        "Show reasoning", params.showThinking, { onParams(params.copy(showThinking = it)) },
-                        subtitle = "Stream the model's reasoning summary while it thinks.", icon = R.drawable.ic_brain,
+                        stringResource(R.string.sheet_show_reasoning), params.showThinking, { onParams(params.copy(showThinking = it)) },
+                        subtitle = stringResource(R.string.sheet_show_reasoning_subtitle), icon = R.drawable.ic_brain,
                     )
                     if (caps.proMode) {
                         GroupDivider()
                         SwitchRow(
-                            "Pro mode", params.proMode, { onParams(params.copy(proMode = it)) },
-                            subtitle = "Does more work per answer. Slower and costs more.", icon = R.drawable.ic_gem,
+                            stringResource(R.string.sheet_pro_mode), params.proMode, { onParams(params.copy(proMode = it)) },
+                            subtitle = stringResource(R.string.sheet_pro_mode_subtitle), icon = R.drawable.ic_gem,
                         )
                     }
                 }
@@ -337,39 +356,39 @@ fun ChatSettingsSheet(
             }
 
             if (caps.verbosity) {
-                SectionLabel("Length", Modifier.padding(start = 12.dp))
+                SectionLabel(stringResource(R.string.sheet_length), Modifier.padding(start = 12.dp))
                 Segmented(
                     options = listOf<Verbosity?>(null) + Verbosity.entries,
                     selected = params.verbosity,
-                    label = { it?.label ?: "Auto" },
+                    label = { it?.label ?: auto },
                     onSelect = { onParams(params.copy(verbosity = it)) },
                 )
                 Spacer(Modifier.height(16.dp))
             }
 
             val canSearch = caps.webSearch || (caps.tools && searchAvailable)
-            SettingsGroup(title = "Tools and speed") {
+            SettingsGroup(title = stringResource(R.string.sheet_tools_and_speed)) {
                 SwitchRow(
-                    "Web search", params.webSearch && canSearch, { onParams(params.copy(webSearch = it)) },
-                    subtitle = when {
-                        caps.webSearch -> "Let the model search the web and cite sources."
-                        canSearch -> "Uses your search key, then reads pages as needed."
-                        caps.tools -> "Add a search key in Settings → Web search to let this model search."
-                        else -> "This model can't use tools or search the web."
-                    },
+                    stringResource(R.string.sheet_web_search), params.webSearch && canSearch, { onParams(params.copy(webSearch = it)) },
+                    subtitle = stringResource(
+                        when {
+                            caps.webSearch -> R.string.sheet_web_search_builtin
+                            canSearch -> R.string.sheet_web_search_with_key
+                            caps.tools -> R.string.sheet_web_search_needs_key
+                            else -> R.string.sheet_web_search_unsupported
+                        },
+                    ),
                     icon = R.drawable.ic_globe, enabled = canSearch,
                 )
                 if (caps.tools && (mcpServers.isNotEmpty() || skillCount > 0)) {
                     GroupDivider()
+                    // "2 servers and 3 skills", joined the way the app's language joins lists.
+                    val servers = mcpServers.size.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.sheet_mcp_server_count, it, it) }
+                    val skills = skillCount.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.sheet_skill_count, it, it) }
+                    val available = android.icu.text.ListFormatter.getInstance(Strings.locale).format(listOfNotNull(servers, skills))
                     SwitchRow(
-                        "MCP tools and skills", params.tools, { onParams(params.copy(tools = it)) },
-                        subtitle = buildString {
-                            val parts = buildList {
-                                if (mcpServers.isNotEmpty()) add("${mcpServers.size} server" + if (mcpServers.size == 1) "" else "s")
-                                if (skillCount > 0) add("$skillCount skill" + if (skillCount == 1) "" else "s")
-                            }
-                            append(parts.joinToString(" and ")).append(" available in this chat.")
-                        },
+                        stringResource(R.string.sheet_mcp_tools), params.tools, { onParams(params.copy(tools = it)) },
+                        subtitle = stringResource(R.string.sheet_tools_available, available),
                         icon = R.drawable.ic_wand,
                     )
                     if (params.tools) {
@@ -382,7 +401,7 @@ fun ChatSettingsSheet(
                                     val set = params.disabledMcpServers.toMutableSet().apply { if (v) remove(server.id) else add(server.id) }
                                     onParams(params.copy(disabledMcpServers = set.toList()))
                                 },
-                                subtitle = server.status ?: "${mcpToolCount(server)} tools",
+                                subtitle = server.status ?: mcpToolCount(server).let { pluralStringResource(R.plurals.sheet_mcp_tool_count, it, it) },
                                 icon = R.drawable.ic_server,
                             )
                         }
@@ -391,23 +410,23 @@ fun ChatSettingsSheet(
                 if (caps.tools) {
                     GroupDivider()
                     SwitchRow(
-                        "YOLO mode", yolo, onYolo,
-                        subtitle = "Run tools without asking, in every chat.",
+                        stringResource(R.string.sheet_yolo), yolo, onYolo,
+                        subtitle = stringResource(R.string.sheet_yolo_subtitle),
                         icon = R.drawable.ic_rocket,
                     )
                 }
                 if (caps.fastMode) {
                     GroupDivider()
                     SwitchRow(
-                        "Fast mode", params.fastMode, { onParams(params.copy(fastMode = it)) },
-                        subtitle = "Up to 2.5× faster output at premium pricing.", icon = R.drawable.ic_zap,
+                        stringResource(R.string.sheet_fast_mode), params.fastMode, { onParams(params.copy(fastMode = it)) },
+                        subtitle = stringResource(R.string.sheet_fast_mode_subtitle), icon = R.drawable.ic_zap,
                     )
                 }
             }
             Spacer(Modifier.height(16.dp))
 
             if (caps.sampling) {
-                SectionLabel("Temperature", Modifier.padding(start = 12.dp))
+                SectionLabel(stringResource(R.string.sheet_temperature), Modifier.padding(start = 12.dp))
                 val temp = params.temperature
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp)) {
                     Slider(
@@ -419,7 +438,7 @@ fun ChatSettingsSheet(
                     )
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        temp?.let { String.format(java.util.Locale.US, "%.2f", it) } ?: "Auto",
+                        temp?.let { temperature(it) } ?: auto,
                         style = FacetTheme.type.labelM, color = c.textSecondary,
                         modifier = Modifier.clip(FacetShapes.small).clickable { onParams(params.copy(temperature = null)) }.padding(6.dp),
                     )
@@ -427,12 +446,12 @@ fun ChatSettingsSheet(
                 Spacer(Modifier.height(8.dp))
             }
 
-            SectionLabel("Maximum reply length", Modifier.padding(start = 12.dp))
+            SectionLabel(stringResource(R.string.sheet_max_reply_length), Modifier.padding(start = 12.dp))
             val maxOptions = listOf<Int?>(null, 2_000, 8_000, 16_000, 32_000, 64_000)
             Segmented(
                 options = maxOptions,
                 selected = params.maxOutputTokens,
-                label = { it?.let { n -> Format.tokens(n.toLong()) } ?: "Auto" },
+                label = { it?.let { n -> Format.tokens(n.toLong()) } ?: auto },
                 onSelect = { onParams(params.copy(maxOutputTokens = it)) },
             )
             Spacer(Modifier.height(16.dp))
@@ -440,26 +459,27 @@ fun ChatSettingsSheet(
             if (canEditInstructions) {
                 FacetTextField(
                     instructions, { instructions = it },
-                    label = "Instructions for this chat",
-                    placeholder = "e.g. Answer in Spanish. Keep replies under 150 words.",
+                    label = stringResource(R.string.sheet_instructions_label),
+                    placeholder = stringResource(R.string.sheet_instructions_placeholder),
                     singleLine = false, minLines = 3, maxLines = 8,
-                    supporting = "Added to the assistant's instructions for this chat only.",
+                    supporting = stringResource(R.string.sheet_instructions_supporting),
                 )
                 Spacer(Modifier.height(16.dp))
             }
-            FacetButton("Use these settings for new chats", onMakeDefault, style = ButtonStyle.Tonal, modifier = Modifier.fillMaxWidth())
+            FacetButton(stringResource(R.string.sheet_make_default), onMakeDefault, style = ButtonStyle.Tonal, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(20.dp))
         }
     }
 }
 
-private fun effortHint(e: Effort?): String = when (e) {
-    null -> "The model decides how long to think."
-    Effort.NONE -> "Answers immediately without extended reasoning."
-    Effort.MINIMAL, Effort.LOW -> "Quick answers for simple questions. Cheapest."
-    Effort.MEDIUM -> "Balanced depth, speed and cost."
-    Effort.HIGH -> "Thinks longer for harder problems."
-    Effort.XHIGH, Effort.MAX -> "Maximum depth for the hardest problems. Slowest and most expensive."
+@StringRes
+private fun effortHint(e: Effort?): Int = when (e) {
+    null -> R.string.sheet_effort_auto
+    Effort.NONE -> R.string.sheet_effort_none
+    Effort.MINIMAL, Effort.LOW -> R.string.sheet_effort_low
+    Effort.MEDIUM -> R.string.sheet_effort_medium
+    Effort.HIGH -> R.string.sheet_effort_high
+    Effort.XHIGH, Effort.MAX -> R.string.sheet_effort_max
 }
 
 @Composable
@@ -530,29 +550,33 @@ fun UsageSheet(item: ThreadItem, onDismiss: () -> Unit) {
     val c = FacetTheme.colors
     FacetSheet(onDismiss) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
-            Text("Usage", style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.padding(bottom = 4.dp))
+            Text(stringResource(R.string.sheet_usage_title), style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.padding(bottom = 4.dp))
             Text(m.modelName ?: m.modelId.orEmpty(), style = FacetTheme.type.labelM, color = c.textSecondary, modifier = Modifier.padding(bottom = 16.dp))
-            fun row(label: String, value: String) = label to value
+            val unknownPrice = stringResource(R.string.sheet_usage_unknown_price)
+            // Label, value, and whether the row is indented under the one above it.
             val rows = buildList {
                 if (u != null) {
-                    add(row("Input tokens", "%,d".format(u.inputTokens)))
-                    if (u.cacheReadTokens > 0) add(row("  of which read from cache", "%,d".format(u.cacheReadTokens)))
-                    if (u.cacheWriteTokens > 0) add(row("  of which written to cache", "%,d".format(u.cacheWriteTokens)))
-                    add(row("Output tokens", "%,d".format(u.outputTokens)))
-                    if (u.reasoningTokens > 0) add(row("Reasoning tokens (in output)", "%,d".format(u.reasoningTokens)))
+                    add(Triple(R.string.sheet_usage_input, Format.number(u.inputTokens), false))
+                    if (u.cacheReadTokens > 0) add(Triple(R.string.sheet_usage_cache_read, Format.number(u.cacheReadTokens), true))
+                    if (u.cacheWriteTokens > 0) add(Triple(R.string.sheet_usage_cache_write, Format.number(u.cacheWriteTokens), true))
+                    add(Triple(R.string.sheet_usage_output, Format.number(u.outputTokens), false))
+                    if (u.reasoningTokens > 0) add(Triple(R.string.sheet_usage_reasoning, Format.number(u.reasoningTokens), false))
                 }
-                add(row("Estimated cost", m.costUsd?.let { Format.cost(it) } ?: "Unknown price"))
-                m.thinkingMs?.let { add(row("Thinking time", Format.seconds(it))) }
+                add(Triple(R.string.sheet_usage_cost, m.costUsd?.let { Format.cost(it) } ?: unknownPrice, false))
+                m.thinkingMs?.let { add(Triple(R.string.sheet_usage_thinking_time, Format.seconds(it), false)) }
             }
-            rows.forEach { (k, v) ->
+            rows.forEach { (label, value, indented) ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 9.dp)) {
-                    Text(k, style = FacetTheme.type.body, color = c.textSecondary, modifier = Modifier.weight(1f))
-                    Text(v, style = FacetTheme.type.labelL, color = c.text)
+                    Text(
+                        stringResource(label), style = FacetTheme.type.body, color = c.textSecondary,
+                        modifier = Modifier.weight(1f).padding(start = if (indented) 14.dp else 0.dp),
+                    )
+                    Text(value, style = FacetTheme.type.labelL, color = c.text)
                 }
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "Costs are estimates from public price lists. Your provider's bill is the source of truth.",
+                stringResource(R.string.sheet_usage_note),
                 style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
             )
         }
@@ -565,17 +589,17 @@ fun EditMessageSheet(initial: String, onSave: (String) -> Unit, onDismiss: () ->
     val c = FacetTheme.colors
     FacetSheet(onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).navigationBarsPadding().imePadding().padding(bottom = 16.dp)) {
-            Text("Edit message", style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+            Text(stringResource(R.string.sheet_edit_message_title), style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
             Text(
-                "Sending creates a new branch. The original stays one tap away.",
+                stringResource(R.string.sheet_edit_message_body),
                 style = FacetTheme.type.labelM.copy(fontWeight = FontWeight.Normal), color = c.textSecondary,
                 modifier = Modifier.padding(start = 4.dp, bottom = 14.dp),
             )
             FacetTextField(text, { text = it }, singleLine = false, minLines = 3, maxLines = 12)
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FacetButton("Cancel", onDismiss, style = ButtonStyle.Tonal, modifier = Modifier.weight(1f))
-                FacetButton("Send", { onSave(text); onDismiss() }, enabled = text.isNotBlank(), modifier = Modifier.weight(1f))
+                FacetButton(stringResource(R.string.action_cancel), onDismiss, style = ButtonStyle.Tonal, modifier = Modifier.weight(1f))
+                FacetButton(stringResource(R.string.action_send), { onSave(text); onDismiss() }, enabled = text.isNotBlank(), modifier = Modifier.weight(1f))
             }
         }
     }
@@ -587,7 +611,7 @@ fun SelectTextSheet(text: String, onDismiss: () -> Unit) {
     val c = FacetTheme.colors
     FacetSheet(onDismiss) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(horizontal = 20.dp).navigationBarsPadding()) {
-            Text("Select text", style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.padding(bottom = 12.dp))
+            Text(stringResource(R.string.sheet_select_text_title), style = FacetTheme.type.titleL, color = c.text, modifier = Modifier.padding(bottom = 12.dp))
             androidx.compose.foundation.text.selection.SelectionContainer(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                 Text(text, style = FacetTheme.type.chat, color = c.text, modifier = Modifier.heightIn(min = 100.dp).padding(bottom = 24.dp))
             }

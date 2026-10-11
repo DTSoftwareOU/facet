@@ -1,5 +1,8 @@
 package io.dtsoftware.facet.update
 
+import androidx.annotation.StringRes
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.net.await
 import io.dtsoftware.facet.core.net.fetchString
 import io.dtsoftware.facet.update.ApkVerifier.toHex
@@ -18,17 +21,20 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /** What went wrong, in words for the person using Facet (docs/DESIGN.md "Voice"). */
-enum class UpdateError(val message: String) {
-    CHECK("Couldn't check for updates. Check your connection and try again."),
-    BAD_MANIFEST("Couldn't read the update information. Try again later."),
-    DOWNLOAD("Couldn't download the update. Check your connection and try again."),
-    NO_SPACE("There isn't enough free space for the update. Free up some space and try again."),
-    CORRUPT("The download was incomplete or damaged, so it wasn't installed. Try again."),
-    NOT_FACET("The download isn't the expected version of Facet, so it wasn't installed."),
-    INSTALL("Android couldn't install the update. Try again."),
-    INSTALL_CONFLICT("Android refused the update because this copy of Facet is signed with a different key. Install Facet from facet.dtsoftware.io to get updates."),
-    INSTALL_STORAGE("There isn't enough storage to install the update. Free up some space and try again."),
+enum class UpdateError(@StringRes val messageRes: Int) {
+    CHECK(R.string.updater_error_check),
+    BAD_MANIFEST(R.string.updater_error_bad_manifest),
+    DOWNLOAD(R.string.updater_error_download),
+    NO_SPACE(R.string.updater_error_no_space),
+    CORRUPT(R.string.updater_error_corrupt),
+    NOT_FACET(R.string.updater_error_not_facet),
+    INSTALL(R.string.updater_error_install),
+    INSTALL_CONFLICT(R.string.updater_error_install_conflict),
+    INSTALL_STORAGE(R.string.updater_error_install_storage),
     ;
+
+    /** The message in the app's language. */
+    val message: String get() = Strings.get(messageRes)
 
     /** The check failed, not the update itself; retrying the update is still "Update". */
     val isCheck: Boolean get() = this == CHECK || this == BAD_MANIFEST

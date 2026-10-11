@@ -39,13 +39,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import io.dtsoftware.facet.ui.theme.JetBrainsMono
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.dtsoftware.facet.R
@@ -105,7 +110,7 @@ fun ToolActivityList(activities: List<ToolActivity>, onApproval: (String, Approv
         }
         if (visible.size < activities.size) {
             Text(
-                "Show ${activities.size - visible.size} more",
+                pluralStringResource(R.plurals.toolview_show_more, activities.size - visible.size, activities.size - visible.size),
                 style = FacetTheme.type.labelM, color = FacetTheme.colors.primary,
                 modifier = Modifier.clip(FacetShapes.small).clickable { showAll = true }.padding(horizontal = 4.dp, vertical = 6.dp),
             )
@@ -117,7 +122,9 @@ fun ToolActivityList(activities: List<ToolActivity>, onApproval: (String, Approv
 private fun ToolRow(a: ToolActivity) {
     val c = FacetTheme.colors
     var expanded by rememberSaveable(a.id) { mutableStateOf(false) }
-    val rotation by animateFloatAsState(if (expanded) 90f else 0f, label = "toolChev")
+    // The chevron points to the end (left in Arabic and Urdu, where the icon is mirrored) and turns down when open.
+    val down = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -90f else 90f
+    val rotation by animateFloatAsState(if (expanded) down else 0f, label = "toolChev")
     val hasDetails = a.argumentsJson.length > 2 || !a.result.isNullOrBlank()
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -136,15 +143,7 @@ private fun ToolRow(a: ToolActivity) {
             }
             Spacer(Modifier.width(8.dp))
             Text(
-                toolLabel(
-                    when {
-                        a.status == ToolStatus.DENIED && a.label.startsWith("Running ") -> "Didn't run " + a.label.removePrefix("Running ")
-                        a.status == ToolStatus.DENIED -> a.label + " · declined"
-                        a.status == ToolStatus.ERROR -> a.label + " · failed"
-                        else -> a.label
-                    },
-                    c.surfaceHigh,
-                ),
+                toolLabel(stepLabel(a), c.surfaceHigh),
                 style = FacetTheme.type.labelM,
                 color = if (a.status == ToolStatus.ERROR || a.status == ToolStatus.DENIED) c.textSecondary else c.textSecondary,
                 maxLines = 1,
@@ -153,7 +152,7 @@ private fun ToolRow(a: ToolActivity) {
             )
             if (hasDetails) {
                 Spacer(Modifier.width(4.dp))
-                FacetIcon(R.drawable.ic_chevron_right, if (expanded) "Hide details" else "Show details", tint = c.textTertiary, size = 14.dp, modifier = Modifier.rotate(rotation))
+                FacetIcon(R.drawable.ic_chevron_right, stringResource(if (expanded) R.string.toolview_hide_details else R.string.toolview_show_details), tint = c.textTertiary, size = 14.dp, modifier = Modifier.rotate(rotation))
             }
         }
         AnimatedVisibility(expanded, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
@@ -167,18 +166,18 @@ private fun ToolRow(a: ToolActivity) {
                     .padding(12.dp),
             ) {
                 if (a.argumentsJson.length > 2) {
-                    Text("Input", style = FacetTheme.type.labelS, color = c.textTertiary)
+                    Text(stringResource(R.string.toolview_input), style = FacetTheme.type.labelS, color = c.textTertiary)
                     Spacer(Modifier.height(4.dp))
                     Text(
                         prettyJson(a.argumentsJson),
-                        style = FacetTheme.type.code.copy(fontSize = 12.sp, lineHeight = 18.sp),
+                        style = FacetTheme.type.code.copy(fontSize = 12.sp, lineHeight = 18.sp, textDirection = TextDirection.Ltr),
                         color = c.syntax.plain,
                         modifier = Modifier.heightIn(max = 160.dp).horizontalScroll(rememberScrollState()),
                     )
                 }
                 if (!a.result.isNullOrBlank()) {
                     if (a.argumentsJson.length > 2) Spacer(Modifier.height(10.dp))
-                    Text("Result", style = FacetTheme.type.labelS, color = c.textTertiary)
+                    Text(stringResource(R.string.toolview_result), style = FacetTheme.type.labelS, color = c.textTertiary)
                     Spacer(Modifier.height(4.dp))
                     Text(
                         a.result.take(1_200) + if (a.result.length > 1_200) "…" else "",
@@ -219,9 +218,10 @@ private fun ApprovalCard(a: ToolActivity, onApproval: (String, ApprovalDecision)
             Spacer(Modifier.width(10.dp))
             Text(
                 when {
-                    a.kind == ToolKind.MEDIA -> "Create this video? Clips can cost a few dollars each."
+                    a.kind == ToolKind.MEDIA -> stringResource(R.string.toolview_create_video)
                     pcSummary != null -> pcSummary.first
-                    else -> "Allow ${a.serverName ?: "this tool"} to run ${a.label.substringAfter(": ")}?"
+                    a.serverName != null -> stringResource(R.string.toolview_allow_server_tool, a.serverName, a.label.substringAfter(": "))
+                    else -> stringResource(R.string.toolview_allow_tool, a.label.substringAfter(": "))
                 },
                 style = FacetTheme.type.labelL, color = c.text,
             )
@@ -232,7 +232,8 @@ private fun ApprovalCard(a: ToolActivity, onApproval: (String, ApprovalDecision)
             Spacer(Modifier.height(10.dp))
             Text(
                 detail,
-                style = FacetTheme.type.code.copy(fontSize = 12.sp, lineHeight = 18.sp),
+                // Commands, file contents and JSON read left to right, also in Arabic and Urdu.
+                style = FacetTheme.type.code.copy(fontSize = 12.sp, lineHeight = 18.sp, textDirection = TextDirection.Ltr),
                 color = c.syntax.plain,
                 maxLines = if (pcSummary != null) 16 else 10,
                 overflow = TextOverflow.Ellipsis,
@@ -241,15 +242,37 @@ private fun ApprovalCard(a: ToolActivity, onApproval: (String, ApprovalDecision)
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FacetButton("Deny", { onApproval(a.id, ApprovalDecision.DENY) }, style = ButtonStyle.Tonal, modifier = Modifier.weight(1f))
-            FacetButton("Allow", { onApproval(a.id, ApprovalDecision.ALLOW) }, modifier = Modifier.weight(1f))
+            FacetButton(stringResource(R.string.toolview_deny), { onApproval(a.id, ApprovalDecision.DENY) }, style = ButtonStyle.Tonal, modifier = Modifier.weight(1f))
+            FacetButton(stringResource(R.string.toolview_allow), { onApproval(a.id, ApprovalDecision.ALLOW) }, modifier = Modifier.weight(1f))
         }
         if (a.kind != ToolKind.MEDIA) Text(
-            if (a.kind == ToolKind.COMPUTER) "Allow for this chat" else "Always allow this tool",
+            stringResource(if (a.kind == ToolKind.COMPUTER) R.string.toolview_allow_for_chat else R.string.toolview_always_allow),
             style = FacetTheme.type.labelM, color = c.primary,
             modifier = Modifier.padding(top = 6.dp).clip(FacetShapes.small).clickable { onApproval(a.id, ApprovalDecision.ALWAYS) }.padding(6.dp),
         )
     }
+}
+
+/** A step's label, with how it ended when the person declined it or it failed. */
+@Composable
+private fun stepLabel(a: ToolActivity): String = when (a.status) {
+    ToolStatus.DENIED -> declinedCommand(a) ?: stringResource(R.string.toolview_step_declined, a.label)
+    ToolStatus.ERROR -> stringResource(R.string.toolview_step_failed, a.label)
+    else -> a.label
+}
+
+/** "Didn't run `npm test`" for a command the person declined on their PC, or null for other steps. */
+@Composable
+private fun declinedCommand(a: ToolActivity): String? {
+    if (a.kind != ToolKind.COMPUTER) return null
+    if ((a.remoteName ?: a.name) == "run_command") {
+        val obj = runCatching { AppJson.parseToJsonElement(a.argumentsJson) as? kotlinx.serialization.json.JsonObject }.getOrNull()
+        val cmd = (obj?.get("command") as? kotlinx.serialization.json.JsonPrimitive)?.content?.lineSequence()?.firstOrNull().orEmpty()
+        return if (cmd.isEmpty()) stringResource(R.string.toolview_didnt_run_a_command)
+        else stringResource(R.string.toolview_didnt_run, "`" + (if (cmd.length > 60) cmd.take(57) + "…" else cmd) + "`")
+    }
+    // Steps saved with an English label ("Running `npm test`") under a renamed tool.
+    return a.label.takeIf { it.startsWith("Running `") }?.let { stringResource(R.string.toolview_didnt_run, it.removePrefix("Running ")) }
 }
 
 private fun prettyJson(raw: String): String = runCatching {

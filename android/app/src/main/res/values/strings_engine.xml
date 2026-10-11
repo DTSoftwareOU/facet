@@ -1,0 +1,532 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Provider errors, shown as the error of a reply. %1$s is always the provider's name (e.g. OpenAI) unless a comment says otherwise. -->
+    <!-- Stands in for the provider's name in error messages when a custom endpoint has no name, e.g. "The endpoint rejected this API key." -->
+    <string name="llm_the_endpoint">The endpoint</string>
+    <string name="llm_auth">%1$s rejected this API key. Check it in Providers.</string>
+    <!-- %1$s appears twice: the provider's name -->
+    <string name="llm_quota">%1$s says this account is out of credits or over its spending limit. Add credits with %1$s, then retry.</string>
+    <!-- %2$s: a model name -->
+    <string name="llm_verify_model">%1$s requires organization verification for “%2$s”. Verify your organization in the %1$s dashboard, or pick another model.</string>
+    <string name="llm_verify_this_model">%1$s requires organization verification for this model. Verify your organization in the %1$s dashboard, or pick another model.</string>
+    <!-- %2$s: a model name -->
+    <string name="llm_denied_model">%1$s denied access to “%2$s” with this key. Check the key\'s permissions or pick another model.</string>
+    <string name="llm_denied_this_model">%1$s denied access to this model with this key. Check the key\'s permissions or pick another model.</string>
+    <!-- %2$s: a model name -->
+    <string name="llm_not_found_model">%1$s couldn\'t find “%2$s”. It may be retired, or this key can\'t use it.</string>
+    <string name="llm_not_found_this_model">%1$s couldn\'t find this model. It may be retired, or this key can\'t use it.</string>
+    <!-- %1$s: a model name -->
+    <string name="llm_too_long_model">This conversation is too long for “%1$s”. Start a new chat, remove attachments, or pick a model with a larger context window.</string>
+    <string name="llm_too_long_this_model">This conversation is too long for this model. Start a new chat, remove attachments, or pick a model with a larger context window.</string>
+    <!-- %1$s: a model name -->
+    <string name="llm_too_long_short_model">This conversation is too long for “%1$s”. Start a new chat or remove attachments.</string>
+    <string name="llm_too_long_short_this_model">This conversation is too long for this model. Start a new chat or remove attachments.</string>
+    <!-- %2$d: seconds to wait ("s" is the unit symbol for seconds) -->
+    <string name="llm_rate_limit_seconds">%1$s is rate-limiting this key. Try again in %2$ds.</string>
+    <!-- %2$d: minutes to wait -->
+    <string name="llm_rate_limit_minutes">%1$s is rate-limiting this key. Try again in %2$d min.</string>
+    <string name="llm_rate_limit_moment">%1$s is rate-limiting this key. Try again in a moment.</string>
+    <string name="llm_timeout">%1$s took too long to respond. Try again.</string>
+    <string name="llm_overloaded">%1$s is overloaded right now. Try again shortly, or switch models.</string>
+    <!-- %2$d: an HTTP status code such as 500 -->
+    <string name="llm_server_error">%1$s had a server error (HTTP %2$d). Try again.</string>
+    <string name="llm_server_error_stream">%1$s had a server error mid-response. Try again.</string>
+    <!-- %2$s: the provider's own error message (usually English) -->
+    <string name="llm_bad_request">%1$s rejected the request: %2$s</string>
+    <string name="llm_bad_request_invalid">%1$s rejected the request as invalid.</string>
+    <!-- %2$d: an HTTP status code; %3$s: the provider's own error message (usually English) -->
+    <string name="llm_http_reason">%1$s returned HTTP %2$d: %3$s</string>
+    <!-- %2$d: an HTTP status code -->
+    <string name="llm_http">%1$s returned HTTP %2$d.</string>
+    <!-- %2$s: a server address (URL) on the local network, e.g. http://192.168.1.2:11434/v1 -->
+    <string name="llm_unreachable_local">Can\'t reach %1$s at %2$s. Make sure it\'s running and reachable from this phone.</string>
+    <string name="llm_unreachable">Can\'t reach %1$s. Check your connection.</string>
+    <string name="llm_ssl">The secure connection to %1$s failed. Check the address and your network.</string>
+    <string name="llm_connection_lost">Lost the connection to %1$s before the response finished. Try again.</string>
+    <string name="llm_truncated">The connection to %1$s closed before the response finished. Try again.</string>
+    <!-- %2$s: the provider's own error message (usually English) -->
+    <string name="llm_stream_error_reason">%1$s stopped with an error: %2$s</string>
+    <string name="llm_stream_error">%1$s stopped with an error.</string>
+    <string name="llm_read_failed">Something went wrong reading the response from %1$s.</string>
+    <!-- %1$s: the name the user gave this provider, e.g. ElevenLabs -->
+    <string name="llm_media_only">%1$s makes media only. Pick a chat model for conversations.</string>
+
+    <!-- Notices shown under a reply. Model names (%1$s, %2$s) are model ids such as claude-opus-4-8. -->
+    <!-- %1$s: the model that answered; %2$s: the model the user picked -->
+    <string name="llm_notice_fallback">Answered by %1$s instead of %2$s (automatic fallback).</string>
+    <!-- %1$s: the model that declined; %2$s: the model that answered instead -->
+    <string name="llm_notice_declined_switch">%1$s declined this request; %2$s answered instead.</string>
+    <string name="llm_notice_declined_other">Another model answered after the requested model declined.</string>
+    <!-- %1$s: a model id -->
+    <string name="llm_refusal">%1$s declined to answer this request. Rephrase it or try another model.</string>
+    <!-- %1$s: a model id -->
+    <string name="llm_refusal_cyber">%1$s declined to answer this request (cybersecurity safeguard). Rephrase it or try another model.</string>
+    <!-- %1$s: a model id -->
+    <string name="llm_refusal_bio">%1$s declined to answer this request (biology safeguard). Rephrase it or try another model.</string>
+    <!-- %1$s: a model id; %2$s: a safeguard category as the provider names it (English, e.g. "violence") -->
+    <string name="llm_refusal_category">%1$s declined to answer this request (%2$s safeguard). Rephrase it or try another model.</string>
+    <!-- %1$s: a model id -->
+    <string name="llm_content_filter">%1$s stopped because of a content filter.</string>
+    <!-- %1$s: a model id -->
+    <string name="llm_declined">%1$s declined to answer this request.</string>
+
+    <!-- Reasoning effort levels (how long a model thinks), shown in a menu -->
+    <string name="llm_effort_off">Off</string>
+    <string name="llm_effort_minimal">Minimal</string>
+    <string name="llm_effort_low">Low</string>
+    <string name="llm_effort_medium">Medium</string>
+    <string name="llm_effort_high">High</string>
+    <string name="llm_effort_xhigh">Extra high</string>
+    <string name="llm_effort_max">Max</string>
+    <!-- Answer length levels (verbosity), shown in a menu -->
+    <string name="llm_verbosity_concise">Concise</string>
+    <string name="llm_verbosity_balanced">Balanced</string>
+    <string name="llm_verbosity_detailed">Detailed</string>
+    <!-- What a model makes (nouns, used as list titles: chat models, image models, …) -->
+    <string name="llm_output_chat">Chat</string>
+    <string name="llm_output_images">Images</string>
+    <string name="llm_output_video">Video</string>
+    <!-- Noun: spoken audio made from text (text to speech) -->
+    <string name="llm_output_speech">Speech</string>
+    <string name="llm_output_music">Music &amp; sound</string>
+    <!-- Noun: speech to text -->
+    <string name="llm_output_transcription">Transcription</string>
+
+    <!-- Provider picker: what each provider offers -->
+    <string name="catalog_blurb_openai">GPT and o-series models</string>
+    <string name="catalog_blurb_anthropic">Claude models</string>
+    <string name="catalog_blurb_google">Gemini models</string>
+    <string name="catalog_blurb_openrouter">Hundreds of models with one key</string>
+    <string name="catalog_blurb_xai">Grok models</string>
+    <!-- "chat" and "reasoner" are DeepSeek's model names -->
+    <string name="catalog_blurb_deepseek">DeepSeek chat and reasoner</string>
+    <string name="catalog_blurb_mistral">Mistral and Magistral models</string>
+    <string name="catalog_blurb_fast_open">Very fast open models</string>
+    <string name="catalog_blurb_open_at_scale">Open models at scale</string>
+    <!-- Sonar is Perplexity's model family; its answers are based on a web search -->
+    <string name="catalog_blurb_perplexity">Search-grounded Sonar models</string>
+    <string name="catalog_blurb_huggingface">Open models from many inference providers</string>
+    <string name="catalog_blurb_moonshot">Kimi models</string>
+    <string name="catalog_blurb_zai">GLM models</string>
+    <string name="catalog_blurb_qwen">Qwen models from Alibaba Cloud</string>
+    <string name="catalog_blurb_minimax">MiniMax models</string>
+    <!-- Command is Cohere's model family -->
+    <string name="catalog_blurb_cohere">Command models</string>
+    <string name="catalog_blurb_nvidia">Open models on NVIDIA GPUs</string>
+    <string name="catalog_blurb_deepinfra">Low-cost open models</string>
+    <string name="catalog_blurb_nebius">Open models in the EU</string>
+    <string name="catalog_blurb_open_low_cost">Open models at low cost</string>
+    <string name="catalog_blurb_venice">Private, uncensored open models</string>
+    <string name="catalog_blurb_vercel">Many providers through one key</string>
+    <!-- Mercury is Inception's model family -->
+    <string name="catalog_blurb_inception">Mercury diffusion models</string>
+    <string name="catalog_blurb_elevenlabs">Voices, music, sound effects and transcription</string>
+    <string name="catalog_blurb_stability">Stable Image and Stable Audio</string>
+    <string name="catalog_blurb_bfl">FLUX image models</string>
+    <!-- Aura is Deepgram's voice family -->
+    <string name="catalog_blurb_deepgram">Transcription and Aura voices</string>
+    <string name="catalog_blurb_local">Models on your own computer</string>
+    <string name="catalog_blurb_custom">Any OpenAI-compatible API</string>
+    <!-- Name of the provider type for any other OpenAI-compatible server -->
+    <string name="catalog_custom_endpoint">Custom endpoint</string>
+
+    <!-- Creating images, video, speech and music -->
+    <!-- Shape of a picture or video -->
+    <string name="mediagen_aspect_square">Square</string>
+    <string name="mediagen_aspect_portrait">Portrait</string>
+    <string name="mediagen_aspect_landscape">Landscape</string>
+    <!-- A voice choice: let the provider pick its default voice -->
+    <string name="mediagen_default_voice">Default voice</string>
+    <!-- Progress of a video being made -->
+    <string name="mediagen_creating_video">Creating video</string>
+    <!-- Progress of a video being made; %1$s: elapsed time such as 1:20 -->
+    <string name="mediagen_creating_video_time">Creating video · %1$s</string>
+    <!-- Media errors: %1$s is the name the user gave the provider (e.g. OpenAI) -->
+    <string name="mediagen_no_image">%1$s returned no image.</string>
+    <!-- %2$s: a status reported by the provider (English) -->
+    <string name="mediagen_no_image_status">%1$s returned no image (status: %2$s).</string>
+    <string name="mediagen_no_video">%1$s returned no video.</string>
+    <!-- %2$s: a status reported by the provider (English) -->
+    <string name="mediagen_no_video_status">%1$s returned no video (status: %2$s).</string>
+    <string name="mediagen_no_audio">%1$s returned no audio.</string>
+    <!-- %2$s: a status reported by the provider (English) -->
+    <string name="mediagen_no_audio_status">%1$s returned no audio (status: %2$s).</string>
+    <!-- %2$s: what the model replied instead (its own words) -->
+    <string name="mediagen_no_image_reason">%1$s didn\'t return an image: %2$s.</string>
+    <string name="mediagen_no_image_plain">%1$s didn\'t return an image.</string>
+    <string name="mediagen_image_not_started">%1$s didn\'t start the image.</string>
+    <!-- %2$s: a status reported by the provider (English) -->
+    <string name="mediagen_image_failed_status">%1$s couldn\'t make that image (%2$s).</string>
+    <string name="mediagen_image_timeout">%1$s took too long to make the image.</string>
+    <string name="mediagen_video_not_started">%1$s didn\'t start the video.</string>
+    <!-- %2$s: the provider's own error message (usually English) -->
+    <string name="mediagen_video_failed_reason">%1$s couldn\'t make that video: %2$s</string>
+    <string name="mediagen_video_failed">%1$s couldn\'t make that video.</string>
+    <string name="mediagen_video_filtered">%1$s finished without a video (it may have been filtered).</string>
+    <string name="mediagen_video_timeout">%1$s took too long to make the video.</string>
+    <!-- %2$s: the provider's own error message (usually English) -->
+    <string name="mediagen_failed_reason">%1$s couldn\'t make that: %2$s</string>
+    <string name="mediagen_failed">%1$s couldn\'t make that.</string>
+    <string name="mediagen_unsupported_chat">Facet can\'t chat with %1$s yet.</string>
+    <string name="mediagen_unsupported_images">Facet can\'t make images with %1$s yet.</string>
+    <string name="mediagen_unsupported_video">Facet can\'t make video with %1$s yet.</string>
+    <string name="mediagen_unsupported_speech">Facet can\'t make speech with %1$s yet.</string>
+    <string name="mediagen_unsupported_music">Facet can\'t make music with %1$s yet.</string>
+    <string name="mediagen_unsupported_transcripts">Facet can\'t make transcripts with %1$s yet.</string>
+    <!-- "Settings → Media models" names a settings page -->
+    <string name="mediagen_no_model_image">No image model is set up. Add a provider that makes images in Settings → Media models.</string>
+    <string name="mediagen_no_model_video">No video model is set up. Add a provider that makes video in Settings → Media models.</string>
+    <string name="mediagen_no_model_speech">No speech model is set up. Add a provider that makes speech in Settings → Media models.</string>
+    <string name="mediagen_no_model_music">No music model is set up. Add a provider that makes music in Settings → Media models.</string>
+    <string name="mediagen_no_model_transcription">No transcription model is set up. Add a provider that makes transcripts in Settings → Media models.</string>
+    <string name="mediagen_no_model_other">No model is set up for this. Add one in Settings → Media models.</string>
+    <string name="mediagen_choose_transcription">Choose a transcription model in Settings → Media models.</string>
+
+    <!-- Chat errors -->
+    <string name="engine_choose_model_to_start">Choose a model to start chatting.</string>
+    <string name="engine_wait_for_reply">Wait for the current reply to finish, or stop it.</string>
+    <string name="engine_provider_removed">The provider for this chat was removed. Pick another model.</string>
+    <string name="engine_choose_model_to_continue">Choose a model to continue.</string>
+    <string name="engine_chat_gone">This chat no longer exists.</string>
+    <string name="engine_nothing_to_reply">Nothing to reply to.</string>
+    <string name="engine_send_failed">Couldn\'t send this message.</string>
+    <!-- %1$s: the name the user gave the provider, e.g. OpenAI -->
+    <string name="engine_unreachable">Couldn\'t reach %1$s. Check your connection and try again.</string>
+    <!-- %1$s: a technical error message (usually English) -->
+    <string name="engine_unknown_error">Something went wrong: %1$s</string>
+    <!-- Notice under a reply when a model kept calling tools -->
+    <plurals name="engine_stopped_after_rounds">
+        <item quantity="one">Stopped after %1$d round of tool use.</item>
+        <item quantity="other">Stopped after %1$d rounds of tool use.</item>
+    </plurals>
+
+    <!-- Tool steps shown in a reply: "-ing" forms while the step runs, past tense once done -->
+    <string name="toolrun_searching_web">Searching the web</string>
+    <string name="toolrun_reading_page">Reading a page</string>
+    <string name="toolrun_read_page">Read a page</string>
+    <string name="toolrun_loading_skill">Loading a skill</string>
+    <!-- Noun: label of a tool call whose tool is unknown -->
+    <string name="toolrun_tool">Tool</string>
+    <!-- %1$s: the search query -->
+    <string name="toolrun_searching">Searching “%1$s”</string>
+    <!-- %1$s: the search query -->
+    <string name="toolrun_searched">Searched “%1$s”</string>
+    <!-- %1$s: a website's host name, e.g. example.com -->
+    <string name="toolrun_reading_host">Reading %1$s</string>
+    <!-- %1$s: a website's host name, e.g. example.com -->
+    <string name="toolrun_read_host">Read %1$s</string>
+    <!-- %1$s: a skill's name, e.g. code-review -->
+    <string name="toolrun_using_skill">Using skill %1$s</string>
+    <!-- %1$s: a skill's name, e.g. code-review -->
+    <string name="toolrun_used_skill">Used skill %1$s</string>
+    <!-- %1$s: a file path -->
+    <string name="toolrun_reading_path">Reading %1$s</string>
+    <!-- %1$s: a file path -->
+    <string name="toolrun_read_path">Read %1$s</string>
+    <!-- %1$s: a file path; %2$s: a skill's name -->
+    <string name="toolrun_read_skill_file">Read %1$s from %2$s</string>
+    <string name="toolrun_creating_an_image">Creating an image</string>
+    <string name="toolrun_created_an_image">Created an image</string>
+    <string name="toolrun_creating_a_video">Creating a video</string>
+    <string name="toolrun_created_a_video">Created a video</string>
+    <!-- Speech: spoken audio made from text -->
+    <string name="toolrun_creating_speech">Creating speech</string>
+    <string name="toolrun_created_speech">Created speech</string>
+    <string name="toolrun_creating_music">Creating music</string>
+    <string name="toolrun_created_music">Created music</string>
+    <string name="toolrun_creating_media">Creating media</string>
+    <string name="toolrun_created_media">Created media</string>
+    <!-- %1$s: a model name, e.g. GPT Image 1 -->
+    <string name="toolrun_created_image_with">Created image with %1$s</string>
+    <!-- %1$s: a model name -->
+    <string name="toolrun_created_video_with">Created video with %1$s</string>
+    <!-- %1$s: a model name. An audio clip of spoken text. -->
+    <string name="toolrun_created_audio_clip_with">Created audio clip with %1$s</string>
+    <!-- %1$s: a model name. A track: a piece of music or a sound effect. -->
+    <string name="toolrun_created_track_with">Created track with %1$s</string>
+    <!-- %1$s: a model name -->
+    <string name="toolrun_created_media_with">Created media with %1$s</string>
+
+    <!-- Tool steps on the user's PC: "-ing" forms while the step runs, past tense once done -->
+    <string name="toolrun_running_command">Running a command</string>
+    <string name="toolrun_ran_command">Ran a command</string>
+    <!-- %1$s: a command line in backticks, e.g. `npm test` -->
+    <string name="toolrun_running">Running %1$s</string>
+    <!-- %1$s: a command line in backticks, e.g. `npm test` -->
+    <string name="toolrun_ran">Ran %1$s</string>
+    <string name="toolrun_reading_file">Reading a file</string>
+    <string name="toolrun_read_file">Read a file</string>
+    <string name="toolrun_writing_file">Writing a file</string>
+    <string name="toolrun_wrote_file">Wrote a file</string>
+    <!-- %1$s: a file path -->
+    <string name="toolrun_writing">Writing %1$s</string>
+    <!-- %1$s: a file path -->
+    <string name="toolrun_wrote">Wrote %1$s</string>
+    <string name="toolrun_editing_file">Editing a file</string>
+    <string name="toolrun_edited_file">Edited a file</string>
+    <!-- %1$s: a file path -->
+    <string name="toolrun_editing">Editing %1$s</string>
+    <!-- %1$s: a file path -->
+    <string name="toolrun_edited">Edited %1$s</string>
+    <string name="toolrun_listing_folder">Listing the folder</string>
+    <string name="toolrun_listed_folder">Listed the folder</string>
+    <!-- %1$s: a folder path -->
+    <string name="toolrun_listing">Listing %1$s</string>
+    <!-- %1$s: a folder path -->
+    <string name="toolrun_listed">Listed %1$s</string>
+    <!-- %1$s: a file name pattern, e.g. *.kt -->
+    <string name="toolrun_finding_files">Finding files matching %1$s</string>
+    <!-- %1$s: a file name pattern, e.g. *.kt -->
+    <string name="toolrun_found_files">Found files matching %1$s</string>
+    <!-- %1$s: the text searched for, already in quotes -->
+    <string name="toolrun_searching_for">Searching for %1$s</string>
+    <!-- %1$s: the text searched for, already in quotes -->
+    <string name="toolrun_searched_for">Searched for %1$s</string>
+    <!-- Results the PC reports for its tools. %1$s: a command line in backticks -->
+    <string name="toolrun_started">Started %1$s</string>
+    <!-- %1$s: a command line in backticks -->
+    <string name="toolrun_stopped">Stopped %1$s</string>
+    <!-- Looked at the output of a background command. %1$s: a command line in backticks -->
+    <string name="toolrun_checked">Checked %1$s</string>
+    <!-- %1$s: a command line in backticks -->
+    <string name="toolrun_timed_out">Timed out: %1$s</string>
+    <!-- Showed a file or folder in the PC's file manager. %1$s: a path -->
+    <string name="toolrun_revealed">Revealed %1$s</string>
+    <!-- %1$s: a file path or web address -->
+    <string name="toolrun_opened">Opened %1$s</string>
+    <!-- %1$s: a tool name -->
+    <string name="toolrun_unknown_tool">Unknown tool %1$s</string>
+    <string name="toolrun_couldnt_run_command">Couldn\'t run a command</string>
+    <string name="toolrun_couldnt_read_file">Couldn\'t read a file</string>
+    <string name="toolrun_couldnt_write_file">Couldn\'t write a file</string>
+    <string name="toolrun_couldnt_edit_file">Couldn\'t edit a file</string>
+    <string name="toolrun_couldnt_list_folder">Couldn\'t list the folder</string>
+    <string name="toolrun_couldnt_search_files">Couldn\'t search for files</string>
+    <string name="toolrun_couldnt_search_text">Couldn\'t search for text</string>
+    <string name="toolrun_couldnt_open_path">Couldn\'t open the path</string>
+    <string name="toolrun_couldnt_find_process">Couldn\'t find process</string>
+    <!-- %1$s: a command line in backticks -->
+    <string name="toolrun_couldnt_run">Couldn\'t run %1$s</string>
+    <!-- %1$s: a file path -->
+    <string name="toolrun_couldnt_read">Couldn\'t read %1$s</string>
+    <!-- %1$s: a file path -->
+    <string name="toolrun_couldnt_write">Couldn\'t write %1$s</string>
+    <!-- %1$s: a file path -->
+    <string name="toolrun_couldnt_edit">Couldn\'t edit %1$s</string>
+    <!-- %1$s: a folder path -->
+    <string name="toolrun_couldnt_list">Couldn\'t list %1$s</string>
+    <!-- %1$s: a search pattern -->
+    <string name="toolrun_couldnt_search_for">Couldn\'t search for %1$s</string>
+    <!-- %1$s: a file path -->
+    <string name="toolrun_couldnt_open">Couldn\'t open %1$s</string>
+    <!-- %1$s: a process id -->
+    <string name="toolrun_couldnt_find_process_id">Couldn\'t find process %1$s</string>
+
+    <!-- Approval questions before a tool runs on the user's PC -->
+    <string name="toolrun_approve_command">Run this command?</string>
+    <!-- %1$s: the PC's name -->
+    <string name="toolrun_approve_command_on">Run this command on %1$s?</string>
+    <!-- %1$s: a file path -->
+    <string name="toolrun_approve_write">Write %1$s?</string>
+    <!-- %1$s: a file path; %2$s: the PC's name -->
+    <string name="toolrun_approve_write_on">Write %1$s on %2$s?</string>
+    <!-- %1$s: a file path -->
+    <string name="toolrun_approve_edit">Edit %1$s?</string>
+    <!-- %1$s: a file path; %2$s: the PC's name -->
+    <string name="toolrun_approve_edit_on">Edit %1$s on %2$s?</string>
+    <string name="toolrun_approve_stop_process">Stop this background process?</string>
+    <!-- %1$s: the PC's name -->
+    <string name="toolrun_approve_stop_process_on">Stop this background process on %1$s?</string>
+    <!-- %1$s: a file path or web address -->
+    <string name="toolrun_approve_open">Open %1$s?</string>
+    <!-- %1$s: a file path or web address; %2$s: the PC's name -->
+    <string name="toolrun_approve_open_on">Open %1$s on %2$s?</string>
+    <!-- %1$s: a tool's name in words, e.g. "list processes" -->
+    <string name="toolrun_approve_allow">Allow %1$s?</string>
+    <!-- %1$s: a tool's name in words, e.g. "list processes"; %2$s: the PC's name -->
+    <string name="toolrun_approve_allow_on">Allow %1$s on %2$s?</string>
+
+    <!-- When a tool needs the user's go-ahead: option names and their descriptions -->
+    <string name="toolrun_approval_always">Always ask</string>
+    <string name="toolrun_approval_always_blurb">Ask before every tool call.</string>
+    <!-- Ask before tools that change something (not before tools that only read) -->
+    <string name="toolrun_approval_writes">Ask for changes</string>
+    <string name="toolrun_approval_writes_blurb">Ask unless the server marks a tool as read-only.</string>
+    <string name="toolrun_approval_never">Never ask</string>
+    <string name="toolrun_approval_never_blurb">Run tools without asking.</string>
+
+    <!-- MCP servers -->
+    <string name="toolrun_mcp_server_not_found">Server not found.</string>
+    <string name="toolrun_mcp_couldnt_connect">Couldn\'t connect.</string>
+    <!-- Status line of an MCP server whose tools need the user to sign in -->
+    <string name="toolrun_mcp_sign_in_required">Sign in required</string>
+    <string name="toolrun_mcp_server_removed">That MCP server was removed.</string>
+    <!-- %1$s: an MCP server's name. "Settings → MCP servers" names a settings page. -->
+    <string name="toolrun_mcp_sign_in_again">%1$s needs you to sign in again. Open Settings → MCP servers.</string>
+    <string name="toolrun_mcp_link_expired">This sign-in link expired. Start again from Settings.</string>
+    <!-- Default name of an MCP server whose address has no host name -->
+    <string name="toolrun_mcp_default_name">MCP server</string>
+
+    <!-- Web search services (bring your own key) -->
+    <string name="websearch_blurb_brave">Independent index. Free tier available.</string>
+    <string name="websearch_blurb_tavily">Search built for AI agents. Free tier available.</string>
+    <string name="websearch_blurb_exa">Neural search with page text.</string>
+    <string name="websearch_blurb_jina">Search with full page content.</string>
+    <!-- SearXNG is a self-hosted metasearch engine; JSON output is a setting it must have turned on -->
+    <string name="websearch_blurb_searxng">Your own metasearch instance (JSON output enabled).</string>
+    <!-- %1$s: a search service, e.g. Brave Search. "Settings → Web search" names a settings page. -->
+    <string name="websearch_key_rejected">%1$s rejected the search key. Check it in Settings → Web search.</string>
+    <!-- %1$s: a search service, e.g. Brave Search -->
+    <string name="websearch_rate_limited">%1$s rate limit reached. Try again shortly.</string>
+    <!-- %1$s: a search service, e.g. Brave Search; %2$d: an HTTP status code -->
+    <string name="websearch_failed">%1$s search failed (HTTP %2$d).</string>
+    <string name="websearch_unexpected">The search service returned something unexpected.</string>
+
+    <!-- Skills -->
+    <string name="skills_no_instructions">The skill has no instructions.</string>
+    <!-- %1$d: a size limit in kilobytes -->
+    <string name="skills_too_large">The skill is larger than %1$d KB of text.</string>
+    <!-- SKILL.md is a file name -->
+    <string name="skills_no_skill_md">No SKILL.md found in that archive.</string>
+    <!-- %1$d: an HTTP status code -->
+    <string name="skills_download_failed">Couldn\'t download the skill (HTTP %1$d).</string>
+    <string name="skills_file_too_large">That file is too large to be a skill.</string>
+
+    <!-- Built-in assistants: names (nouns) and the starter prompts shown in a new chat. Starters are sent as the user's message, so write them as a person would ask. -->
+    <string name="builtin_code">Code</string>
+    <string name="builtin_writer">Writer</string>
+    <string name="builtin_tutor">Tutor</string>
+    <string name="builtin_translator">Translator</string>
+    <string name="builtin_analyst">Analyst</string>
+    <string name="builtin_facet_https">Explain how HTTPS keeps a connection private</string>
+    <!-- Any city works; keep a well-known travel destination -->
+    <string name="builtin_facet_trip">Plan a 3-day trip to Lisbon on a modest budget</string>
+    <string name="builtin_facet_email">Help me write a polite follow-up email</string>
+    <string name="builtin_facet_cat">What should I know before adopting a cat?</string>
+    <string name="builtin_code_review">Review this function for bugs</string>
+    <string name="builtin_code_coroutine">Write a Kotlin coroutine that retries with backoff</string>
+    <string name="builtin_code_mutex">Explain the difference between a mutex and a semaphore</string>
+    <string name="builtin_code_convert">Convert this Python script to TypeScript</string>
+    <string name="builtin_writer_tighten">Tighten this paragraph without changing its meaning</string>
+    <string name="builtin_writer_bio">Draft a short bio for a conference talk</string>
+    <string name="builtin_writer_warmer">Make this message sound warmer but still professional</string>
+    <string name="builtin_writer_titles">Give me five title ideas for this article</string>
+    <string name="builtin_tutor_derivatives">Teach me derivatives from scratch</string>
+    <!-- Pick a foreign language that suits readers of this language (e.g. English for German speakers) -->
+    <string name="builtin_tutor_quiz">Quiz me on Spanish past tense verbs</string>
+    <string name="builtin_tutor_moon">Why does the moon have phases?</string>
+    <string name="builtin_tutor_neural">Walk me through how a neural network learns</string>
+    <!-- Pick a target language that suits readers of this language (e.g. English for Spanish speakers), and translate the question -->
+    <string name="builtin_translator_station">Translate to Spanish: Where is the nearest train station?</string>
+    <string name="builtin_translator_japanese">Translate this email into formal Japanese</string>
+    <!-- "saudade" is a Portuguese word; keep it as is -->
+    <string name="builtin_translator_saudade">What does \"saudade\" mean?</string>
+    <string name="builtin_translator_french">Translate to French and keep the formatting</string>
+    <string name="builtin_analyst_renting">Compare renting vs buying with these numbers</string>
+    <string name="builtin_analyst_risks">Summarize the key risks in this plan</string>
+    <string name="builtin_analyst_coffee">Build a simple unit economics model for a coffee shop</string>
+    <string name="builtin_analyst_expected_value">What\'s the expected value of this decision?</string>
+    <!-- Default name of an assistant the user made without naming it -->
+    <string name="builtin_default_assistant">Assistant</string>
+    <!-- Default name of a chat folder the user made without naming it -->
+    <string name="builtin_default_folder">Folder</string>
+
+    <!-- MCP directory: categories (nouns, shown as filter chips) -->
+    <string name="mcpdir_cat_knowledge">Docs &amp; knowledge</string>
+    <string name="mcpdir_cat_developer">Developer</string>
+    <string name="mcpdir_cat_productivity">Productivity</string>
+    <string name="mcpdir_cat_design">Design</string>
+    <string name="mcpdir_cat_data">Data &amp; analytics</string>
+    <string name="mcpdir_cat_cloud">Cloud</string>
+    <string name="mcpdir_cat_business">Business</string>
+    <string name="mcpdir_cat_commerce">Payments &amp; shopping</string>
+    <string name="mcpdir_cat_search">Search &amp; web</string>
+    <string name="mcpdir_cat_finance">Finance</string>
+    <string name="mcpdir_cat_travel">Travel &amp; maps</string>
+    <string name="mcpdir_cat_ai">AI &amp; media</string>
+    <!-- MCP directory: what each server does (server and product names stay as they are) -->
+    <string name="mcpdir_blurb_deepwiki">Ask questions about any public GitHub repository.</string>
+    <string name="mcpdir_blurb_context7">Current docs and code examples for popular libraries.</string>
+    <string name="mcpdir_blurb_microsoft_learn">Official Microsoft, Azure and .NET documentation.</string>
+    <string name="mcpdir_blurb_aws_knowledge">AWS docs, best practices and regional availability.</string>
+    <string name="mcpdir_blurb_cloudflare_docs">Cloudflare developer documentation.</string>
+    <string name="mcpdir_blurb_openai_docs">OpenAI API guides and reference.</string>
+    <string name="mcpdir_blurb_claude_docs">Claude and Anthropic API documentation.</string>
+    <string name="mcpdir_blurb_gitmcp">Read the docs of any GitHub project on demand.</string>
+    <string name="mcpdir_blurb_astro_docs">Astro framework documentation.</string>
+    <string name="mcpdir_blurb_svelte_docs">Svelte and SvelteKit documentation.</string>
+    <string name="mcpdir_blurb_nuxt_docs">Nuxt documentation and modules.</string>
+    <string name="mcpdir_blurb_pinecone_docs">Pinecone vector database documentation.</string>
+    <string name="mcpdir_blurb_github">Repositories, issues and pull requests. Needs a personal access token.</string>
+    <string name="mcpdir_blurb_gitlab">Projects, merge requests and pipelines.</string>
+    <string name="mcpdir_blurb_sentry">Errors, issues and releases from your projects.</string>
+    <string name="mcpdir_blurb_grep_by_vercel">Search code across a million public repositories.</string>
+    <string name="mcpdir_blurb_socket">Security and quality scores for open-source packages.</string>
+    <string name="mcpdir_blurb_semgrep">Scan code for security issues.</string>
+    <string name="mcpdir_blurb_postman">APIs, collections and workspaces.</string>
+    <string name="mcpdir_blurb_buildkite">Pipelines, builds and test results.</string>
+    <string name="mcpdir_blurb_jam">Bug reports with console logs and network requests.</string>
+    <string name="mcpdir_blurb_globalping">Ping, traceroute and DNS tests from around the world.</string>
+    <string name="mcpdir_blurb_openzeppelin">Generate secure Solidity smart contracts.</string>
+    <string name="mcpdir_blurb_notion">Search, read and edit your Notion workspace.</string>
+    <string name="mcpdir_blurb_linear">Issues, projects and cycles.</string>
+    <string name="mcpdir_blurb_atlassian">Jira issues and Confluence pages.</string>
+    <string name="mcpdir_blurb_asana">Tasks, projects and goals.</string>
+    <string name="mcpdir_blurb_monday_com">Boards, items and updates.</string>
+    <string name="mcpdir_blurb_clickup">Tasks, docs and spaces.</string>
+    <string name="mcpdir_blurb_todoist">Your tasks and projects.</string>
+    <string name="mcpdir_blurb_airtable">Bases, tables and records.</string>
+    <string name="mcpdir_blurb_dropbox">Find and read files in your Dropbox.</string>
+    <string name="mcpdir_blurb_zapier">Run actions in thousands of apps.</string>
+    <string name="mcpdir_blurb_fireflies">Meeting transcripts and summaries.</string>
+    <string name="mcpdir_blurb_granola">Your meeting notes.</string>
+    <string name="mcpdir_blurb_cal_com">Bookings and availability.</string>
+    <string name="mcpdir_blurb_egnyte">Search and read company files.</string>
+    <string name="mcpdir_blurb_figma">Read designs, components and variables.</string>
+    <string name="mcpdir_blurb_canva">Create and edit Canva designs.</string>
+    <string name="mcpdir_blurb_miro">Boards, sticky notes and diagrams.</string>
+    <string name="mcpdir_blurb_excalidraw">Sketch hand-drawn diagrams.</string>
+    <string name="mcpdir_blurb_gamma">Generate presentations and documents.</string>
+    <string name="mcpdir_blurb_webflow">Sites, pages and CMS collections.</string>
+    <string name="mcpdir_blurb_wix">Manage your Wix sites.</string>
+    <string name="mcpdir_blurb_cloudinary">Upload, search and transform media.</string>
+    <string name="mcpdir_blurb_supabase">Postgres databases, auth and storage.</string>
+    <string name="mcpdir_blurb_neon">Serverless Postgres: branches and queries.</string>
+    <string name="mcpdir_blurb_prisma_postgres">Create and query Prisma Postgres databases.</string>
+    <string name="mcpdir_blurb_motherduck">Query data with DuckDB in the cloud.</string>
+    <string name="mcpdir_blurb_hex">Notebooks, data apps and analyses.</string>
+    <string name="mcpdir_blurb_posthog">Product analytics, feature flags and experiments.</string>
+    <string name="mcpdir_blurb_axiom">Query logs and events.</string>
+    <string name="mcpdir_blurb_grafana">Dashboards, alerts and metrics.</string>
+    <string name="mcpdir_blurb_honeycomb">Traces and observability queries.</string>
+    <string name="mcpdir_blurb_vercel">Projects, deployments and logs.</string>
+    <string name="mcpdir_blurb_netlify">Sites, deploys and forms.</string>
+    <string name="mcpdir_blurb_railway">Services, deployments and variables.</string>
+    <string name="mcpdir_blurb_digitalocean">App Platform apps and deployments.</string>
+    <string name="mcpdir_blurb_cloudflare_workers">Workers, KV, R2 and D1.</string>
+    <string name="mcpdir_blurb_cloudflare_observability">Logs and analytics for your Workers.</string>
+    <string name="mcpdir_blurb_cloudflare_browser">Fetch pages and take screenshots in a real browser.</string>
+    <string name="mcpdir_blurb_intercom">Conversations, contacts and help articles.</string>
+    <string name="mcpdir_blurb_close">CRM leads, deals and activities.</string>
+    <string name="mcpdir_blurb_klaviyo">Email and SMS campaigns, flows and metrics.</string>
+    <string name="mcpdir_blurb_ahrefs">SEO: backlinks, keywords and rankings.</string>
+    <string name="mcpdir_blurb_semrush">SEO and competitor research.</string>
+    <string name="mcpdir_blurb_stripe">Payments, customers and subscriptions.</string>
+    <string name="mcpdir_blurb_paypal">Invoices, orders and transactions.</string>
+    <string name="mcpdir_blurb_square">Sales, catalog and customers.</string>
+    <string name="mcpdir_blurb_instacart">Turn recipes and lists into grocery carts.</string>
+    <string name="mcpdir_blurb_ramp">Company spend, cards and bills.</string>
+    <string name="mcpdir_blurb_exa">Web search built for AI, with full page contents.</string>
+    <string name="mcpdir_blurb_jina_ai">Read web pages and search the web.</string>
+    <string name="mcpdir_blurb_tavily">Web search and page extraction.</string>
+    <string name="mcpdir_blurb_bright_data">Scrape sites and search without getting blocked.</string>
+    <string name="mcpdir_blurb_apify">Thousands of ready-made scrapers and automations.</string>
+    <string name="mcpdir_blurb_cloudflare_radar">Internet traffic trends and outages.</string>
+    <string name="mcpdir_blurb_coingecko">Crypto prices, market data and trends.</string>
+    <string name="mcpdir_blurb_alpha_vantage">Stock, forex and economic data.</string>
+    <string name="mcpdir_blurb_kiwi_com">Search flights and fares.</string>
+    <string name="mcpdir_blurb_mapbox">Places, directions and maps.</string>
+    <string name="mcpdir_blurb_hugging_face">Search models, datasets, papers and Spaces.</string>
+    <string name="mcpdir_blurb_replicate">Run open-source models for images, video and audio.</string>
+    <string name="mcpdir_blurb_runway">Generate and edit video and images.</string>
+</resources>

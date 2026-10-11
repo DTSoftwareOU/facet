@@ -36,6 +36,9 @@ const ICONS = {
   'files': 'files', 'cpu': 'cpu', 'infinity': 'infinity', 'timer': 'timer', 'gem': 'gem', 'scale': 'scale', 'rocket': 'rocket', 'film': 'film', 'music': 'music', 'pause': 'pause',
 };
 
+// Icons that point along the reading direction flip in right-to-left languages (Arabic, Urdu).
+const MIRRORED = new Set(['arrow_left', 'arrow_right', 'chevron_left', 'chevron_right', 'undo', 'log_in', 'log_out']);
+
 const num = (s) => parseFloat(s);
 const fmt = (n) => +n.toFixed(3);
 
@@ -67,7 +70,7 @@ function pointsPath(points, close) {
   return d + (close ? 'z' : '');
 }
 
-function convert(svg) {
+function convert(svg, res) {
   const paths = [];
   for (const m of svg.matchAll(/<(path|circle|ellipse|rect|line|polyline|polygon)\b([^>]*)\/?>/g)) {
     const [_, tag, rest] = m; const a = attrs(rest);
@@ -85,7 +88,9 @@ function convert(svg) {
     `    <path\n        android:pathData="${d}"\n        android:fillColor="#00000000"\n        android:strokeColor="#FF000000"\n` +
     `        android:strokeWidth="${STROKE}"\n        android:strokeLineCap="round"\n        android:strokeLineJoin="round" />`).join('\n');
   return `<?xml version="1.0" encoding="utf-8"?>\n<!-- Lucide icon (ISC License, https://lucide.dev) -->\n` +
-    `<vector xmlns:android="http://schemas.android.com/apk/res/android"\n    android:width="24dp"\n    android:height="24dp"\n` +
+    `<vector xmlns:android="http://schemas.android.com/apk/res/android"\n` +
+    (MIRRORED.has(res) ? '    android:autoMirrored="true"\n' : '') +
+    `    android:width="24dp"\n    android:height="24dp"\n` +
     `    android:viewportWidth="24"\n    android:viewportHeight="24">\n${body}\n</vector>\n`;
 }
 
@@ -96,6 +101,6 @@ await Promise.all(Object.entries(ICONS).map(async ([name, res]) => {
   const r = await fetch(url);
   if (!r.ok) { failed.push(name); return; }
   const svg = await r.text();
-  fs.writeFileSync(path.join(outDir, `ic_${res}.xml`), convert(svg));
+  fs.writeFileSync(path.join(outDir, `ic_${res}.xml`), convert(svg, res));
 }));
 console.log(`wrote ${Object.keys(ICONS).length - failed.length} icons; failed: ${failed.join(', ') || 'none'}`);

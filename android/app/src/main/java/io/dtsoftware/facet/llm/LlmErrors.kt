@@ -1,5 +1,8 @@
 package io.dtsoftware.facet.llm
 
+import androidx.annotation.StringRes
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.net.HttpStatusException
 import io.dtsoftware.facet.llm.internal.obj
 import io.dtsoftware.facet.llm.internal.parseObjectOrNull
@@ -19,7 +22,7 @@ object LlmErrors {
     private const val MAX_DETAIL = 600
 
     fun providerName(config: ProviderConfig): String =
-        if (config.kind == ProviderKind.CUSTOM) config.label.ifBlank { "The endpoint" } else config.kind.displayName
+        if (config.kind == ProviderKind.CUSTOM) config.label.ifBlank { Strings.get(R.string.llm_the_endpoint) } else config.kind.displayName
 
     /** Removes anything that looks like a credential, including the configured key itself. */
     fun redact(text: String, apiKey: String?): String {
@@ -51,39 +54,55 @@ object LlmErrors {
         val raw = redact(extractMessage(e.body), config.apiKey)
         val m = raw.lowercase()
         val code = errorCode(e.body)?.lowercase().orEmpty()
-        val modelName = model?.let { "“$it”" } ?: "this model"
         fun err(kind: ErrorKind, message: String) =
             LlmError(kind, message, e.code, e.retryAfterSeconds, raw.ifBlank { null })
+        /** [named] when the model is known (its name is the second argument), else [unnamed]. */
+        fun aboutModel(@StringRes named: Int, @StringRes unnamed: Int): String =
+            if (model != null) Strings.get(named, provider, model) else Strings.get(unnamed, provider)
 
         val creditProblem = "credit balance" in m || "insufficient_quota" in code || "insufficient credits" in m ||
             "billing" in m || "exceeded your current quota" in m || "payment required" in m || "out of credits" in m
         return when {
-            e.code == 401 -> err(ErrorKind.AUTH, "$provider rejected this API key. Check it in Providers.")
+            e.code == 401 -> err(ErrorKind.AUTH, Strings.get(R.string.llm_auth, provider))
             e.code == 402 || creditProblem ->
-                err(ErrorKind.QUOTA, "$provider says this account is out of credits or over its spending limit. Add credits with $provider, then retry.")
+                err(ErrorKind.QUOTA, Strings.get(R.string.llm_quota, provider))
             e.code == 403 && ("verif" in m) ->
-                err(ErrorKind.PERMISSION, "$provider requires organization verification for $modelName. Verify your organization in the $provider dashboard, or pick another model.")
+                err(ErrorKind.PERMISSION, aboutModel(R.string.llm_verify_model, R.string.llm_verify_this_model))
             e.code == 403 ->
-                err(ErrorKind.PERMISSION, "$provider denied access to $modelName with this key. Check the key's permissions or pick another model.")
+                err(ErrorKind.PERMISSION, aboutModel(R.string.llm_denied_model, R.string.llm_denied_this_model))
             e.code == 404 ->
-                err(ErrorKind.NOT_FOUND, "$provider couldn't find $modelName. It may be retired, or this key can't use it.")
+                err(ErrorKind.NOT_FOUND, aboutModel(R.string.llm_not_found_model, R.string.llm_not_found_this_model))
             e.code == 413 || ParamHealer.isContextLength(raw) ->
-                err(ErrorKind.CONTEXT_LENGTH, "This conversation is too long for $modelName. Start a new chat, remove attachments, or pick a model with a larger context window.")
+                err(
+                    ErrorKind.CONTEXT_LENGTH,
+                    if (model != null) Strings.get(R.string.llm_too_long_model, model) else Strings.get(R.string.llm_too_long_this_model),
+                )
             e.code == 429 -> {
-                val wait = e.retryAfterSeconds?.let { if (it <= 90) " Try again in ${it}s." else " Try again in ${(it + 59) / 60} min." }
-                    ?: " Try again in a moment."
-                err(ErrorKind.RATE_LIMIT, "$provider is rate-limiting this key.$wait")
+                val wait = e.retryAfterSeconds
+                err(
+                    ErrorKind.RATE_LIMIT,
+                    when {
+                        wait == null -> Strings.get(R.string.llm_rate_limit_moment, provider)
+                        wait <= 90 -> Strings.get(R.string.llm_rate_limit_seconds, provider, wait.toInt())
+                        else -> Strings.get(R.string.llm_rate_limit_minutes, provider, ((wait + 59) / 60).toInt())
+                    },
+                )
             }
-            e.code == 408 -> err(ErrorKind.TIMEOUT, "$provider took too long to respond. Try again.")
+            e.code == 408 -> err(ErrorKind.TIMEOUT, Strings.get(R.string.llm_timeout, provider))
             e.code == 529 || ((e.code == 503 || e.code == 502) && "overload" in m) || "overloaded" in code ->
-                err(ErrorKind.OVERLOADED, "$provider is overloaded right now. Try again shortly, or switch models.")
+                err(ErrorKind.OVERLOADED, Strings.get(R.string.llm_overloaded, provider))
             e.code in 500..599 ->
-                err(ErrorKind.SERVER, "$provider had a server error (HTTP ${e.code}). Try again.")
-            e.code == 400 || e.code == 422 -> {
-                val shown = raw.take(220).ifBlank { "invalid request" }
-                err(ErrorKind.BAD_REQUEST, "$provider rejected the request: $shown")
-            }
-            else -> err(ErrorKind.UNKNOWN, "$provider returned HTTP ${e.code}${if (raw.isNotBlank()) ": ${raw.take(200)}" else "."}")
+                err(ErrorKind.SERVER, Strings.get(R.string.llm_server_error, provider, e.code))
+            e.code == 400 || e.code == 422 -> err(
+                ErrorKind.BAD_REQUEST,
+                if (raw.isBlank()) Strings.get(R.string.llm_bad_request_invalid, provider)
+                else Strings.get(R.string.llm_bad_request, provider, raw.take(220)),
+            )
+            else -> err(
+                ErrorKind.UNKNOWN,
+                if (raw.isNotBlank()) Strings.get(R.string.llm_http_reason, provider, e.code, raw.take(200))
+                else Strings.get(R.string.llm_http, provider, e.code),
+            )
         }
     }
 
@@ -93,16 +112,16 @@ object LlmErrors {
         val local = config.kind == ProviderKind.OLLAMA || config.kind == ProviderKind.LMSTUDIO
         val detail = redact(e.message ?: e.javaClass.simpleName, config.apiKey)
         return when (e) {
-            is SocketTimeoutException -> LlmError(ErrorKind.TIMEOUT, "$provider took too long to respond. Try again.", detail = detail)
+            is SocketTimeoutException -> LlmError(ErrorKind.TIMEOUT, Strings.get(R.string.llm_timeout, provider), detail = detail)
             is UnknownHostException, is ConnectException, is NoRouteToHostException -> LlmError(
                 ErrorKind.NETWORK,
-                if (local) "Can't reach $provider at ${config.baseUrl}. Make sure it's running and reachable from this phone."
-                else "Can't reach $provider. Check your connection.",
+                if (local) Strings.get(R.string.llm_unreachable_local, provider, config.baseUrl)
+                else Strings.get(R.string.llm_unreachable, provider),
                 detail = detail,
             )
-            is SSLException -> LlmError(ErrorKind.NETWORK, "The secure connection to $provider failed. Check the address and your network.", detail = detail)
-            is InterruptedIOException -> LlmError(ErrorKind.TIMEOUT, "$provider took too long to respond. Try again.", detail = detail)
-            else -> LlmError(ErrorKind.NETWORK, "Lost the connection to $provider before the response finished. Try again.", detail = detail)
+            is SSLException -> LlmError(ErrorKind.NETWORK, Strings.get(R.string.llm_ssl, provider), detail = detail)
+            is InterruptedIOException -> LlmError(ErrorKind.TIMEOUT, Strings.get(R.string.llm_timeout, provider), detail = detail)
+            else -> LlmError(ErrorKind.NETWORK, Strings.get(R.string.llm_connection_lost, provider), detail = detail)
         }
     }
 
@@ -114,20 +133,24 @@ object LlmErrors {
         val m = raw.lowercase()
         return when {
             "overloaded" in t || "overloaded" in m ->
-                LlmError(ErrorKind.OVERLOADED, "$provider is overloaded right now. Try again shortly, or switch models.", detail = raw)
+                LlmError(ErrorKind.OVERLOADED, Strings.get(R.string.llm_overloaded, provider), detail = raw)
             "rate_limit" in t || "rate limit" in m ->
-                LlmError(ErrorKind.RATE_LIMIT, "$provider is rate-limiting this key. Try again in a moment.", detail = raw)
+                LlmError(ErrorKind.RATE_LIMIT, Strings.get(R.string.llm_rate_limit_moment, provider), detail = raw)
             "quota" in t || "insufficient" in t || "credit" in m ->
-                LlmError(ErrorKind.QUOTA, "$provider says this account is out of credits or over its spending limit. Add credits with $provider, then retry.", detail = raw)
+                LlmError(ErrorKind.QUOTA, Strings.get(R.string.llm_quota, provider), detail = raw)
             "authentication" in t || "invalid_api_key" in t ->
-                LlmError(ErrorKind.AUTH, "$provider rejected this API key. Check it in Providers.", detail = raw)
-            ParamHealer.isContextLength(raw) ->
-                LlmError(ErrorKind.CONTEXT_LENGTH, "This conversation is too long for ${model?.let { "“$it”" } ?: "this model"}. Start a new chat or remove attachments.", detail = raw)
+                LlmError(ErrorKind.AUTH, Strings.get(R.string.llm_auth, provider), detail = raw)
+            ParamHealer.isContextLength(raw) -> LlmError(
+                ErrorKind.CONTEXT_LENGTH,
+                if (model != null) Strings.get(R.string.llm_too_long_short_model, model) else Strings.get(R.string.llm_too_long_short_this_model),
+                detail = raw,
+            )
             "server" in t || "api_error" in t ->
-                LlmError(ErrorKind.SERVER, "$provider had a server error mid-response. Try again.", detail = raw)
+                LlmError(ErrorKind.SERVER, Strings.get(R.string.llm_server_error_stream, provider), detail = raw)
             else -> LlmError(
                 ErrorKind.UNKNOWN,
-                "$provider stopped with an error${if (raw.isNotBlank()) ": ${raw.take(200)}" else "."}",
+                if (raw.isNotBlank()) Strings.get(R.string.llm_stream_error_reason, provider, raw.take(200))
+                else Strings.get(R.string.llm_stream_error, provider),
                 detail = raw.ifBlank { null },
             )
         }
@@ -135,6 +158,10 @@ object LlmErrors {
 
     fun truncatedStream(config: ProviderConfig): LlmError = LlmError(
         ErrorKind.NETWORK,
-        "The connection to ${providerName(config)} closed before the response finished. Try again.",
+        Strings.get(R.string.llm_truncated, providerName(config)),
     )
+
+    /** An unexpected failure while reading a provider's response. */
+    fun readFailed(config: ProviderConfig, detail: String?): LlmError =
+        LlmError(ErrorKind.UNKNOWN, Strings.get(R.string.llm_read_failed, providerName(config)), detail = detail)
 }

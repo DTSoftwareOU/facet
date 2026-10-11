@@ -11,6 +11,8 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.em
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.ui.theme.JetBrainsMono
 import org.intellij.markdown.IElementType
 import org.intellij.markdown.MarkdownElementTypes as E
@@ -329,7 +331,7 @@ internal class MdParser(private val colors: InlineColors, private val links: Lin
             E.IMAGE -> {
                 val linkNode = n.children.firstOrNull { it.type == E.INLINE_LINK || it.type == E.FULL_REFERENCE_LINK || it.type == E.SHORT_REFERENCE_LINK }
                 val textNode = linkNode?.children?.firstOrNull { it.type == E.LINK_TEXT || it.type == E.LINK_LABEL }
-                val alt = textNode?.let { decode(ctx.text(it).trim('[', ']')) }?.takeIf { it.isNotBlank() } ?: "image"
+                val alt = textNode?.let { decode(ctx.text(it).trim('[', ']')) }?.takeIf { it.isNotBlank() } ?: Strings.get(R.string.markdown_image)
                 val dest = when (linkNode?.type) {
                     E.INLINE_LINK -> linkNode.children.firstOrNull { it.type == E.LINK_DESTINATION }
                         ?.let { ctx.text(it).trim().removePrefix("<").removeSuffix(">") }

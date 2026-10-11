@@ -1,5 +1,8 @@
 package io.dtsoftware.facet.domain.tools
 
+import androidx.annotation.StringRes
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.llm.Citation
 import io.dtsoftware.facet.llm.ProviderBlocks
 import io.dtsoftware.facet.llm.ToolSpec
@@ -7,10 +10,16 @@ import kotlinx.serialization.Serializable
 
 /** When an MCP tool needs the user's go-ahead before it runs. */
 @Serializable
-enum class ToolApproval(val label: String, val blurb: String) {
-    ALWAYS("Always ask", "Ask before every tool call."),
-    WRITES("Ask for changes", "Ask unless the server marks a tool as read-only."),
-    NEVER("Never ask", "Run tools without asking."),
+enum class ToolApproval(@StringRes val labelRes: Int, @StringRes val blurbRes: Int) {
+    ALWAYS(R.string.toolrun_approval_always, R.string.toolrun_approval_always_blurb),
+    WRITES(R.string.toolrun_approval_writes, R.string.toolrun_approval_writes_blurb),
+    NEVER(R.string.toolrun_approval_never, R.string.toolrun_approval_never_blurb);
+
+    /** The option's name in the app's language. */
+    val label: String get() = Strings.get(labelRes)
+
+    /** What the option does, in the app's language. */
+    val blurb: String get() = Strings.get(blurbRes)
 }
 
 /** Stored by name in [ToolCallRecord.kind]. COMPUTER: tools that run on a PC (here: one of the account's PCs, docs/REMOTE.md). */
@@ -79,16 +88,19 @@ data class ToolTrace(val steps: List<ToolStep>, val finalText: String)
 enum class SearchKind(
     val id: String,
     val displayName: String,
-    val blurb: String,
+    @StringRes val blurbRes: Int,
     val keyUrl: String?,
     val needsKey: Boolean,
     val defaultUrl: String,
 ) {
-    BRAVE("search.brave", "Brave Search", "Independent index. Free tier available.", "https://api-dashboard.search.brave.com/app/keys", true, "https://api.search.brave.com"),
-    TAVILY("search.tavily", "Tavily", "Search built for AI agents. Free tier available.", "https://app.tavily.com/home", true, "https://api.tavily.com"),
-    EXA("search.exa", "Exa", "Neural search with page text.", "https://dashboard.exa.ai/api-keys", true, "https://api.exa.ai"),
-    JINA("search.jina", "Jina Search", "Search with full page content.", "https://jina.ai/api-dashboard/key-manager", true, "https://s.jina.ai"),
-    SEARXNG("search.searxng", "SearXNG", "Your own metasearch instance (JSON output enabled).", "https://docs.searxng.org", false, "https://");
+    BRAVE("search.brave", "Brave Search", R.string.websearch_blurb_brave, "https://api-dashboard.search.brave.com/app/keys", true, "https://api.search.brave.com"),
+    TAVILY("search.tavily", "Tavily", R.string.websearch_blurb_tavily, "https://app.tavily.com/home", true, "https://api.tavily.com"),
+    EXA("search.exa", "Exa", R.string.websearch_blurb_exa, "https://dashboard.exa.ai/api-keys", true, "https://api.exa.ai"),
+    JINA("search.jina", "Jina Search", R.string.websearch_blurb_jina, "https://jina.ai/api-dashboard/key-manager", true, "https://s.jina.ai"),
+    SEARXNG("search.searxng", "SearXNG", R.string.websearch_blurb_searxng, "https://docs.searxng.org", false, "https://");
+
+    /** What the service offers, in the app's language. */
+    val blurb: String get() = Strings.get(blurbRes)
 
     companion object {
         const val PREFIX = "search."

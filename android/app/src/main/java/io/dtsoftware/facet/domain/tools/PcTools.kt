@@ -1,5 +1,8 @@
 package io.dtsoftware.facet.domain.tools
 
+import androidx.annotation.StringRes
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.core.util.Ids
 import io.dtsoftware.facet.data.db.ConversationEntity
@@ -50,7 +53,7 @@ class PcTools(
             ToolOutcome(
                 r.content.ifBlank { if (r.isError) "The tool failed without a message." else "(No output.)" },
                 r.isError,
-                label = r.label?.takeIf { it.isNotBlank() } ?: "${host.name}: $tool",
+                label = r.label?.takeIf { it.isNotBlank() }?.let { localizeLabel(it) } ?:"${host.name}: $tool",
             )
         } catch (e: RemoteException) {
             ToolOutcome(e.message ?: "$pcName couldn't run the tool.", isError = true)
@@ -112,35 +115,97 @@ class PcTools(
         /** Labels for computer tools while they run; the PC supplies the final label. */
         fun label(tool: String, args: String, done: Boolean): String {
             val path = shortPath(arg(args, "path"))
+            fun pick(@StringRes running: Int, @StringRes finished: Int, vararg values: Any) =
+                Strings.get(if (done) finished else running, *values)
+            /** Without a path: the general line ("Reading a file"); with one: the line naming it. */
+            fun withPath(@StringRes running: Int, @StringRes finished: Int, @StringRes runningPath: Int, @StringRes finishedPath: Int) =
+                if (path.isEmpty()) pick(running, finished) else pick(runningPath, finishedPath, path)
             return when (tool) {
                 "run_command" -> {
                     val cmd = arg(args, "command").lineSequence().firstOrNull().orEmpty()
-                    (if (done) "Ran " else "Running ") + if (cmd.isNotEmpty()) "`" + (if (cmd.length > 60) cmd.take(57) + "…" else cmd) + "`" else "a command"
+                    if (cmd.isEmpty()) pick(R.string.toolrun_running_command, R.string.toolrun_ran_command)
+                    else pick(R.string.toolrun_running, R.string.toolrun_ran, "`" + (if (cmd.length > 60) cmd.take(57) + "…" else cmd) + "`")
                 }
-                "read_file" -> (if (done) "Read " else "Reading ") + path.ifEmpty { "a file" }
-                "write_file" -> (if (done) "Wrote " else "Writing ") + path.ifEmpty { "a file" }
-                "edit_file" -> (if (done) "Edited " else "Editing ") + path.ifEmpty { "a file" }
-                "list_directory" -> (if (done) "Listed " else "Listing ") + path.ifEmpty { "the folder" }
-                "glob" -> (if (done) "Found files matching " else "Finding files matching ") + arg(args, "pattern").ifEmpty { "…" }
-                "grep" -> (if (done) "Searched for " else "Searching for ") + "“${arg(args, "pattern").take(40)}”"
+                "read_file" -> withPath(R.string.toolrun_reading_file, R.string.toolrun_read_file, R.string.toolrun_reading_path, R.string.toolrun_read_path)
+                "write_file" -> withPath(R.string.toolrun_writing_file, R.string.toolrun_wrote_file, R.string.toolrun_writing, R.string.toolrun_wrote)
+                "edit_file" -> withPath(R.string.toolrun_editing_file, R.string.toolrun_edited_file, R.string.toolrun_editing, R.string.toolrun_edited)
+                "list_directory" -> withPath(R.string.toolrun_listing_folder, R.string.toolrun_listed_folder, R.string.toolrun_listing, R.string.toolrun_listed)
+                "glob" -> pick(R.string.toolrun_finding_files, R.string.toolrun_found_files, arg(args, "pattern").ifEmpty { "…" })
+                "grep" -> pick(R.string.toolrun_searching_for, R.string.toolrun_searched_for, "“${arg(args, "pattern").take(40)}”")
                 else -> tool.replace('_', ' ')
             }
         }
 
+        /** Final labels the PC reports in English (the Windows app's bridge), in the app's language when known. */
+        private val fixedLabels: Map<String, Int> = mapOf(
+            "Ran a command" to R.string.toolrun_ran_command,
+            "Read a file" to R.string.toolrun_read_file,
+            "Wrote a file" to R.string.toolrun_wrote_file,
+            "Edited a file" to R.string.toolrun_edited_file,
+            "Listed the folder" to R.string.toolrun_listed_folder,
+            "Couldn't run a command" to R.string.toolrun_couldnt_run_command,
+            "Couldn't read a file" to R.string.toolrun_couldnt_read_file,
+            "Couldn't write a file" to R.string.toolrun_couldnt_write_file,
+            "Couldn't edit a file" to R.string.toolrun_couldnt_edit_file,
+            "Couldn't list the folder" to R.string.toolrun_couldnt_list_folder,
+            "Couldn't search for files" to R.string.toolrun_couldnt_search_files,
+            "Couldn't search for text" to R.string.toolrun_couldnt_search_text,
+            "Couldn't open the path" to R.string.toolrun_couldnt_open_path,
+            "Couldn't find process" to R.string.toolrun_couldnt_find_process,
+        )
+
+        /** Patterns of the PC's labels with one variable part; checked in order (the "Couldn't" ones first). */
+        private val labelPatterns: List<Pair<Regex, Int>> = listOf(
+            "Couldn't run " to R.string.toolrun_couldnt_run,
+            "Couldn't read " to R.string.toolrun_couldnt_read,
+            "Couldn't write " to R.string.toolrun_couldnt_write,
+            "Couldn't edit " to R.string.toolrun_couldnt_edit,
+            "Couldn't list " to R.string.toolrun_couldnt_list,
+            "Couldn't search for " to R.string.toolrun_couldnt_search_for,
+            "Couldn't open " to R.string.toolrun_couldnt_open,
+            "Couldn't find process " to R.string.toolrun_couldnt_find_process_id,
+            "Unknown tool " to R.string.toolrun_unknown_tool,
+            "Timed out: " to R.string.toolrun_timed_out,
+            "Ran " to R.string.toolrun_ran,
+            "Started " to R.string.toolrun_started,
+            "Stopped " to R.string.toolrun_stopped,
+            "Checked " to R.string.toolrun_checked,
+            "Read " to R.string.toolrun_read_path,
+            "Wrote " to R.string.toolrun_wrote,
+            "Edited " to R.string.toolrun_edited,
+            "Listed " to R.string.toolrun_listed,
+            "Found files matching " to R.string.toolrun_found_files,
+            "Searched for " to R.string.toolrun_searched_for,
+            "Revealed " to R.string.toolrun_revealed,
+            "Opened " to R.string.toolrun_opened,
+        ).map { (prefix, res) -> Regex("^" + Regex.escape(prefix) + "(.+)$", RegexOption.DOT_MATCHES_ALL) to res }
+
+        /** A final label from the PC (English) in the app's language; unknown labels pass through unchanged. */
+        fun localizeLabel(label: String): String {
+            fixedLabels[label]?.let { return Strings.get(it) }
+            for ((re, res) in labelPatterns) {
+                val m = re.find(label) ?: continue
+                return Strings.get(res, m.groupValues[1])
+            }
+            return label
+        }
+
         /** What the model wants to do on the PC, in words, for the approval card: a question and the exact detail. */
         fun approvalSummary(tool: String, args: String, pcName: String?): Pair<String, String?> {
-            val on = pcName?.let { " on $it" }.orEmpty()
+            /** The question without the PC's name, or with it as the last argument. */
+            fun ask(@StringRes plain: Int, @StringRes onPc: Int, vararg values: Any): String =
+                if (pcName == null) Strings.get(plain, *values) else Strings.get(onPc, *values, pcName)
             return when (tool) {
-                "run_command" -> "Run this command$on?" to arg(args, "command")
-                "write_file" -> "Write ${arg(args, "path")}$on?" to arg(args, "content").take(2000)
+                "run_command" -> ask(R.string.toolrun_approve_command, R.string.toolrun_approve_command_on) to arg(args, "command")
+                "write_file" -> ask(R.string.toolrun_approve_write, R.string.toolrun_approve_write_on, arg(args, "path")) to arg(args, "content").take(2000)
                 "edit_file" -> {
                     val old = arg(args, "old_string").lines().joinToString("\n") { "- $it" }
                     val new = arg(args, "new_string").lines().joinToString("\n") { "+ $it" }
-                    "Edit ${arg(args, "path")}$on?" to "$old\n$new".take(3000)
+                    ask(R.string.toolrun_approve_edit, R.string.toolrun_approve_edit_on, arg(args, "path")) to "$old\n$new".take(3000)
                 }
-                "stop_process" -> "Stop this background process$on?" to arg(args, "id")
-                "open_path" -> "Open ${arg(args, "path")}$on?" to null
-                else -> "Allow ${tool.replace('_', ' ')}$on?" to null
+                "stop_process" -> ask(R.string.toolrun_approve_stop_process, R.string.toolrun_approve_stop_process_on) to arg(args, "id")
+                "open_path" -> ask(R.string.toolrun_approve_open, R.string.toolrun_approve_open_on, arg(args, "path")) to null
+                else -> ask(R.string.toolrun_approve_allow, R.string.toolrun_approve_allow_on, tool.replace('_', ' ')) to null
             }
         }
     }

@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.domain.tools
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.data.prefs.SettingsStore
 import io.dtsoftware.facet.data.repo.ProviderRepository
@@ -132,7 +134,7 @@ class ToolRegistry(
                 val q = str("query")
                 val config = searchConfig() ?: return ToolOutcome("Web search isn't set up.", true)
                 val results = search.search(config, q, args["max_results"]?.jsonPrimitive?.intOrNull ?: 6)
-                ToolOutcome(search.formatResults(q, results), citations = search.citations(results), label = "Searched “${q.take(60)}”")
+                ToolOutcome(search.formatResults(q, results), citations = search.citations(results), label = Strings.get(R.string.toolrun_searched, q.take(60)))
             }
             ToolKind.FETCH -> {
                 val url = str("url")
@@ -144,7 +146,7 @@ class ToolRegistry(
                         append(url).append("\n\n").append(text.ifBlank { "(The page had no readable text.)" })
                     },
                     citations = listOf(io.dtsoftware.facet.llm.Citation(url, title.ifBlank { host })),
-                    label = "Read $host",
+                    label = Strings.get(R.string.toolrun_read_host, host),
                 )
             }
             ToolKind.SKILL -> when (def.spec.name) {
@@ -161,7 +163,7 @@ class ToolRegistry(
                                 files.forEach { append("- ").append(it.path).append('\n') }
                             }
                         },
-                        label = "Used skill ${s.name}",
+                        label = Strings.get(R.string.toolrun_used_skill, s.name),
                     )
                 }
                 else -> {
@@ -169,7 +171,7 @@ class ToolRegistry(
                         ?: return ToolOutcome("No enabled skill named \"${str("skill")}\".", true)
                     val f = skills.resources(s).firstOrNull { it.path == str("path").trimStart('/') }
                         ?: return ToolOutcome("The skill ${s.name} has no file \"${str("path")}\".", true)
-                    ToolOutcome(f.content, label = "Read ${f.path} from ${s.name}")
+                    ToolOutcome(f.content, label = Strings.get(R.string.toolrun_read_skill_file, f.path, s.name))
                 }
             }
             ToolKind.MEDIA -> {
@@ -188,10 +190,17 @@ class ToolRegistry(
                 val (att, choice) = svc.create(output, prompt, convId, aspect, seconds, ctx.onProgress)
                 val what = MEDIA_TOOLS.getValue(output).noun
                 val size = if (att.width != null && att.height != null) ", ${att.width}×${att.height}" else ""
+                val createdWith = when (output) {
+                    io.dtsoftware.facet.llm.ModelOutput.IMAGE -> R.string.toolrun_created_image_with
+                    io.dtsoftware.facet.llm.ModelOutput.VIDEO -> R.string.toolrun_created_video_with
+                    io.dtsoftware.facet.llm.ModelOutput.SPEECH -> R.string.toolrun_created_audio_clip_with
+                    io.dtsoftware.facet.llm.ModelOutput.MUSIC -> R.string.toolrun_created_track_with
+                    else -> R.string.toolrun_created_media_with
+                }
                 ToolOutcome(
                     "Created the $what with ${choice.model.displayName} (${att.mimeType}$size). It is already shown to the user " +
                         "below your message; don't link or describe a file path. Briefly say what you made, and offer changes.",
-                    label = "Created $what with ${choice.model.displayName}",
+                    label = Strings.get(createdWith, choice.model.displayName),
                     attachments = listOf(io.dtsoftware.facet.data.repo.AttachmentStore.ref(att)),
                 )
             }

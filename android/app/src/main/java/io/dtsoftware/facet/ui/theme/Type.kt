@@ -8,6 +8,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import io.dtsoftware.facet.R
@@ -70,7 +71,9 @@ fun facetTypography(chatScale: Float = 1f): FacetTypography {
         ),
         titleL = base.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.01).em),
         titleM = base.copy(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
-        chat = base.copy(fontSize = (16.5f * chatScale).sp, lineHeight = (26f * chatScale).sp),
+        // Messages and the message box follow each text's own direction (Arabic in an English UI and
+        // vice versa); interface text follows the layout.
+        chat = base.copy(fontSize = (16.5f * chatScale).sp, lineHeight = (26f * chatScale).sp, textDirection = TextDirection.Content),
         body = base.copy(fontSize = 15.sp, lineHeight = 22.sp),
         labelL = base.copy(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
         labelM = base.copy(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.005.em),

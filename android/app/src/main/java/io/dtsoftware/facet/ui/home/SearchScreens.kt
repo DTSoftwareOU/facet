@@ -29,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -67,21 +69,27 @@ fun SearchScreen(container: AppContainer, onBack: () -> Unit, onOpen: (String) -
     }
     Column(Modifier.fillMaxSize().background(c.background).statusBarsPadding().imePadding()) {
         Row(Modifier.padding(start = 4.dp, end = 12.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            FacetIconButton(R.drawable.ic_arrow_left, "Back", onBack)
-            SearchField(query, { query = it }, "Search all chats", Modifier.focusRequester(focus))
+            FacetIconButton(R.drawable.ic_arrow_left, stringResource(R.string.action_back), onBack)
+            SearchField(query, { query = it }, stringResource(R.string.search_placeholder), Modifier.focusRequester(focus))
         }
         when {
-            query.isBlank() -> EmptyState("Search everything", "Find words in any chat, on any of your devices' synced history.", icon = R.drawable.ic_search, modifier = Modifier.fillMaxWidth())
-            titles.isEmpty() && hits.isEmpty() -> EmptyState("No results", "Nothing matches “$query”.", modifier = Modifier.fillMaxWidth())
+            query.isBlank() -> EmptyState(
+                stringResource(R.string.search_empty_title), stringResource(R.string.search_empty_body),
+                icon = R.drawable.ic_search, modifier = Modifier.fillMaxWidth(),
+            )
+            titles.isEmpty() && hits.isEmpty() -> EmptyState(
+                stringResource(R.string.search_no_results_title), stringResource(R.string.search_no_results_body, query),
+                modifier = Modifier.fillMaxWidth(),
+            )
             else -> LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
                 if (titles.isNotEmpty()) {
-                    item { SectionLabel("Chats", Modifier.padding(start = 8.dp)) }
+                    item { SectionLabel(stringResource(R.string.search_section_chats), Modifier.padding(start = 8.dp)) }
                     items(titles, key = { "t/" + it.id }) { conv ->
                         ResultRow(conv.title, null, Dates.short(conv.lastActivityAt)) { onOpen(conv.id) }
                     }
                 }
                 if (hits.isNotEmpty()) {
-                    item { SectionLabel("Messages", Modifier.padding(start = 8.dp, top = 12.dp)) }
+                    item { SectionLabel(stringResource(R.string.search_section_messages), Modifier.padding(start = 8.dp, top = 12.dp)) }
                     items(hits, key = { "m/" + it.messageId }) { hit ->
                         ResultRow(hit.title, hit.snippet, Dates.short(hit.createdAt)) { onOpen(hit.conversationId) }
                     }
@@ -98,7 +106,7 @@ private fun ResultRow(title: String, snippet: String?, date: String, onClick: ()
         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 11.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title.ifBlank { "Untitled" }, style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(title.ifBlank { stringResource(R.string.common_untitled) }, style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Spacer(Modifier.width(8.dp))
             Text(date, style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary)
         }
@@ -128,11 +136,16 @@ fun ArchiveScreen(container: AppContainer, onBack: () -> Unit, onOpen: (String) 
     val scope = rememberCoroutineScope()
     var deleteAll by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(c.background)) {
-        FacetTopBar("Archived chats", onNav = onBack, actions = {
-            if (archived.isNotEmpty()) FacetIconButton(R.drawable.ic_delete, "Delete all archived", { deleteAll = true }, tint = c.textSecondary)
+        FacetTopBar(stringResource(R.string.search_archive_title), onNav = onBack, actions = {
+            if (archived.isNotEmpty()) {
+                FacetIconButton(R.drawable.ic_delete, stringResource(R.string.search_archive_delete_all), { deleteAll = true }, tint = c.textSecondary)
+            }
         })
         if (archived.isEmpty()) {
-            EmptyState("Nothing archived", "Archive chats from the chat list to tuck them away without deleting them.", icon = R.drawable.ic_archive, modifier = Modifier.fillMaxWidth())
+            EmptyState(
+                stringResource(R.string.search_archive_empty_title), stringResource(R.string.search_archive_empty_body),
+                icon = R.drawable.ic_archive, modifier = Modifier.fillMaxWidth(),
+            )
         } else {
             LazyColumn(contentPadding = PaddingValues(12.dp)) {
                 items(archived, key = { it.id }) { conv ->
@@ -141,11 +154,11 @@ fun ArchiveScreen(container: AppContainer, onBack: () -> Unit, onOpen: (String) 
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(conv.title.ifBlank { "Untitled" }, style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(conv.title.ifBlank { stringResource(R.string.common_untitled) }, style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(Dates.short(conv.lastActivityAt), style = FacetTheme.type.labelS.copy(fontWeight = FontWeight.Normal), color = c.textTertiary)
                         }
-                        FacetIconButton(R.drawable.ic_unarchive, "Unarchive", { scope.launch { container.conversations.setArchived(conv.id, false) } }, tint = c.textSecondary)
-                        FacetIconButton(R.drawable.ic_delete, "Delete", { scope.launch { container.conversations.delete(conv.id) } }, tint = c.textSecondary)
+                        FacetIconButton(R.drawable.ic_unarchive, stringResource(R.string.search_archive_unarchive), { scope.launch { container.conversations.setArchived(conv.id, false) } }, tint = c.textSecondary)
+                        FacetIconButton(R.drawable.ic_delete, stringResource(R.string.action_delete), { scope.launch { container.conversations.delete(conv.id) } }, tint = c.textSecondary)
                     }
                 }
             }
@@ -153,7 +166,9 @@ fun ArchiveScreen(container: AppContainer, onBack: () -> Unit, onOpen: (String) 
     }
     if (deleteAll) {
         ConfirmDialog(
-            "Delete all archived chats?", "${archived.size} chats will be removed from all your devices.", "Delete all",
+            stringResource(R.string.search_archive_delete_all_title),
+            pluralStringResource(R.plurals.search_archive_delete_all_body, archived.size, archived.size),
+            stringResource(R.string.search_archive_delete_all_confirm),
             onConfirm = { scope.launch { archived.forEach { container.conversations.delete(it.id) } } },
             onDismiss = { deleteAll = false }, danger = true,
         )

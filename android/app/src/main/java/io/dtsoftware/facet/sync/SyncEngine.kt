@@ -5,9 +5,11 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.util.Log
 import androidx.room.withTransaction
+import io.dtsoftware.facet.R
 import io.dtsoftware.facet.core.crypto.DecryptionException
 import io.dtsoftware.facet.core.crypto.FacetCrypto
 import io.dtsoftware.facet.core.crypto.SecretBox
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.AppJson
 import io.dtsoftware.facet.core.util.Clock
 import io.dtsoftware.facet.data.db.FacetDatabase
@@ -117,7 +119,7 @@ class SyncEngine(
                         requestSync(0)
                     }
                     AccountState.Guest -> _state.value = SyncState(SyncPhase.OFF)
-                    is AccountState.Expired -> _state.value = SyncState(SyncPhase.PAUSED, prefs.getLong(K_LAST, 0), "Sign in again to resume sync.")
+                    is AccountState.Expired -> _state.value = SyncState(SyncPhase.PAUSED, prefs.getLong(K_LAST, 0), Strings.get(R.string.sync_status_sign_in_to_resume))
                 }
                 updateStream()
             }
@@ -170,7 +172,7 @@ class SyncEngine(
             }
             val now = Clock.now()
             prefs.edit().putLong(K_LAST, now).apply()
-            _state.value = SyncState(SyncPhase.IDLE, now, if (storageFull) STORAGE_FULL else null, storageFull)
+            _state.value = SyncState(SyncPhase.IDLE, now, if (storageFull) Strings.get(R.string.sync_status_storage_full) else null, storageFull)
             true
         } catch (e: CancellationException) {
             throw e
@@ -181,11 +183,11 @@ class SyncEngine(
             _state.value = SyncState(SyncPhase.ERROR, prefs.getLong(K_LAST, 0), e.message)
             false
         } catch (e: IOException) {
-            _state.value = SyncState(SyncPhase.OFFLINE, prefs.getLong(K_LAST, 0), "Offline. Changes will sync when you're back online.")
+            _state.value = SyncState(SyncPhase.OFFLINE, prefs.getLong(K_LAST, 0), Strings.get(R.string.sync_status_offline))
             false
         } catch (e: Exception) {
             Log.w(TAG, "sync failed", e)
-            _state.value = SyncState(SyncPhase.ERROR, prefs.getLong(K_LAST, 0), "Sync failed. It will retry automatically.")
+            _state.value = SyncState(SyncPhase.ERROR, prefs.getLong(K_LAST, 0), Strings.get(R.string.sync_status_failed))
             false
         }
     }
@@ -731,7 +733,6 @@ class SyncEngine(
         const val K_FREED_AT = "auto_freed_at"
         const val K_FREED_FILES = "auto_freed_files"
         const val K_FREED_BYTES = "auto_freed_bytes"
-        const val STORAGE_FULL = "Your sync storage is full. New changes and files are kept on this device until you free up space in Settings → Data and storage."
         const val EAGER_DOWNLOAD_MAX = 6L * 1024 * 1024
     }
 }

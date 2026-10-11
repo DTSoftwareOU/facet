@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -50,6 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.currentStateAsState
 import io.dtsoftware.facet.AppContainer
 import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.util.Dates
 import io.dtsoftware.facet.core.util.Format
 import io.dtsoftware.facet.ui.components.ButtonStyle
@@ -67,6 +69,7 @@ import io.dtsoftware.facet.update.UpdateManager
 import io.dtsoftware.facet.update.UpdateManifest
 import io.dtsoftware.facet.update.UpdatePhase
 import io.dtsoftware.facet.update.UpdateState
+import java.text.NumberFormat
 
 /** Callbacks shared by the dialog and Settings → About. */
 class UpdateActions(
@@ -166,32 +169,31 @@ fun UpdateCard(state: UpdateState, manifest: UpdateManifest, actions: UpdateActi
         Spacer(Modifier.height(18.dp))
         Text(
             when {
-                phase == UpdatePhase.NeedsPermission -> "Allow Facet to install updates"
-                state.busy -> "Updating to Facet ${manifest.versionName}"
-                else -> "Facet ${manifest.versionName} is available"
+                phase == UpdatePhase.NeedsPermission -> stringResource(R.string.update_allow_install_title)
+                state.busy -> stringResource(R.string.update_updating_to, manifest.versionName)
+                else -> stringResource(R.string.update_available_title, manifest.versionName)
             },
             style = FacetTheme.type.titleL, color = c.text,
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "You have ${state.installedVersionName} · ${Format.bytes(manifest.size)} download",
+            stringResource(R.string.update_installed_and_size, state.installedVersionName, Format.bytes(manifest.size)),
             style = FacetTheme.type.labelM.copy(fontWeight = FontWeight.Normal), color = c.textTertiary,
         )
         Spacer(Modifier.height(18.dp))
         when (phase) {
             is UpdatePhase.Downloading -> ProgressBlock(
                 phase.fraction,
-                "${Format.bytes(phase.bytes)} of ${Format.bytes(phase.total)}",
-                "${(phase.fraction * 100).toInt()}%",
+                stringResource(R.string.update_progress_bytes, Format.bytes(phase.bytes), Format.bytes(phase.total)),
+                percent(phase.fraction),
             )
-            UpdatePhase.Verifying -> ProgressBlock(1f, "Checking the download…", null)
+            UpdatePhase.Verifying -> ProgressBlock(1f, stringResource(R.string.update_verifying), null)
             UpdatePhase.NeedsPermission -> Text(
-                "Android asks once before an app can install updates. On the next screen, turn on " +
-                    "\"Allow from this source\", then come back to Facet.",
+                stringResource(R.string.update_permission_body),
                 style = FacetTheme.type.body, color = c.textSecondary,
             )
             UpdatePhase.Installing -> Text(
-                "Confirm the update in Android's prompt. Facet closes while it installs.",
+                stringResource(R.string.update_installing_body),
                 style = FacetTheme.type.body, color = c.textSecondary,
             )
             else -> ReleaseNotes(manifest)
@@ -199,16 +201,19 @@ fun UpdateCard(state: UpdateState, manifest: UpdateManifest, actions: UpdateActi
         if (!state.busy) state.error?.let { ErrorLine(it.message, Modifier.padding(top = 16.dp)) }
         val buttons: @Composable RowScope.() -> Unit = when (phase) {
             is UpdatePhase.Downloading, UpdatePhase.Verifying -> ({
-                FacetButton("Cancel", actions.cancel, style = ButtonStyle.Text)
+                FacetButton(stringResource(R.string.action_cancel), actions.cancel, style = ButtonStyle.Text)
             })
             UpdatePhase.Installing -> ({})
             UpdatePhase.NeedsPermission -> ({
-                FacetButton("Not now", actions.notNow, style = ButtonStyle.Text)
-                FacetButton("Open settings", actions.openInstallSettings)
+                FacetButton(stringResource(R.string.action_not_now), actions.notNow, style = ButtonStyle.Text)
+                FacetButton(stringResource(R.string.action_open_settings), actions.openInstallSettings)
             })
             else -> ({
-                FacetButton("Not now", actions.notNow, style = ButtonStyle.Text)
-                FacetButton(if (state.error?.isCheck == false) "Try again" else "Update", actions.update, icon = R.drawable.ic_download)
+                FacetButton(stringResource(R.string.action_not_now), actions.notNow, style = ButtonStyle.Text)
+                FacetButton(
+                    stringResource(if (state.error?.isCheck == false) R.string.action_try_again else R.string.update_update),
+                    actions.update, icon = R.drawable.ic_download,
+                )
             })
         }
         if (phase != UpdatePhase.Installing) {
@@ -223,10 +228,10 @@ private fun ReleaseNotes(manifest: UpdateManifest) {
     val c = FacetTheme.colors
     val lines = manifest.noteLines
     if (lines.isEmpty()) {
-        Text("Bug fixes and improvements.", style = FacetTheme.type.body, color = c.textSecondary)
+        Text(stringResource(R.string.update_no_notes), style = FacetTheme.type.body, color = c.textSecondary)
         return
     }
-    Text("What's new", style = FacetTheme.type.labelM, color = c.textTertiary)
+    Text(stringResource(R.string.update_whats_new), style = FacetTheme.type.labelM, color = c.textTertiary)
     Spacer(Modifier.height(8.dp))
     Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         lines.forEach { Bullet(it) }
@@ -254,6 +259,12 @@ private fun ProgressBlock(fraction: Float, label: String, trailing: String?) {
             if (trailing != null) Text(trailing, style = FacetTheme.type.labelM, color = c.textSecondary)
         }
     }
+}
+
+/** A fraction as a whole percentage, rounded down, in the app's language ("42%", "%42", "٤٢٪"). */
+private fun percent(fraction: Float): String {
+    val whole = (fraction.coerceIn(0f, 1f) * 100).toInt()
+    return NumberFormat.getPercentInstance(Strings.locale).apply { maximumFractionDigits = 0 }.format(whole / 100.0)
 }
 
 @Composable
@@ -300,18 +311,18 @@ fun UpdateSection(container: AppContainer) {
 @Composable
 fun UpdateGroup(state: UpdateState, autoCheck: Boolean, actions: UpdateActions, onCheck: () -> Unit, onAutoCheck: (Boolean) -> Unit) {
     val idle = state.phase == UpdatePhase.Idle
-    SettingsGroup(title = "Updates") {
+    SettingsGroup(title = stringResource(R.string.update_section_title)) {
         UpdateStatus(state, actions)
         GroupDivider()
         SettingsRow(
-            "Check for updates", icon = R.drawable.ic_regenerate, showChevron = false,
+            stringResource(R.string.update_check), icon = R.drawable.ic_regenerate, showChevron = false,
             titleColor = if (idle) FacetTheme.colors.text else FacetTheme.colors.textTertiary,
             onClick = if (idle) onCheck else null,
         )
         GroupDivider()
         SwitchRow(
-            "Check for updates automatically", autoCheck, onAutoCheck,
-            subtitle = "Asks facet.dtsoftware.io for the latest version when Facet opens and every few hours. No personal data is sent.",
+            stringResource(R.string.update_auto_check), autoCheck, onAutoCheck,
+            subtitle = stringResource(R.string.update_auto_check_subtitle),
             icon = R.drawable.ic_timer,
         )
     }
@@ -322,31 +333,38 @@ private fun UpdateStatus(state: UpdateState, actions: UpdateActions) {
     val c = FacetTheme.colors
     val m = state.available
     val phase = state.phase
-    val installed = "Version ${state.installedVersionName}"
+    val installed = stringResource(R.string.update_version, state.installedVersionName)
     when {
         phase is UpdatePhase.Downloading && m != null -> Column(Modifier.padding(bottom = 14.dp)) {
             StatusRow(
-                "Downloading version ${m.versionName}", "${Format.bytes(phase.bytes)} of ${Format.bytes(phase.total)}",
+                stringResource(R.string.update_downloading_version, m.versionName),
+                stringResource(R.string.update_progress_bytes, Format.bytes(phase.bytes), Format.bytes(phase.total)),
                 icon = R.drawable.ic_download, iconTint = c.primary,
-                trailing = { FacetButton("Cancel", actions.cancel, style = ButtonStyle.Text) },
+                trailing = { FacetButton(stringResource(R.string.action_cancel), actions.cancel, style = ButtonStyle.Text) },
             )
             ProgressTrack(phase.fraction, Modifier.padding(start = 53.dp, end = 16.dp))
         }
-        phase == UpdatePhase.Verifying && m != null -> StatusRow("Checking the download…", "Version ${m.versionName}", spinner = true)
-        phase == UpdatePhase.NeedsPermission -> StatusRow(
-            "Allow Facet to install updates", "Turn on \"Allow from this source\" for Facet, then come back.",
-            icon = R.drawable.ic_shield, iconTint = c.warning,
-            trailing = { FacetButton("Open settings", actions.openInstallSettings, style = ButtonStyle.Tonal) },
+        phase == UpdatePhase.Verifying && m != null -> StatusRow(
+            stringResource(R.string.update_verifying), stringResource(R.string.update_version, m.versionName), spinner = true,
         )
-        phase == UpdatePhase.Installing && m != null -> StatusRow("Installing version ${m.versionName}", "Confirm the update in Android's prompt.", spinner = true)
-        phase == UpdatePhase.Checking -> StatusRow("Checking for updates…", installed, spinner = true)
+        phase == UpdatePhase.NeedsPermission -> StatusRow(
+            stringResource(R.string.update_allow_install_title), stringResource(R.string.update_permission_short),
+            icon = R.drawable.ic_shield, iconTint = c.warning,
+            trailing = { FacetButton(stringResource(R.string.action_open_settings), actions.openInstallSettings, style = ButtonStyle.Tonal) },
+        )
+        phase == UpdatePhase.Installing && m != null -> StatusRow(
+            stringResource(R.string.update_installing_version, m.versionName), stringResource(R.string.update_confirm_prompt), spinner = true,
+        )
+        phase == UpdatePhase.Checking -> StatusRow(stringResource(R.string.update_checking), installed, spinner = true)
         m != null -> Column(Modifier.padding(bottom = 14.dp)) {
             StatusRow(
-                "Version ${m.versionName} is available",
-                state.error?.message ?: "${Format.bytes(m.size)} · You have ${state.installedVersionName}",
+                stringResource(R.string.update_version_available, m.versionName),
+                state.error?.message ?: (Format.bytes(m.size) + " · " + stringResource(R.string.update_you_have, state.installedVersionName)),
                 subtitleColor = if (state.error != null) c.error else c.textSecondary,
                 icon = R.drawable.ic_download, iconTint = c.primary,
-                trailing = { FacetButton(if (state.error?.isCheck == false) "Try again" else "Update", actions.update) },
+                trailing = {
+                    FacetButton(stringResource(if (state.error?.isCheck == false) R.string.action_try_again else R.string.update_update), actions.update)
+                },
             )
             val notes = m.noteLines
             if (notes.isNotEmpty()) {
@@ -363,10 +381,14 @@ private fun UpdateStatus(state: UpdateState, actions: UpdateActions) {
         }
         state.error != null -> StatusRow(installed, state.error.message, subtitleColor = c.error, icon = R.drawable.ic_alert, iconTint = c.error)
         state.lastCheckedAt > 0 -> StatusRow(
-            "Facet is up to date", "$installed · Checked ${Dates.relative(state.lastCheckedAt).replaceFirstChar { it.lowercase() }}",
+            stringResource(R.string.update_up_to_date),
+            installed + " · " + (
+                if (Dates.justNow(state.lastCheckedAt)) stringResource(R.string.update_checked_just_now)
+                else stringResource(R.string.update_checked, Dates.relative(state.lastCheckedAt))
+            ),
             icon = R.drawable.ic_circle_check, iconTint = c.success,
         )
-        else -> StatusRow(installed, "Not checked yet", icon = R.drawable.ic_info)
+        else -> StatusRow(installed, stringResource(R.string.update_not_checked), icon = R.drawable.ic_info)
     }
 }
 
@@ -408,4 +430,5 @@ private fun StatusRow(
 
 /** The Settings list's "About Facet AI" subtitle: the version, or the update waiting. */
 fun aboutSubtitle(state: UpdateState): String =
-    state.available?.takeIf { state.enabled }?.let { "Version ${it.versionName} is available" } ?: "Version ${state.installedVersionName}"
+    state.available?.takeIf { state.enabled }?.let { Strings.get(R.string.update_version_available, it.versionName) }
+        ?: Strings.get(R.string.update_version, state.installedVersionName)

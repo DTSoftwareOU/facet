@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -35,8 +36,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -45,8 +48,10 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -93,24 +98,58 @@ fun Markdown(
         MdEnv(base, codeStyle, colors, density, onCopyCode)
     }.also { it.onCopyCode = onCopyCode }
 
-    Column(modifier) {
-        blocks.forEachIndexed { i, kb ->
-            key(kb.key) {
-                val top = if (i == 0) 0.dp else spacingBefore(blocks[i - 1].block, kb.block, nested = false)
-                RenderBlock(
-                    block = kb.block,
-                    env = env,
-                    color = env.base.color,
-                    modifier = if (top > 0.dp) Modifier.padding(top = top) else Modifier,
-                    cursor = streaming && i == blocks.lastIndex,
-                    depth = 0,
-                )
+    // Each text lays out in its own direction, like dir="auto" on the web: an English reply in an
+    // Arabic interface reads left to right (bullets, quotes and table columns too), and vice versa.
+    val direction = remember(text) { contentDirection(text) } ?: LocalLayoutDirection.current
+    CompositionLocalProvider(LocalLayoutDirection provides direction) {
+        Column(modifier) {
+            blocks.forEachIndexed { i, kb ->
+                key(kb.key) {
+                    val top = if (i == 0) 0.dp else spacingBefore(blocks[i - 1].block, kb.block, nested = false)
+                    RenderBlock(
+                        block = kb.block,
+                        env = env,
+                        color = env.base.color,
+                        modifier = if (top > 0.dp) Modifier.padding(top = top) else Modifier,
+                        cursor = streaming && i == blocks.lastIndex,
+                        depth = 0,
+                    )
+                }
+            }
+            if (streaming && blocks.isEmpty()) {
+                Box(Modifier.height(env.lineHeight), contentAlignment = Alignment.CenterStart) { StreamingCursor() }
             }
         }
-        if (streaming && blocks.isEmpty()) {
-            Box(Modifier.height(env.lineHeight), contentAlignment = Alignment.CenterStart) { StreamingCursor() }
+    }
+}
+
+/**
+ * The direction of the first letter of [text] outside code (Unicode's first-strong rule), or null
+ * when there's no letter yet (the surrounding layout direction applies).
+ */
+internal fun contentDirection(text: String): LayoutDirection? {
+    var fenced = false
+    for (line in text.lineSequence()) {
+        val t = line.trimStart()
+        if (t.startsWith("```") || t.startsWith("~~~")) {
+            fenced = !fenced
+            continue
+        }
+        if (fenced) continue
+        var code = false
+        for (ch in line) {
+            if (ch == '`') {
+                code = !code
+                continue
+            }
+            if (code) continue
+            when (Character.getDirectionality(ch)) {
+                Character.DIRECTIONALITY_RIGHT_TO_LEFT, Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC -> return LayoutDirection.Rtl
+                Character.DIRECTIONALITY_LEFT_TO_RIGHT -> return LayoutDirection.Ltr
+            }
         }
     }
+    return null
 }
 
 /** Resolved rendering inputs shared by all blocks of one document. */
@@ -260,7 +299,7 @@ private fun inlineContentFor(
                     InlineTextContent(Placeholder(w, fontSize, PlaceholderVerticalAlign.TextCenter)) {}
                 }
                 rendered.failed -> {
-                    val codeStyle = env.code.copy(fontSize = fontSize * 0.88f, color = env.colors.text)
+                    val codeStyle = env.code.copy(fontSize = fontSize * 0.88f, color = env.colors.text, textDirection = TextDirection.Ltr)
                     val measured = measurer.measure(AnnotatedString(m.latex), codeStyle, softWrap = false)
                     val w = with(density) { (measured.size.width + 8.dp.toPx()).toSp() }
                     val h = with(density) { (measured.size.height + 2.dp.toPx()).toSp() }
@@ -310,7 +349,7 @@ internal fun MathBlockView(latex: String, env: MdEnv, color: Color) {
             rendered == null -> Spacer(Modifier.height(with(density) { (sizePx * 1.8f).toDp() }))
             rendered.failed -> Text(
                 text = latex,
-                style = env.code.copy(color = env.colors.textSecondary),
+                style = env.code.copy(color = env.colors.textSecondary, textDirection = TextDirection.Ltr),
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .background(env.colors.inlineCodeBackground)
@@ -328,8 +367,10 @@ private fun QuoteView(block: MdBlock.Quote, env: MdEnv, cursor: Boolean, modifie
         modifier
             .fillMaxWidth()
             .drawBehind {
+                // The bar sits on the start side: the left, or the right in RTL languages.
                 val w = 3.dp.toPx()
-                drawRoundRect(bar, Offset.Zero, Size(w, size.height), CornerRadius(w / 2, w / 2))
+                val x = if (layoutDirection == LayoutDirection.Rtl) size.width - w else 0f
+                drawRoundRect(bar, Offset(x, 0f), Size(w, size.height), CornerRadius(w / 2, w / 2))
             }
             .padding(start = 15.dp, top = 2.dp, bottom = 2.dp),
     ) {
@@ -408,7 +449,7 @@ private fun TaskBox(checked: Boolean, env: MdEnv) {
         ) {
             Icon(
                 painter = painterResource(R.drawable.ic_check),
-                contentDescription = "Done",
+                contentDescription = stringResource(R.string.markdown_task_done),
                 tint = env.colors.onPrimary,
                 modifier = Modifier.size(13.dp),
             )

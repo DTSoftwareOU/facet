@@ -1,5 +1,7 @@
 package io.dtsoftware.facet.mcp
 
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import io.dtsoftware.facet.core.net.await
 import io.dtsoftware.facet.core.net.toJsonBody
 import java.io.IOException
@@ -54,7 +56,7 @@ object McpOAuth {
     ): McpPendingAuth {
         val d = discover(serverUrl, wwwAuthenticate, http)
         if (d.codeChallengeMethods != null && "S256" !in d.codeChallengeMethods) {
-            throw McpException("This server's sign-in doesn't support PKCE (S256), so Facet can't sign in safely.")
+            throw McpException(Strings.get(R.string.mcp_oauth_no_pkce))
         }
         val reuse = previous != null && previous.clientId.isNotBlank() &&
             previous.authorizationEndpoint == d.authorizationEndpoint &&
@@ -68,7 +70,7 @@ object McpOAuth {
         val verifier = Mcp.randomUrlSafe(48)
         val state = Mcp.randomUrlSafe(24)
         val authUrl = d.authorizationEndpoint.toHttpUrlOrNull()
-            ?: throw McpException("This server advertised an invalid sign-in address.")
+            ?: throw McpException(Strings.get(R.string.mcp_oauth_invalid_address))
         val url = authUrl.newBuilder()
             .addQueryParameter("response_type", "code")
             .addQueryParameter("client_id", clientId)
@@ -112,7 +114,7 @@ object McpOAuth {
         val res = try {
             tokenRequest(o, form, http)
         } catch (e: OAuthErrorException) {
-            throw McpException("Sign-in didn't complete: ${e.message}", e.status)
+            throw McpException(Strings.get(R.string.mcp_oauth_incomplete, e.message.orEmpty()), e.status)
         }
         return applyTokens(o, res, keepRefresh = null)
     }
@@ -130,7 +132,7 @@ object McpOAuth {
     }
 
     private fun applyTokens(state: McpOAuthState, res: JsonObject, keepRefresh: String?): McpOAuthState {
-        val access = res.str("access_token") ?: throw McpException("The sign-in server didn't return an access token.")
+        val access = res.str("access_token") ?: throw McpException(Strings.get(R.string.mcp_oauth_no_token))
         val expiresIn = (res["expires_in"] as? JsonPrimitive)?.let { it.longOrNull ?: it.contentOrNull?.toLongOrNull() }
         return state.copy(
             accessToken = access,
@@ -143,7 +145,7 @@ object McpOAuth {
     // ---- discovery ----
 
     internal suspend fun discover(serverUrl: String, wwwAuthenticate: String?, http: OkHttpClient): OAuthDiscovery {
-        val server = serverUrl.trim().toHttpUrlOrNull() ?: throw McpException("That server address isn't a valid URL.")
+        val server = serverUrl.trim().toHttpUrlOrNull() ?: throw McpException(Strings.get(R.string.mcp_oauth_invalid_url))
         val challenge = parseBearerChallenge(wwwAuthenticate)
 
         var prm: JsonObject? = challenge["resource_metadata"]?.let { getJson(it, http) }
@@ -185,10 +187,7 @@ object McpOAuth {
 
     private suspend fun register(d: OAuthDiscovery, redirectUri: String, clientName: String, http: OkHttpClient): Pair<String, String?> {
         val endpoint = d.registrationEndpoint
-            ?: throw McpException(
-                "This server requires an app that was registered in advance, and it doesn't allow automatic registration. " +
-                    "Facet can't sign in to it yet; use a server that supports dynamic client registration, or connect with an access token in headers.",
-            )
+            ?: throw McpException(Strings.get(R.string.mcp_oauth_registration_required))
         val body = buildJsonObject {
             put("client_name", clientName)
             putJsonArray("redirect_uris") { add(redirectUri) }
@@ -204,15 +203,15 @@ object McpOAuth {
         val response = try {
             http.newCall(request).await()
         } catch (e: IOException) {
-            throw McpException("Couldn't reach the server's sign-in service.", cause = e)
+            throw McpException(Strings.get(R.string.mcp_oauth_unreachable), cause = e)
         }
         val text = response.use { withContext(Dispatchers.IO) { it.body.string() } }
         val json = runCatching { Mcp.json.parseToJsonElement(text) as? JsonObject }.getOrNull()
         if (!response.isSuccessful) {
             val reason = json?.str("error_description") ?: json?.str("error") ?: "HTTP ${response.code}"
-            throw McpException("The server didn't accept Facet's sign-in registration: $reason", response.code)
+            throw McpException(Strings.get(R.string.mcp_oauth_registration_refused, reason), response.code)
         }
-        val clientId = json?.str("client_id") ?: throw McpException("The server's sign-in registration didn't return a client id.")
+        val clientId = json?.str("client_id") ?: throw McpException(Strings.get(R.string.mcp_oauth_no_client_id))
         return clientId to json.str("client_secret")
     }
 
@@ -244,7 +243,7 @@ object McpOAuth {
         val response = try {
             http.newCall(request).await()
         } catch (e: IOException) {
-            throw McpException("Couldn't reach the server's sign-in service.", cause = e)
+            throw McpException(Strings.get(R.string.mcp_oauth_unreachable), cause = e)
         }
         val text = response.use { withContext(Dispatchers.IO) { it.body.string() } }
         val json = runCatching { Mcp.json.parseToJsonElement(text) as? JsonObject }.getOrNull()

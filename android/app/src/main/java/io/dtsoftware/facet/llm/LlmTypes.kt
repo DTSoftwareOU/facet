@@ -1,5 +1,8 @@
 package io.dtsoftware.facet.llm
 
+import androidx.annotation.StringRes
+import io.dtsoftware.facet.R
+import io.dtsoftware.facet.core.i18n.Strings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 
@@ -24,19 +27,25 @@ data class ProviderConfig(
 
 /** Reasoning effort levels across providers. Not every model supports every level. */
 @Serializable
-enum class Effort(val wire: String, val label: String) {
-    NONE("none", "Off"),
-    MINIMAL("minimal", "Minimal"),
-    LOW("low", "Low"),
-    MEDIUM("medium", "Medium"),
-    HIGH("high", "High"),
-    XHIGH("xhigh", "Extra high"),
-    MAX("max", "Max"),
+enum class Effort(val wire: String, @StringRes val labelRes: Int) {
+    NONE("none", R.string.llm_effort_off),
+    MINIMAL("minimal", R.string.llm_effort_minimal),
+    LOW("low", R.string.llm_effort_low),
+    MEDIUM("medium", R.string.llm_effort_medium),
+    HIGH("high", R.string.llm_effort_high),
+    XHIGH("xhigh", R.string.llm_effort_xhigh),
+    MAX("max", R.string.llm_effort_max);
+
+    /** The level's name in the app's language. */
+    val label: String get() = Strings.get(labelRes)
 }
 
 @Serializable
-enum class Verbosity(val wire: String, val label: String) {
-    LOW("low", "Concise"), MEDIUM("medium", "Balanced"), HIGH("high", "Detailed")
+enum class Verbosity(val wire: String, @StringRes val labelRes: Int) {
+    LOW("low", R.string.llm_verbosity_concise), MEDIUM("medium", R.string.llm_verbosity_balanced), HIGH("high", R.string.llm_verbosity_detailed);
+
+    /** The level's name in the app's language. */
+    val label: String get() = Strings.get(labelRes)
 }
 
 /** How a model exposes reasoning control. */
@@ -90,15 +99,21 @@ data class ModelPricing(
     val cacheWrite: Double? = null,
 )
 
-/** What a model produces. Chat pickers list TEXT models; the others are media models chosen in Settings. */
+/**
+ * What a model produces. Chat pickers list TEXT models; the others are media models chosen in Settings.
+ * [label] is interface text; [noun] and [what] are English words for file names and model-facing text.
+ */
 @Serializable
-enum class ModelOutput(val label: String, val noun: String, val what: String) {
-    TEXT("Chat", "chat", "chat"),
-    IMAGE("Images", "image", "images"),
-    VIDEO("Video", "video", "video"),
-    SPEECH("Speech", "speech", "speech"),
-    MUSIC("Music & sound", "music", "music"),
-    TRANSCRIPTION("Transcription", "transcription", "transcripts"),
+enum class ModelOutput(@StringRes val labelRes: Int, val noun: String, val what: String) {
+    TEXT(R.string.llm_output_chat, "chat", "chat"),
+    IMAGE(R.string.llm_output_images, "image", "images"),
+    VIDEO(R.string.llm_output_video, "video", "video"),
+    SPEECH(R.string.llm_output_speech, "speech", "speech"),
+    MUSIC(R.string.llm_output_music, "music", "music"),
+    TRANSCRIPTION(R.string.llm_output_transcription, "transcription", "transcripts");
+
+    /** The kind's name in the app's language, e.g. "Images". */
+    val label: String get() = Strings.get(labelRes)
 }
 
 @Serializable

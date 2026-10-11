@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -63,22 +64,22 @@ import kotlinx.coroutines.launch
 fun AssistantsScreen(container: AppContainer, onBack: () -> Unit, onEdit: (String?) -> Unit) {
     val assistants by container.assistants.observeAll().collectAsStateWithLifecycle(emptyList())
     val c = FacetTheme.colors
-    SettingsPage("Assistants", onBack) {
+    SettingsPage(stringResource(R.string.library_assistants_title), onBack) {
         Text(
-            "Assistants are reusable personas: instructions, a default model and conversation starters. Pick one when you start a chat.",
+            stringResource(R.string.library_assistants_intro),
             style = FacetTheme.type.body, color = c.textSecondary, modifier = Modifier.padding(horizontal = 4.dp),
         )
-        FacetButton("Create an assistant", { onEdit(null) }, icon = R.drawable.ic_plus, modifier = Modifier.fillMaxWidth())
+        FacetButton(stringResource(R.string.library_assistant_create), { onEdit(null) }, icon = R.drawable.ic_plus, modifier = Modifier.fillMaxWidth())
         val custom = assistants.filterNot { it.builtin }
         if (custom.isNotEmpty()) {
-            SettingsGroup(title = "Yours") {
+            SettingsGroup(title = stringResource(R.string.library_assistants_yours)) {
                 custom.forEachIndexed { i, a ->
                     if (i > 0) GroupDivider()
                     AssistantRow(a) { onEdit(a.id) }
                 }
             }
         }
-        SettingsGroup(title = "Built in") {
+        SettingsGroup(title = stringResource(R.string.library_assistants_builtin)) {
             assistants.filter { it.builtin }.forEachIndexed { i, a ->
                 if (i > 0) GroupDivider()
                 AssistantRow(a, null)
@@ -91,7 +92,7 @@ fun AssistantsScreen(container: AppContainer, onBack: () -> Unit, onEdit: (Strin
 private fun AssistantRow(a: Assistant, onClick: (() -> Unit)?) {
     SettingsRow(
         a.name,
-        subtitle = a.instructions.lineSequence().firstOrNull()?.take(90)?.ifBlank { null } ?: "General-purpose assistant",
+        subtitle = a.instructions.lineSequence().firstOrNull()?.take(90)?.ifBlank { null } ?: stringResource(R.string.library_assistant_general),
         leading = { AssistantAvatar(a, size = 36.dp) },
         onClick = onClick,
     )
@@ -128,9 +129,10 @@ fun AssistantEditScreen(container: AppContainer, assistantId: String?, onDone: (
         loaded = true
     }
 
-    SettingsPage(if (assistantId == null) "New assistant" else "Edit assistant", onDone) {
+    SettingsPage(stringResource(if (assistantId == null) R.string.library_assistant_new else R.string.library_assistant_edit), onDone) {
         if (!loaded) return@SettingsPage
-        val preview = Assistant("preview", name.ifBlank { "Assistant" }, emoji, null, color, instructions, model, null, emptyList(), false)
+        val defaultName = stringResource(R.string.library_assistant_default_name)
+        val preview = Assistant("preview", name.ifBlank { defaultName }, emoji, null, color, instructions, model, null, emptyList(), false)
         Row(verticalAlignment = Alignment.CenterVertically) {
             AssistantAvatar(preview, size = 64.dp)
             Spacer(Modifier.width(16.dp))
@@ -151,37 +153,38 @@ fun AssistantEditScreen(container: AppContainer, assistantId: String?, onDone: (
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             EmojiChoices.drop(8).forEach { e -> EmojiCell(e, e == emoji) { emoji = e } }
         }
-        FacetTextField(name, { name = it }, label = "Name", placeholder = "e.g. Travel planner")
+        FacetTextField(name, { name = it }, label = stringResource(R.string.common_name), placeholder = stringResource(R.string.library_assistant_name_placeholder))
         FacetTextField(
-            instructions, { instructions = it }, label = "Instructions",
-            placeholder = "Describe the role, tone, and anything it should always or never do.",
+            instructions, { instructions = it }, label = stringResource(R.string.library_assistant_instructions),
+            placeholder = stringResource(R.string.library_assistant_instructions_placeholder),
             singleLine = false, minLines = 5, maxLines = 14,
         )
-        SettingsGroup(title = "Default model") {
+        SettingsGroup(title = stringResource(R.string.library_assistant_default_model)) {
             val label = model?.let { ref ->
                 val pm = catalog.firstOrNull { it.provider.id == ref.providerId }
                 (pm?.models?.firstOrNull { it.id == ref.modelId }?.displayName ?: ref.modelId) + (pm?.let { " · " + it.provider.label } ?: "")
-            } ?: "Use the chat's current model"
+            } ?: stringResource(R.string.library_assistant_current_model)
+            val clearLabel = stringResource(R.string.library_assistant_clear_model)
             SettingsRow(label, icon = R.drawable.ic_cpu, onClick = { picker = true }, trailing = if (model != null) {
-                { FacetIconButton(R.drawable.ic_close, "Clear", { model = null }, tint = c.textTertiary, size = 16.dp) }
+                { FacetIconButton(R.drawable.ic_close, clearLabel, { model = null }, tint = c.textTertiary, size = 16.dp) }
             } else null)
         }
         Column {
-            Text("Conversation starters", style = FacetTheme.type.labelM, color = c.textTertiary, modifier = Modifier.padding(start = 12.dp, bottom = 8.dp))
+            Text(stringResource(R.string.library_assistant_starters), style = FacetTheme.type.labelM, color = c.textTertiary, modifier = Modifier.padding(start = 12.dp, bottom = 8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 starters.forEachIndexed { i, s ->
-                    FacetTextField(s, { starters[i] = it }, placeholder = "Starter ${i + 1}")
+                    FacetTextField(s, { starters[i] = it }, placeholder = stringResource(R.string.library_assistant_starter, i + 1))
                 }
             }
             if (starters.size < 6) {
                 Text(
-                    "Add another", style = FacetTheme.type.labelM, color = c.primary,
+                    stringResource(R.string.library_assistant_add_starter), style = FacetTheme.type.labelM, color = c.primary,
                     modifier = Modifier.padding(top = 6.dp).clip(FacetShapes.small).clickable { starters.add("") }.padding(8.dp),
                 )
             }
         }
         FacetButton(
-            "Save assistant",
+            stringResource(R.string.library_assistant_save),
             {
                 scope.launch {
                     container.assistants.save(assistantId, name, emoji, color, instructions, model, null, starters.toList())
@@ -192,7 +195,7 @@ fun AssistantEditScreen(container: AppContainer, assistantId: String?, onDone: (
             modifier = Modifier.fillMaxWidth(),
         )
         if (assistantId != null) {
-            FacetButton("Delete assistant", { confirmDelete = true }, style = ButtonStyle.Danger, modifier = Modifier.fillMaxWidth())
+            FacetButton(stringResource(R.string.library_assistant_delete), { confirmDelete = true }, style = ButtonStyle.Danger, modifier = Modifier.fillMaxWidth())
         }
     }
     if (picker) {
@@ -207,7 +210,7 @@ fun AssistantEditScreen(container: AppContainer, assistantId: String?, onDone: (
     }
     if (confirmDelete && assistantId != null) {
         ConfirmDialog(
-            "Delete this assistant?", "Existing chats keep working with their instructions removed.", "Delete",
+            stringResource(R.string.library_assistant_delete_title), stringResource(R.string.library_assistant_delete_body), stringResource(R.string.action_delete),
             onConfirm = { scope.launch { container.assistants.delete(assistantId); onDone() } },
             onDismiss = { confirmDelete = false }, danger = true,
         )
@@ -235,14 +238,17 @@ fun PromptsScreen(container: AppContainer, onBack: () -> Unit) {
     var editing by remember { mutableStateOf<PromptEntity?>(null) }
     var creating by remember { mutableStateOf(false) }
     val c = FacetTheme.colors
-    SettingsPage("Prompt library", onBack) {
+    SettingsPage(stringResource(R.string.library_prompts_title), onBack) {
         Text(
-            "Save prompts you use often. In any chat, type / to search and insert one.",
+            stringResource(R.string.library_prompts_intro),
             style = FacetTheme.type.body, color = c.textSecondary, modifier = Modifier.padding(horizontal = 4.dp),
         )
-        FacetButton("New prompt", { creating = true }, icon = R.drawable.ic_plus, modifier = Modifier.fillMaxWidth())
+        FacetButton(stringResource(R.string.library_prompt_new), { creating = true }, icon = R.drawable.ic_plus, modifier = Modifier.fillMaxWidth())
         if (prompts.isEmpty()) {
-            EmptyState("No saved prompts", "Try one like “Summarize this in five bullet points”.", icon = R.drawable.ic_library, modifier = Modifier.fillMaxWidth())
+            EmptyState(
+                stringResource(R.string.library_prompts_empty_title), stringResource(R.string.library_prompts_empty_body),
+                icon = R.drawable.ic_library, modifier = Modifier.fillMaxWidth(),
+            )
         } else {
             SettingsGroup {
                 prompts.forEachIndexed { i, p ->
@@ -271,15 +277,27 @@ private fun PromptSheet(container: AppContainer, prompt: PromptEntity?, onDismis
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding().imePadding().padding(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(if (prompt == null) "New prompt" else "Edit prompt", style = FacetTheme.type.titleL, color = FacetTheme.colors.text)
-            FacetTextField(title, { title = it }, label = "Title", placeholder = "e.g. Five-bullet summary")
-            FacetTextField(body, { body = it }, label = "Prompt", placeholder = "Summarize the following in five bullet points:", singleLine = false, minLines = 4, maxLines = 12)
+            Text(
+                stringResource(if (prompt == null) R.string.library_prompt_new else R.string.library_prompt_edit),
+                style = FacetTheme.type.titleL, color = FacetTheme.colors.text,
+            )
+            FacetTextField(
+                title, { title = it }, label = stringResource(R.string.library_prompt_title),
+                placeholder = stringResource(R.string.library_prompt_title_placeholder),
+            )
+            FacetTextField(
+                body, { body = it }, label = stringResource(R.string.library_prompt_body),
+                placeholder = stringResource(R.string.library_prompt_body_placeholder), singleLine = false, minLines = 4, maxLines = 12,
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (prompt != null) {
-                    FacetButton("Delete", { scope.launch { container.prompts.delete(prompt.id); onDismiss() } }, style = ButtonStyle.Danger, modifier = Modifier.weight(1f))
+                    FacetButton(
+                        stringResource(R.string.action_delete), { scope.launch { container.prompts.delete(prompt.id); onDismiss() } },
+                        style = ButtonStyle.Danger, modifier = Modifier.weight(1f),
+                    )
                 }
                 FacetButton(
-                    "Save", { scope.launch { container.prompts.save(prompt?.id, title, body); onDismiss() } },
+                    stringResource(R.string.action_save), { scope.launch { container.prompts.save(prompt?.id, title, body); onDismiss() } },
                     enabled = body.isNotBlank(), modifier = Modifier.weight(1f),
                 )
             }
