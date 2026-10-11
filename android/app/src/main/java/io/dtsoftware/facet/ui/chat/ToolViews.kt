@@ -39,7 +39,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import io.dtsoftware.facet.ui.theme.JetBrainsMono
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -86,6 +91,7 @@ private fun iconFor(kind: ToolKind) = when (kind) {
     ToolKind.SKILL -> R.drawable.ic_wand
     ToolKind.MCP -> R.drawable.ic_server
     ToolKind.MEDIA -> R.drawable.ic_sparkles
+    ToolKind.COMPUTER -> R.drawable.ic_monitor
 }
 
 @Composable
@@ -130,11 +136,15 @@ private fun ToolRow(a: ToolActivity) {
             }
             Spacer(Modifier.width(8.dp))
             Text(
-                a.label + when (a.status) {
-                    ToolStatus.DENIED -> " · declined"
-                    ToolStatus.ERROR -> " · failed"
-                    else -> ""
-                },
+                toolLabel(
+                    when {
+                        a.status == ToolStatus.DENIED && a.label.startsWith("Running ") -> "Didn't run " + a.label.removePrefix("Running ")
+                        a.status == ToolStatus.DENIED -> a.label + " · declined"
+                        a.status == ToolStatus.ERROR -> a.label + " · failed"
+                        else -> a.label
+                    },
+                    c.surfaceHigh,
+                ),
                 style = FacetTheme.type.labelM,
                 color = if (a.status == ToolStatus.ERROR || a.status == ToolStatus.DENIED) c.textSecondary else c.textSecondary,
                 maxLines = 1,
@@ -202,22 +212,29 @@ private fun ApprovalCard(a: ToolActivity, onApproval: (String, ApprovalDecision)
             .border(1.dp, c.primary.copy(alpha = 0.5f), FacetShapes.group)
             .padding(14.dp),
     ) {
+        // PC tools say what will happen in words, with the exact command or edit.
+        val pcSummary = if (a.kind == ToolKind.COMPUTER) io.dtsoftware.facet.domain.tools.PcTools.approvalSummary(a.remoteName ?: a.name, a.argumentsJson, a.serverName) else null
         Row(verticalAlignment = Alignment.CenterVertically) {
-            FacetIcon(R.drawable.ic_shield, null, tint = c.primary, size = 18.dp)
+            FacetIcon(if (a.kind == ToolKind.COMPUTER) R.drawable.ic_monitor else R.drawable.ic_shield, null, tint = c.primary, size = 18.dp)
             Spacer(Modifier.width(10.dp))
             Text(
-                if (a.kind == ToolKind.MEDIA) "Create this video? Clips can cost a few dollars each."
-                else "Allow ${a.serverName ?: "this tool"} to run ${a.label.substringAfter(": ")}?",
+                when {
+                    a.kind == ToolKind.MEDIA -> "Create this video? Clips can cost a few dollars each."
+                    pcSummary != null -> pcSummary.first
+                    else -> "Allow ${a.serverName ?: "this tool"} to run ${a.label.substringAfter(": ")}?"
+                },
                 style = FacetTheme.type.labelL, color = c.text,
             )
         }
-        if (a.argumentsJson.length > 2) {
+        val detail = if (pcSummary != null) pcSummary.second?.takeIf { it.isNotBlank() } ?: prettyJson(a.argumentsJson).takeIf { a.argumentsJson.length > 2 }
+        else prettyJson(a.argumentsJson).takeIf { a.argumentsJson.length > 2 }
+        if (detail != null) {
             Spacer(Modifier.height(10.dp))
             Text(
-                prettyJson(a.argumentsJson),
+                detail,
                 style = FacetTheme.type.code.copy(fontSize = 12.sp, lineHeight = 18.sp),
                 color = c.syntax.plain,
-                maxLines = 10,
+                maxLines = if (pcSummary != null) 16 else 10,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth().clip(FacetShapes.small).background(c.codeBackground).padding(10.dp),
             )
@@ -228,7 +245,7 @@ private fun ApprovalCard(a: ToolActivity, onApproval: (String, ApprovalDecision)
             FacetButton("Allow", { onApproval(a.id, ApprovalDecision.ALLOW) }, modifier = Modifier.weight(1f))
         }
         if (a.kind != ToolKind.MEDIA) Text(
-            "Always allow this tool",
+            if (a.kind == ToolKind.COMPUTER) "Allow for this chat" else "Always allow this tool",
             style = FacetTheme.type.labelM, color = c.primary,
             modifier = Modifier.padding(top = 6.dp).clip(FacetShapes.small).clickable { onApproval(a.id, ApprovalDecision.ALWAYS) }.padding(6.dp),
         )
@@ -239,3 +256,19 @@ private fun prettyJson(raw: String): String = runCatching {
     val el = AppJson.parseToJsonElement(raw)
     kotlinx.serialization.json.Json { prettyPrint = true }.encodeToString(kotlinx.serialization.json.JsonElement.serializer(), el)
 }.getOrDefault(raw)
+
+/** Tool labels mark commands and names with backticks ("Ran `npm test`"): show those parts as code. */
+private fun toolLabel(label: String, codeBackground: androidx.compose.ui.graphics.Color): AnnotatedString {
+    val parts = label.split('`')
+    if (parts.size < 3) return AnnotatedString(label)
+    return buildAnnotatedString {
+        parts.forEachIndexed { i, part ->
+            // An odd part sits between a pair of backticks; an unpaired last one stays plain text.
+            if (i % 2 == 1 && i < parts.size - 1) {
+                withStyle(SpanStyle(fontFamily = JetBrainsMono, background = codeBackground)) { append(part) }
+            } else {
+                append(if (i % 2 == 1) "`$part" else part)
+            }
+        }
+    }
+}

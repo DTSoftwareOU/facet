@@ -51,6 +51,7 @@ class AppContainer(private val app: Application) {
 
     val quirks = PrefsQuirkStore(app)
     val pricing = PricingCatalog(File(app.cacheDir, "pricing.json"), http)
+    val updates = io.dtsoftware.facet.update.UpdateManager.create(app, http, settings, scope)
 
     private lateinit var syncRef: SyncEngine
     private val onLocalChange: () -> Unit = { if (::syncRef.isInitialized) syncRef.requestSync() }
@@ -69,7 +70,11 @@ class AppContainer(private val app: Application) {
     val skills = SkillRepository(db, http, onLocalChange)
     val mcp = McpManager(app, db, secrets, http, scope, onLocalChange)
     val media = io.dtsoftware.facet.domain.media.MediaService(providers, settings, attachments, http, app.cacheDir)
-    val tools = ToolRegistry(webSearch, providers, mcp, skills, settings, media)
+    /** The account's PCs, reached through the encrypted relay (docs/REMOTE.md). */
+    val remote = io.dtsoftware.facet.remote.RemoteHosts(
+        scope, io.dtsoftware.facet.sync.SyncRelayTransport(sync, auth, syncApi), io.dtsoftware.facet.remote.PrefsKnownHostStore(app),
+    )
+    val tools = ToolRegistry(webSearch, providers, mcp, skills, settings, media, io.dtsoftware.facet.domain.tools.PcTools(remote, conversations, settings))
     val chat = ChatEngine(
         scope, conversations, providers, assistants, attachments, settings, pricing, sync, tools,
         mcpAutoApprove = { serverId, tool -> mcp.setAutoApprove(serverId, tool, true) },

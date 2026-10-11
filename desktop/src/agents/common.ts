@@ -386,7 +386,7 @@ export interface Part {
 }
 
 /**
- * Text parts are separated by blank lines, consecutive tool lines by single newlines, and a tool
+ * Text parts are separated by blank lines, consecutive tool lines by hard line breaks, and a tool
  * line repeated back to back is written once with a count. Image placeholders only stand in for
  * messages that have nothing else.
  */
@@ -404,7 +404,8 @@ function joinParts(parts: Part[]): string {
   }
   let out = '';
   segs.forEach((s, i) => {
-    if (i) out += segs[i - 1].kind === 'tool' && s.kind === 'tool' ? '\n' : '\n\n';
+    // Two trailing spaces make a Markdown hard break, so tool lines stay on their own lines when rendered.
+    if (i) out += segs[i - 1].kind === 'tool' && s.kind === 'tool' ? '  \n' : '\n\n';
     out += s.count > 1 ? `${s.text} (×${s.count})` : s.text;
   });
   return out;

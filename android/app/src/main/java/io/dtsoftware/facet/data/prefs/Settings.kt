@@ -30,10 +30,14 @@ data class LocalPrefs(
     val notifyOnComplete: Boolean = true,
     val notificationsAsked: Boolean = false,
     val pricingFeed: Boolean = true,
+    /** Check facet.dtsoftware.io for app updates at launch and every few hours (release builds only). */
+    val autoUpdateCheck: Boolean = true,
     val onboardingDone: Boolean = false,
     /** Model used for the next new chat when no assistant default applies. */
     val lastProviderId: String? = null,
     val lastModelId: String? = null,
+    /** Your PC → Ask before: which actions on a PC need approval on this device (YOLO mode overrides it). */
+    val pcApproval: io.dtsoftware.facet.domain.tools.ToolApproval = io.dtsoftware.facet.domain.tools.ToolApproval.WRITES,
 )
 
 /** A model reference: a configured provider plus a model id. */

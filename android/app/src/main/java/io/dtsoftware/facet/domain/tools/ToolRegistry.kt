@@ -22,7 +22,8 @@ data class PreparedTools(
 
 /**
  * Decides which client tools a model gets for a reply and runs them:
- * Facet web search + page reader (for models without built-in search), skills, and MCP tools.
+ * Facet web search + page reader (for models without built-in search), skills, MCP tools,
+ * media generation, and the computer tools of the PC a chat works on.
  */
 class ToolRegistry(
     private val search: WebSearch,
@@ -31,6 +32,7 @@ class ToolRegistry(
     private val skills: SkillRepository,
     private val settings: SettingsStore,
     private val media: io.dtsoftware.facet.domain.media.MediaService? = null,
+    private val pc: PcTools? = null,
 ) {
     /** The configured BYOK search backend, if any. */
     suspend fun searchConfig(): SearchConfig? = providers.all()
@@ -41,7 +43,8 @@ class ToolRegistry(
     suspend fun usesFacetSearch(params: GenParams, caps: ModelCaps): Boolean =
         params.webSearch && caps.tools && (!caps.webSearch || !settings.synced.value.preferNativeSearch) && searchConfig() != null
 
-    suspend fun prepare(params: GenParams, caps: ModelCaps): PreparedTools {
+    /** The tools for one reply. [conversation] decides whether a PC's computer tools are offered. */
+    suspend fun prepare(params: GenParams, caps: ModelCaps, conversation: io.dtsoftware.facet.data.db.ConversationEntity? = null): PreparedTools {
         val defs = ArrayList<ToolDef>()
         val addendum = ArrayList<String>()
 
@@ -106,6 +109,7 @@ class ToolRegistry(
                     }
                     server.instructions?.takeIf { it.isNotBlank() }?.let { addendum += "## Tools from ${server.name}\n${it.take(2000)}" }
                 }
+                pc?.addTools(defs, addendum, conversation)
             }
         }
         val svc = media
@@ -199,6 +203,8 @@ class ToolRegistry(
                 }
                 ToolOutcome(text, r.isError, label = "${def.serverName}: ${def.remoteName}")
             }
+            ToolKind.COMPUTER -> pc?.run(def, AppJson.encodeToString(JsonObject.serializer(), args), ctx)
+                ?: ToolOutcome("Computer tools aren't available here.", isError = true)
         }
     }
 

@@ -123,6 +123,9 @@ private sealed interface Sheet {
     data class Edit(val messageId: String, val text: String) : Sheet
     data class Select(val text: String) : Sheet
     data class ModelEdit(val providerId: String, val modelId: String) : Sheet
+    /** The chat's PC and folder; [folders] opens on the folder browser (/folder). */
+    data class Pc(val folders: Boolean = false) : Sheet
+    data class Resume(val agent: io.dtsoftware.facet.remote.CodingAgent) : Sheet
 }
 
 @Composable
@@ -277,8 +280,24 @@ fun ChatScreen(
         if (state.thread.isNotEmpty()) listState.scrollToItem(state.thread.lastIndex)
     }
 
+    val slashAvailable = SlashCommands.available(state.pc.target, anyPcOnline = state.pc.hosts.isNotEmpty())
+
+    fun runSlash(command: SlashCommand) {
+        input = TextFieldValue("")
+        when (command) {
+            SlashCommand.NEW -> vm.newChat()
+            SlashCommand.MODEL -> sheet = Sheet.ModelPicker
+            SlashCommand.FOLDER -> sheet = Sheet.Pc(folders = true)
+            SlashCommand.PC -> sheet = Sheet.Pc()
+            SlashCommand.RESUME_CLAUDE -> sheet = Sheet.Resume(io.dtsoftware.facet.remote.CodingAgent.CLAUDE)
+            SlashCommand.RESUME_CODEX -> sheet = Sheet.Resume(io.dtsoftware.facet.remote.CodingAgent.CODEX)
+        }
+    }
+
     fun send() {
         val text = input.text
+        // A command typed out in full ("/new") runs instead of being sent.
+        SlashCommands.exact(text, slashAvailable)?.let { runSlash(it); return }
         if (vm.send(text)) {
             input = TextFieldValue("")
             speaker.stop()
@@ -297,7 +316,8 @@ fun ChatScreen(
         if (anchorId == "pending" && lastUserId != null) {
             anchorId = lastUserId
             val index = state.thread.indexOfFirst { it.message.id == lastUserId }
-            if (index >= 0) listState.animateScrollToItem(index)
+            // Not in this effect: changing anchorId restarts it, which would cancel the scroll.
+            if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
         }
     }
 
@@ -400,6 +420,18 @@ fun ChatScreen(
                         container.settings.updateSynced { it.copy(yoloMode = false) }
                         toast("YOLO mode is off. Facet will ask before tools that change things.")
                     },
+                    slashCommands = slashAvailable,
+                    onSlashCommand = ::runSlash,
+                    header = {
+                        // Only while a PC is online or this chat works on one; otherwise Facet is a plain chatbot.
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = state.loaded && state.pc.visible,
+                            enter = fadeIn() + androidx.compose.animation.expandVertically(),
+                            exit = fadeOut() + androidx.compose.animation.shrinkVertically(),
+                        ) {
+                            PcChip(state.pc, onClick = { sheet = Sheet.Pc() }, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+                        }
+                    },
                     modifier = Modifier.widthIn(max = 800.dp).padding(horizontal = 10.dp).padding(bottom = 8.dp),
                 )
             }
@@ -490,6 +522,36 @@ fun ChatScreen(
         is Sheet.Edit -> EditMessageSheet(s.text, onSave = { vm.edit(s.messageId, it) }, onDismiss = { sheet = null })
         is Sheet.Select -> SelectTextSheet(s.text) { sheet = null }
         is Sheet.ModelEdit -> io.dtsoftware.facet.ui.settings.ModelEditSheet(container, s.providerId, s.modelId) { sheet = null }
+        is Sheet.Pc -> PcSheet(
+            remote = container.remote,
+            pc = state.pc,
+            modelCanUseTools = state.model?.model?.caps?.tools == true,
+            toolsOn = state.params.tools,
+            startWithFolders = s.folders,
+            onBind = vm::setPc,
+            onTurnOnTools = { vm.updateParams(state.params.copy(tools = true)) },
+            onDismiss = { sheet = null },
+        )
+        is Sheet.Resume -> {
+            val host = state.pc.target
+            if (host == null) {
+                LaunchedEffect(Unit) { sheet = null }
+            } else {
+                ResumeSheet(
+                    remote = container.remote,
+                    agent = s.agent,
+                    host = host,
+                    folder = if (state.pc.bound) state.pc.workingFolder else null,
+                    onFolder = { path -> vm.setPc(host.hostId, path) },
+                    onContinue = { session, folder ->
+                        val truncated = vm.continueSession(s.agent, host.hostId, folder, session.id)
+                        sheet = null
+                        if (truncated) toast("The session was long, so only its latest part came over.")
+                    },
+                    onDismiss = { sheet = null },
+                )
+            }
+        }
         null -> Unit
     }
     if (renameOpen) {

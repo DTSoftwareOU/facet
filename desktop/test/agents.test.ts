@@ -22,6 +22,9 @@ import {
 
 // All fixtures are synthetic: they mimic the shapes of real transcripts, not their content.
 
+/** Tool lines are joined with Markdown hard breaks; most expectations are written with plain newlines. */
+const soft = (text: string) => text.replaceAll('  ' + String.fromCharCode(10), String.fromCharCode(10));
+
 let tmp: string;
 let homeCount = 0;
 before(() => {
@@ -174,7 +177,7 @@ describe('Claude Code conversion', () => {
     assert.equal(s.title, 'Fix the failing test');
     assert.equal(s.truncated, false);
     assert.deepEqual(
-      s.messages.map((m) => [m.role, m.text]),
+      s.messages.map((m) => [m.role, soft(m.text)]),
       [
         ['user', 'Fix the failing test\nin src/app.ts'],
         [
@@ -250,7 +253,7 @@ describe('Claude Code conversion', () => {
     assert.ok(s);
     assert.deepEqual(
       s.messages.map((m) => m.text),
-      ['First prompt', 'First answer.', 'Edited prompt', 'Reading both.\n\n› Read a.ts\n› Read b.ts\n\nBoth read.'],
+      ['First prompt', 'First answer.', 'Edited prompt', 'Reading both.\n\n› Read a.ts  \n› Read b.ts\n\nBoth read.'],
     );
   });
 
@@ -283,7 +286,7 @@ describe('Claude Code conversion', () => {
     const s = await readAgentSession('claude', CWD, log.id, WIN(home));
     assert.ok(s);
     assert.deepEqual(
-      s.messages.map((m) => [m.role, m.text]),
+      s.messages.map((m) => [m.role, soft(m.text)]),
       [
         ['user', 'Summary of the earlier conversation:\n\n1. The user wants a faster parser.'],
         ['assistant', 'Preserved reply.'],
@@ -627,7 +630,7 @@ describe('Codex conversion', () => {
     assert.equal(s.cwd, CWD);
     assert.equal(s.title, 'Make the tests pass');
     assert.deepEqual(
-      s.messages.map((m) => [m.role, m.text]),
+      s.messages.map((m) => [m.role, soft(m.text)]),
       [
         ['user', 'Make the tests pass'],
         [
@@ -686,7 +689,7 @@ describe('Codex conversion', () => {
     log.write(home);
     const s = await readAgentSession('codex', CWD, CX2, WIN(home));
     assert.deepEqual(
-      s?.messages.map((m) => m.text),
+      s?.messages.map((m) => soft(m.text)),
       [
         'Set up the project',
         [
@@ -777,7 +780,7 @@ describe('Codex conversion', () => {
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, `{"timestamp":"x","type":"session_meta","payload":{"id":"${CX1}","cwd":"C:\\\\Work\\\\My App"}}\n{broken\n\n{"type":"response_item","payload":null}\n{"type":"response_item","payload":{"type":"message","role":"user","content":"string content"}}\n{"type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{not json"}}\n{"type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","changes":null}}}`);
     const s = await readAgentSession('codex', CWD, CX1, WIN(home));
-    assert.deepEqual(s?.messages.map((m) => m.text), ['string content', '› Ran a command\n› Edited files']);
+    assert.deepEqual(s?.messages.map((m) => m.text), ['string content', '› Ran a command  \n› Edited files']);
     assert.deepEqual(await listAgentSessions('codex', CWD, WIN(path.join(home, 'missing'))), []);
     // @ts-expect-error: unknown agents give nothing.
     assert.deepEqual(await listAgentSessions('gemini', CWD, WIN(home)), []);
@@ -857,7 +860,7 @@ describe('agent import helpers', () => {
     ]);
     assert.deepEqual(msgs, [
       { role: 'user', text: '[image] [image]', at: 1 },
-      { role: 'assistant', text: '› Ran `a` (×2)\n› Ran `b`\n\ndone', at: 4 },
+      { role: 'assistant', text: '› Ran `a` (×2)  \n› Ran `b`\n\ndone', at: 4 },
       { role: 'user', text: 'see this' },
     ]);
   });

@@ -34,6 +34,8 @@ class ConversationRepository(
         modelId: String?,
         params: GenParams,
         folderId: String? = null,
+        computerHost: String? = null,
+        computerFolder: String? = null,
     ): ConversationEntity {
         val now = Clock.now()
         val c = ConversationEntity(
@@ -47,9 +49,20 @@ class ConversationRepository(
             createdAt = now,
             lastActivityAt = now,
             updatedAt = now,
+            computerHost = computerHost,
+            computerFolder = computerFolder?.takeIf { computerHost != null },
         )
         conversations.upsert(c)
         return c
+    }
+
+    /** Stores a chat created whole, e.g. one continued from a Claude Code session, with its messages. */
+    suspend fun insertWithMessages(conversation: ConversationEntity, messages: List<MessageEntity>) {
+        db.withTransaction {
+            conversations.upsert(conversation)
+            this.messages.upsertAll(messages)
+        }
+        onLocalChange()
     }
 
     /** Applies [transform] and marks the conversation for sync. */
@@ -74,12 +87,16 @@ class ConversationRepository(
     suspend fun setSystemPrompt(id: String, prompt: String?) = update(id) { it.copy(systemPrompt = prompt?.takeIf { p -> p.isNotBlank() }) }
     suspend fun setCurrentLeaf(id: String, leafId: String?) = update(id) { it.copy(currentLeafId = leafId) }
 
+    /** Binds the chat to a PC and a folder on it, or to none (both null). */
+    suspend fun setComputer(id: String, hostId: String?, folder: String?) =
+        update(id) { it.copy(computerHost = hostId, computerFolder = folder?.takeIf { hostId != null }) }
+
     /** Soft-deletes a conversation with its messages and attachments (tombstones sync to other devices). */
     suspend fun delete(id: String) {
         val now = Clock.now()
         db.withTransaction {
             val c = conversations.get(id) ?: return@withTransaction
-            conversations.upsert(c.copy(deleted = true, dirty = true, updatedAt = now, title = "", systemPrompt = null))
+            conversations.upsert(c.copy(deleted = true, dirty = true, updatedAt = now, title = "", systemPrompt = null, computerFolder = null))
             messages.tombstoneConversation(id, now)
             db.attachments().tombstoneConversation(id, now)
         }

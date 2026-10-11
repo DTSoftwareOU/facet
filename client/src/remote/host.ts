@@ -5,7 +5,7 @@
  */
 import type { AgentKind, DesktopSettings } from '../platform/platform';
 import { platform } from '../platform';
-import type { HostHandler, RemoteHub } from './hub';
+import { messageId, type HostHandler, type RemoteHub } from './hub';
 import { RemoteError, type HostAnnouncement, type RemoteMessage } from './protocol';
 
 /** Results larger than this are refused rather than relayed (the server takes envelopes up to 4 MiB). */
@@ -88,7 +88,7 @@ export class HostService implements HostHandler {
     }
     if (m.type !== 'call') return;
     const reply = (body: { ok: true; value: unknown } | { ok: false; error: { code: string; message: string } }) =>
-      this.hub.send(from, { type: 'result', re: m.id, ...body }).catch(() => {});
+      this.deliver(from, { type: 'result', re: m.id, ...body });
     if (!this.remoteAccess) {
       this.warn(from);
       await reply({ ok: false, error: { code: 'remote_disabled', message: 'This PC doesn’t allow other devices to use it. Turn it on in Facet on the PC: Settings → Computer access.' } });
@@ -165,6 +165,23 @@ export class HostService implements HostHandler {
       }
       default:
         throw new RemoteError('unknown_method', 'This version of Facet on the PC can’t do that. Update it.');
+    }
+  }
+
+  /**
+   * Sends a result, retrying for a few seconds when the device is briefly unreachable (its stream
+   * reconnecting, say); otherwise the result would be lost and the device would wait for its timeout.
+   */
+  private async deliver(to: string, body: { type: string; [field: string]: unknown }): Promise<void> {
+    const id = messageId();
+    for (const wait of [0, 500, 1000, 2000, 4000, 8000]) {
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      try {
+        await this.hub.send(to, body, id);
+        return;
+      } catch (e) {
+        if (!(e instanceof RemoteError) || e.code !== 'offline') return;
+      }
     }
   }
 

@@ -46,6 +46,9 @@ class WebRecordsCompatTest {
         assertTrue(c.titleSet && c.pinned && !c.archived)
         assertEquals("builtin.code", c.assistantId)
         assertEquals("m2", c.currentLeafId)
+        // The PC and folder the chat works on (docs/REMOTE.md); the Windows-only local folder never syncs.
+        assertEquals("host-1", c.computerHost)
+        assertEquals("C:\\Users\\alex\\app", c.computerFolder)
         val params = parseParams(c.paramsJson)
         assertEquals(Effort.HIGH, params.effort)
         assertTrue(params.webSearch)

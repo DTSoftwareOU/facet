@@ -37,6 +37,10 @@ data class ConversationEntity(
     val updatedAt: Long,
     val deleted: Boolean = false,
     val dirty: Boolean = true,
+    /** The hostId of the PC this chat works on (docs/REMOTE.md), or null for a normal chat. */
+    val computerHost: String? = null,
+    /** The chat's working folder on that PC (an absolute path). */
+    val computerFolder: String? = null,
 )
 
 @Entity(

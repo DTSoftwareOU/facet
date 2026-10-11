@@ -13,13 +13,14 @@ enum class ToolApproval(val label: String, val blurb: String) {
     NEVER("Never ask", "Run tools without asking."),
 }
 
-enum class ToolKind { SEARCH, FETCH, SKILL, MCP, MEDIA }
+/** Stored by name in [ToolCallRecord.kind]. COMPUTER: tools that run on a PC (here: one of the account's PCs, docs/REMOTE.md). */
+enum class ToolKind { SEARCH, FETCH, SKILL, MCP, MEDIA, COMPUTER }
 
 /** A tool offered to the model for one request. */
 data class ToolDef(
     val spec: ToolSpec,
     val kind: ToolKind,
-    /** MCP server id and the tool's original name on that server. */
+    /** MCP server id (for COMPUTER tools: the PC's hostId) and the tool's original name on that server. */
     val serverId: String? = null,
     val serverName: String? = null,
     val remoteName: String? = null,
@@ -28,8 +29,11 @@ data class ToolDef(
     val output: io.dtsoftware.facet.llm.ModelOutput? = null,
 )
 
-/** Where a tool runs: the reply's chat, and a way to show progress (e.g. "Creating video · 1:20"). */
-data class ToolContext(val conversationId: String? = null, val onProgress: (String) -> Unit = {})
+/**
+ * Where a tool runs: the reply's chat, the model's id for this call (so a PC can stop it), and a way to
+ * show progress (e.g. "Creating video · 1:20").
+ */
+data class ToolContext(val conversationId: String? = null, val callId: String? = null, val onProgress: (String) -> Unit = {})
 
 /** What a tool returned, ready for the model and the UI. */
 data class ToolOutcome(

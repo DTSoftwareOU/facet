@@ -72,6 +72,7 @@ object Routes {
     @Serializable data class McpServerEdit(val serverId: String? = null)
     @Serializable object Skills
     @Serializable data class SkillEdit(val skillId: String? = null)
+    @Serializable object YourPc
     @Serializable object Account
     @Serializable object Devices
     @Serializable object Privacy
@@ -106,6 +107,7 @@ fun FacetRoot(container: AppContainer, launchRequests: MutableStateFlow<LaunchRe
     }
 
     AppLockGate(enabled = prefs.appLock) {
+        io.dtsoftware.facet.ui.update.UpdateHost(container.updates)
         Box(Modifier.fillMaxSize().background(FacetTheme.colors.background)) {
             NavHost(
                 navController = nav,
@@ -203,6 +205,7 @@ fun FacetRoot(container: AppContainer, launchRequests: MutableStateFlow<LaunchRe
                 composable<Routes.SkillEdit> { entry ->
                     io.dtsoftware.facet.ui.settings.SkillEditScreen(container, entry.toRoute<Routes.SkillEdit>().skillId) { nav.popBackStack() }
                 }
+                composable<Routes.YourPc> { io.dtsoftware.facet.ui.settings.PcSettingsScreen(container) { nav.popBackStack() } }
                 composable<Routes.Account> {
                     AccountScreen(
                         container,
@@ -216,7 +219,7 @@ fun FacetRoot(container: AppContainer, launchRequests: MutableStateFlow<LaunchRe
                 composable<Routes.Devices> { DevicesScreen(container) { nav.popBackStack() } }
                 composable<Routes.Privacy> { PrivacyScreen(container) { nav.popBackStack() } }
                 composable<Routes.Data> { DataScreen(container) { nav.popBackStack() } }
-                composable<Routes.About> { AboutScreen { nav.popBackStack() } }
+                composable<Routes.About> { AboutScreen(container) { nav.popBackStack() } }
                 composable<Routes.Auth> { entry ->
                     val r = entry.toRoute<Routes.Auth>()
                     AuthScreen(

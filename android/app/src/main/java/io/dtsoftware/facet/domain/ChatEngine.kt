@@ -81,6 +81,8 @@ data class ToolActivity(
     val argumentsJson: String = "",
     val result: String? = null,
     val serverName: String? = null,
+    /** The tool's own name on its MCP server or PC (the model may see it renamed). */
+    val remoteName: String? = null,
 )
 
 /** In-flight state of a streaming assistant turn, overlaid on the stored message by the UI. */
@@ -103,8 +105,15 @@ data class LiveTurn(
     val startedAt: Long = Clock.now(),
 )
 
-/** What a brand-new chat starts with. */
-data class NewChatSpec(val assistantId: String?, val model: ModelRef, val params: GenParams, val folderId: String? = null)
+/** What a brand-new chat starts with, including the PC and folder it works in, if any. */
+data class NewChatSpec(
+    val assistantId: String?,
+    val model: ModelRef,
+    val params: GenParams,
+    val folderId: String? = null,
+    val computerHost: String? = null,
+    val computerFolder: String? = null,
+)
 
 class ChatException(message: String) : Exception(message)
 
@@ -137,6 +146,8 @@ class ChatEngine(
 
     private val jobs = ConcurrentHashMap<String, Job>()
     private val approvals = ConcurrentHashMap<String, CompletableDeferred<ApprovalDecision>>()
+    /** PC tools the user allowed for the rest of a chat ("conversationId/toolName"). */
+    private val chatApprovals: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     init {
         // Turning on YOLO mode (here or on another device) also answers approvals already waiting.
@@ -171,7 +182,10 @@ class ChatEngine(
     suspend fun send(conversationId: String?, text: String, attachmentIds: List<String>, newChat: NewChatSpec?): String {
         val conv = conversationId?.let { conversations.get(it) }
             ?: newChat?.let { spec ->
-                conversations.create(spec.assistantId, spec.model.providerId, spec.model.modelId, spec.params, spec.folderId)
+                conversations.create(
+                    spec.assistantId, spec.model.providerId, spec.model.modelId, spec.params, spec.folderId,
+                    spec.computerHost, spec.computerFolder,
+                )
             }
             ?: throw ChatException("Choose a model to start chatting.")
         if (isGenerating(conv.id)) throw ChatException("Wait for the current reply to finish, or stop it.")
@@ -261,10 +275,13 @@ class ChatEngine(
 
         _live.update { it + (reply.id to LiveTurn(reply.id, conversationId)) }
         _active.update { it + conversationId }
+        // A chat that works on a PC keeps the relay stream open for the whole reply, also in the background.
+        val releaseStream = if (conv.computerHost != null) sync.holdStream() else null
         val job = scope.launch {
             try {
                 generate(conversationId, reply, provider, model)
             } finally {
+                releaseStream?.invoke()
                 jobs.remove(conversationId)
                 _active.update { it - conversationId }
                 _live.update { it - reply.id }
@@ -324,7 +341,8 @@ class ChatEngine(
 
         try {
             val base = buildRequest(conversationId, reply, model)
-            val prepared: PreparedTools = runCatching { tools.prepare(base.params, model.caps) }.getOrDefault(PreparedTools(emptyList(), null))
+            val prepared: PreparedTools = runCatching { tools.prepare(base.params, model.caps, conversations.get(conversationId)) }
+                .getOrDefault(PreparedTools(emptyList(), null))
             val system = listOfNotNull(base.system, prepared.systemAddendum).joinToString("\n\n").ifBlank { null }
             var messages = base.messages
             var round = 0
@@ -378,7 +396,7 @@ class ChatEngine(
                             val def = prepared.byName[ev.name]
                             st.activities[ev.id] = ToolActivity(
                                 ev.id, ev.name, def?.kind ?: ToolKind.MCP, preparingLabel(def?.kind, def?.serverName, def?.remoteName ?: ev.name),
-                                ToolStatus.PREPARING, serverName = def?.serverName,
+                                ToolStatus.PREPARING, serverName = def?.serverName, remoteName = def?.remoteName,
                             )
                             publishTools()
                         }
@@ -386,7 +404,7 @@ class ChatEngine(
                             calls += ev
                             val def = prepared.byName[ev.name]
                             val existing = st.activities[ev.id]
-                            st.activities[ev.id] = (existing ?: ToolActivity(ev.id, ev.name, def?.kind ?: ToolKind.MCP, preparingLabel(def?.kind, def?.serverName, def?.remoteName ?: ev.name), ToolStatus.PREPARING, serverName = def?.serverName))
+                            st.activities[ev.id] = (existing ?: ToolActivity(ev.id, ev.name, def?.kind ?: ToolKind.MCP, preparingLabel(def?.kind, def?.serverName, def?.remoteName ?: ev.name), ToolStatus.PREPARING, serverName = def?.serverName, remoteName = def?.remoteName))
                                 .copy(argumentsJson = ev.argumentsJson, label = runningLabel(def, ev.argumentsJson))
                             publishTools()
                         }
@@ -482,13 +500,16 @@ class ChatEngine(
             update { it.copy(status = ToolStatus.ERROR, result = msg) }
             return ToolCallRecord(call.id, call.name, ToolKind.MCP.name, call.name, call.argumentsJson, msg, true)
         }
-        if (def.needsApproval && !settings.synced.value.yoloMode) {
+        val approvedForChat = def.kind == ToolKind.COMPUTER && "${reply.conversationId}/${def.spec.name}" in chatApprovals
+        if (def.needsApproval && !settings.synced.value.yoloMode && !approvedForChat) {
             update { it.copy(status = ToolStatus.AWAITING_APPROVAL) }
             val pending = CompletableDeferred<ApprovalDecision>()
             approvals[call.id] = pending
             if (settings.synced.value.yoloMode) respondToApproval(call.id, ApprovalDecision.ALLOW)
             val decision = pending.await()
             if (decision == ApprovalDecision.ALWAYS && def.kind == ToolKind.MCP) runCatching { mcpAutoApprove(def.serverId!!, def.remoteName!!) }
+            // "Allow for this chat": the same PC tool runs without asking for the rest of this chat (until Facet restarts).
+            if (decision == ApprovalDecision.ALWAYS && def.kind == ToolKind.COMPUTER) chatApprovals += "${reply.conversationId}/${def.spec.name}"
             if (decision == ApprovalDecision.DENY) {
                 val msg = "The user declined this tool call. Don't retry it; continue without it or ask the user how to proceed."
                 update { it.copy(status = ToolStatus.DENIED, result = msg) }
@@ -497,9 +518,13 @@ class ChatEngine(
         }
         update { it.copy(status = ToolStatus.RUNNING) }
         val start = Clock.now()
-        val timeoutMs = if (def.kind == ToolKind.MEDIA) MEDIA_TOOL_TIMEOUT_MS else TOOL_TIMEOUT_MS
+        val timeoutMs = when (def.kind) {
+            ToolKind.MEDIA -> MEDIA_TOOL_TIMEOUT_MS
+            ToolKind.COMPUTER -> COMPUTER_TOOL_TIMEOUT_MS
+            else -> TOOL_TIMEOUT_MS
+        }
         val outcome = try {
-            val ctx = ToolContext(reply.conversationId) { progress -> update { it.copy(label = progress) } }
+            val ctx = ToolContext(reply.conversationId, call.id) { progress -> update { it.copy(label = progress) } }
             withTimeout(timeoutMs) { tools.execute(def, call.argumentsJson, ctx) }
         } catch (e: CancellationException) {
             if (e is kotlinx.coroutines.TimeoutCancellationException) {
@@ -520,6 +545,7 @@ class ChatEngine(
         ToolKind.SEARCH -> "Searching the web"
         ToolKind.FETCH -> "Reading a page"
         ToolKind.SKILL -> "Loading a skill"
+        ToolKind.COMPUTER -> io.dtsoftware.facet.domain.tools.PcTools.label(name, "{}", done = false)
         else -> if (serverName != null) "$serverName: $name" else name
     }
 
@@ -538,6 +564,7 @@ class ChatEngine(
                 io.dtsoftware.facet.llm.ModelOutput.MUSIC -> "music"
                 else -> "media"
             }
+            ToolKind.COMPUTER -> io.dtsoftware.facet.domain.tools.PcTools.label(def.remoteName ?: def.spec.name, args, done)
             null -> "Tool"
         }
     }
@@ -717,6 +744,8 @@ class ChatEngine(
         const val TOOL_TIMEOUT_MS = 130_000L
         /** Video and long music can take several minutes. */
         const val MEDIA_TOOL_TIMEOUT_MS = 12 * 60_000L
+        /** A PC's commands have their own timeouts; the relay call waits up to 15 minutes (docs/REMOTE.md). */
+        const val COMPUTER_TOOL_TIMEOUT_MS = 16 * 60_000L
     }
 }
 

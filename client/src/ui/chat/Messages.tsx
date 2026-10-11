@@ -23,7 +23,7 @@ import {
   Volume2,
   Wand2,
 } from 'lucide-react';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { getApp } from '../../app';
 import { Format } from '../../core/format';
 import { parseJson } from '../../core/json';
@@ -224,6 +224,13 @@ function approvalSummary(t: ToolActivity): { title: string; detail: string | nul
   return { title: `Allow ${t.label}?`, detail: t.argumentsJson && t.argumentsJson !== '{}' ? prettyArgs(t.argumentsJson) : null };
 }
 
+/** Tool labels mark commands and names with backticks ("Ran `npm test`"): show those parts as code. */
+function labelParts(label: string): ReactNode {
+  const parts = label.split(/`([^`]+)`/);
+  if (parts.length === 1) return label;
+  return parts.map((part, i) => (i % 2 ? <code key={i} className="tool-code">{part}</code> : part));
+}
+
 function ToolItem({ t, live }: { t: ToolActivity; live: boolean }) {
   const [open, setOpen] = useState(false);
   const app = getApp();
@@ -233,7 +240,7 @@ function ToolItem({ t, live }: { t: ToolActivity; live: boolean }) {
     <div className="tool-item">
       <button type="button" className="tool-line" onClick={() => setOpen(!open)} aria-expanded={open}>
         {toolIcon(t)}
-        <span className="label">{t.label}</span>
+        <span className="label">{labelParts(t.label)}</span>
         {statusIcon(t)}
         {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
       </button>

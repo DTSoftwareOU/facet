@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -48,9 +49,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -60,6 +63,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -115,23 +123,34 @@ fun Composer(
     searchAvailable: Boolean = false,
     yolo: Boolean = false,
     onYoloOff: () -> Unit = {},
+    /** Built-in slash commands that apply right now (saved prompts are always listed). */
+    slashCommands: Set<SlashCommand> = emptySet(),
+    onSlashCommand: (SlashCommand) -> Unit = {},
+    /** Shown just above the message box, e.g. the PC chip. */
+    header: (@Composable () -> Unit)? = null,
 ) {
     val c = FacetTheme.colors
     val canSend = (value.text.isNotBlank() || attachments.isNotEmpty()) && caps != null
-    val slashQuery = remember(value.text) {
-        val t = value.text
-        if (t.startsWith("/") && !t.contains('\n') && t.length <= 40) t.drop(1).trim().lowercase() else null
+    // "/" at the start of the message opens the command list, filtered as you type.
+    val slashQuery = remember(value.text) { SlashCommands.query(value.text) }
+    val matches = remember(slashQuery, prompts, slashCommands) {
+        if (slashQuery == null) emptyList() else SlashCommands.filter(slashQuery, slashCommands, prompts)
     }
-    val matches = remember(slashQuery, prompts) {
-        if (slashQuery == null) emptyList() else prompts.filter { it.title.lowercase().contains(slashQuery) || it.body.lowercase().contains(slashQuery) }.take(6)
+    var highlight by remember(slashQuery) { mutableIntStateOf(0) }
+    val slashOpen = matches.isNotEmpty() && !voice.listening
+
+    fun pick(item: SlashItem) {
+        when (item) {
+            is SlashItem.Command -> onSlashCommand(item.command)
+            is SlashItem.Prompt -> onValueChange(TextFieldValue(item.prompt.body, TextRange(item.prompt.body.length)))
+        }
     }
 
     Column(modifier.fillMaxWidth()) {
-        AnimatedVisibility(slashQuery != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-            PromptSuggestions(matches, hasAny = prompts.isNotEmpty()) { p ->
-                onValueChange(TextFieldValue(p.body, TextRange(p.body.length)))
-            }
+        AnimatedVisibility(slashOpen, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+            SlashCommandList(matches, highlight.coerceIn(0, (matches.size - 1).coerceAtLeast(0)), ::pick)
         }
+        header?.invoke()
         Column(
             Modifier
                 .fillMaxWidth()
@@ -167,8 +186,22 @@ fun Composer(
                             capitalization = KeyboardCapitalization.Sentences,
                             imeAction = if (sendOnEnter) ImeAction.Send else ImeAction.Default,
                         ),
-                        keyboardActions = KeyboardActions(onSend = { if (canSend && !generating) onSend() }),
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 26.dp),
+                        keyboardActions = KeyboardActions(onSend = {
+                            if (slashOpen) pick(matches[highlight.coerceIn(0, matches.lastIndex)]) else if (canSend && !generating) onSend()
+                        }),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 26.dp)
+                            // Hardware keyboards: arrows move through the command list, Enter or Tab picks.
+                            .onPreviewKeyEvent { e ->
+                                if (!slashOpen || e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                                when (e.key) {
+                                    Key.DirectionDown -> { highlight = (highlight + 1).coerceAtMost(matches.lastIndex); true }
+                                    Key.DirectionUp -> { highlight = (highlight - 1).coerceAtLeast(0); true }
+                                    Key.Enter, Key.NumPadEnter, Key.Tab -> { pick(matches[highlight.coerceIn(0, matches.lastIndex)]); true }
+                                    else -> false
+                                }
+                            },
                     )
                 }
             }
@@ -292,9 +325,12 @@ private fun RemoveBadge(modifier: Modifier, onRemove: () -> Unit) {
     }
 }
 
+/** The slash command list above the composer: built-in commands, then saved prompts as /their-title. */
 @Composable
-private fun PromptSuggestions(matches: List<PromptEntity>, hasAny: Boolean, onPick: (PromptEntity) -> Unit) {
+private fun SlashCommandList(items: List<SlashItem>, highlighted: Int, onPick: (SlashItem) -> Unit) {
     val c = FacetTheme.colors
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    LaunchedEffect(highlighted) { if (items.isNotEmpty()) listState.animateScrollToItem(highlighted) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -304,22 +340,34 @@ private fun PromptSuggestions(matches: List<PromptEntity>, hasAny: Boolean, onPi
             .border(1.dp, c.outlineVariant, RoundedCornerShape(20.dp))
             .padding(vertical = 6.dp),
     ) {
-        if (matches.isEmpty()) {
-            Text(
-                if (hasAny) "No saved prompt matches." else "Save prompts in Settings → Prompt library, then type / to insert them.",
-                style = FacetTheme.type.body,
-                color = c.textSecondary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            )
-        } else {
-            LazyColumn(Modifier.heightIn(max = 260.dp)) {
-                items(matches, key = { it.id }) { p ->
-                    Column(
-                        Modifier.fillMaxWidth().clickable { onPick(p) }.padding(horizontal = 16.dp, vertical = 10.dp),
-                    ) {
-                        Text(p.title, style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        LazyColumn(Modifier.heightIn(max = 260.dp), state = listState) {
+            itemsIndexed(items, key = { _, it -> if (it is SlashItem.Prompt) "p/" + it.prompt.id else "c/" + it.name }) { i, item ->
+                val selected = i == highlighted
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 6.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (selected) c.surfaceHigh else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable(role = androidx.compose.ui.semantics.Role.Button) { onPick(item) }
+                        .padding(horizontal = 10.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(c.surfaceHighest), contentAlignment = Alignment.Center) {
+                        FacetIcon(
+                            if (item is SlashItem.Command) item.command.icon else R.drawable.ic_library, null,
+                            tint = c.textSecondary, size = 16.dp,
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("/" + item.name, style = FacetTheme.type.labelL, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            p.body, style = FacetTheme.type.labelM.copy(fontWeight = FontWeight.Normal), color = c.textSecondary,
+                            when (item) {
+                                is SlashItem.Command -> item.command.description
+                                is SlashItem.Prompt -> item.prompt.body.replace('\n', ' ')
+                            },
+                            style = FacetTheme.type.labelM.copy(fontWeight = FontWeight.Normal), color = c.textSecondary,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }

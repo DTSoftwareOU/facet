@@ -44,6 +44,8 @@ object RecordType {
     val title: String, val titleSet: Boolean, val assistantId: String?, val folderId: String?,
     val providerId: String?, val modelId: String?, val paramsJson: String, val systemPrompt: String?,
     val currentLeafId: String?, val pinned: Boolean, val archived: Boolean, val createdAt: Long, val lastActivityAt: Long,
+    /** The PC (hostId) and folder the chat works in; omitted when unset (docs/REMOTE.md). */
+    val computerHost: String? = null, val computerFolder: String? = null,
 )
 
 @Serializable data class MsgPayload(
@@ -140,7 +142,7 @@ class RecordCodec(private val vaultKey: ByteArray, private val secrets: SecretBo
     fun encode(e: ConversationEntity) = encodeEntity(RecordType.CONVERSATION, e.id, e.updatedAt, e.deleted) {
         ConvPayload(
             e.title, e.titleSet, e.assistantId, e.folderId, e.providerId, e.modelId, e.paramsJson, e.systemPrompt,
-            e.currentLeafId, e.pinned, e.archived, e.createdAt, e.lastActivityAt,
+            e.currentLeafId, e.pinned, e.archived, e.createdAt, e.lastActivityAt, e.computerHost, e.computerFolder,
         )
     }
 
@@ -199,6 +201,7 @@ class RecordCodec(private val vaultKey: ByteArray, private val secrets: SecretBo
         return ConversationEntity(
             r.id, p.title, p.titleSet, p.assistantId, p.folderId, p.providerId, p.modelId, p.paramsJson, p.systemPrompt,
             p.currentLeafId, p.pinned, p.archived, p.createdAt, p.lastActivityAt, r.updatedAt, deleted = false, dirty = false,
+            computerHost = p.computerHost?.takeIf { it.isNotBlank() }, computerFolder = p.computerFolder?.takeIf { it.isNotBlank() },
         )
     }
 

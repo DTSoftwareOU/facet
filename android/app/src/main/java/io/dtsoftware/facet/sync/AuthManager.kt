@@ -348,6 +348,9 @@ class AuthManager(
 
     val previousUserId: String? get() = prefs.getString(K_USER, null)
 
+    /** This device's session id on the sync server (from the sign-in and refresh responses); null when signed out. */
+    val sessionId: String? get() = if (isSignedIn) prefs.getString(K_SESSION, null) else null
+
     private fun device(): DeviceDto {
         val userName = runCatching { Settings.Global.getString(appContext.contentResolver, Settings.Global.DEVICE_NAME) }.getOrNull()
         val name = userName?.takeIf { it.isNotBlank() } ?: run {

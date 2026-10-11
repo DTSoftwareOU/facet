@@ -165,6 +165,10 @@ fun SettingsScreen(container: AppContainer, onBack: () -> Unit, navigate: (Any) 
             GroupDivider()
             SettingsRow("Media models", subtitle = "Images, video, voices, music and transcription", icon = R.drawable.ic_sparkles, onClick = { navigate(Routes.MediaModels) })
             GroupDivider()
+            if (account is AccountState.SignedIn) {
+                SettingsRow("Your PC", subtitle = pcSubtitle(container), icon = R.drawable.ic_monitor, onClick = { navigate(Routes.YourPc) })
+                GroupDivider()
+            }
             SwitchRow(
                 "YOLO mode", synced.yoloMode, { on -> container.settings.updateSynced { it.copy(yoloMode = on) } },
                 subtitle = "Run every tool without asking, and allow up to ${ToolRegistry.YOLO_TOOL_ROUNDS} tool rounds per reply.",
@@ -179,7 +183,8 @@ fun SettingsScreen(container: AppContainer, onBack: () -> Unit, navigate: (Any) 
             SettingsRow("Data and storage", icon = R.drawable.ic_server, onClick = { navigate(Routes.Data) })
         }
         SettingsGroup {
-            SettingsRow("About Facet", subtitle = "Version ${BuildConfig.VERSION_NAME}", icon = R.drawable.ic_info, onClick = { navigate(Routes.About) })
+            val update by container.updates.state.collectAsStateWithLifecycle()
+            SettingsRow("About Facet", subtitle = io.dtsoftware.facet.ui.update.aboutSubtitle(update), icon = R.drawable.ic_info, onClick = { navigate(Routes.About) })
         }
     }
 }
@@ -484,7 +489,7 @@ fun DataScreen(container: AppContainer, onBack: () -> Unit) {
 // ---------------- About ----------------
 
 @Composable
-fun AboutScreen(onBack: () -> Unit) {
+fun AboutScreen(container: AppContainer, onBack: () -> Unit) {
     val uri = LocalUriHandler.current
     val c = FacetTheme.colors
     var licenses by remember { mutableStateOf(false) }
@@ -499,7 +504,13 @@ fun AboutScreen(onBack: () -> Unit) {
                 "Every model, one home. Open source and end-to-end encrypted.\nMade by DT Software OÜ.",
                 style = FacetTheme.type.body, color = c.textSecondary, textAlign = TextAlign.Center,
             )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Facet is independent and isn't affiliated with or endorsed by any AI provider. Product and model names are trademarks of their owners.",
+                style = FacetTheme.type.labelS, color = c.textTertiary, textAlign = TextAlign.Center,
+            )
         }
+        io.dtsoftware.facet.ui.update.UpdateSection(container)
         SettingsGroup {
             SettingsRow("Website", subtitle = BuildConfig.WEBSITE_URL.removePrefix("https://"), icon = R.drawable.ic_globe, onClick = { uri.openUri(BuildConfig.WEBSITE_URL) })
             GroupDivider()

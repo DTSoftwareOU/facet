@@ -20,6 +20,9 @@ import io.dtsoftware.facet.domain.NewChatSpec
 import io.dtsoftware.facet.llm.GenParams
 import io.dtsoftware.facet.llm.ModelInfo
 import io.dtsoftware.facet.llm.ProviderKind
+import io.dtsoftware.facet.remote.AgentImport
+import io.dtsoftware.facet.remote.CodingAgent
+import io.dtsoftware.facet.remote.RemoteHost
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -65,10 +68,48 @@ data class ChatUiState(
     val searchAvailable: Boolean = false,
     val mcpServers: List<io.dtsoftware.facet.data.db.McpServerEntity> = emptyList(),
     val skillCount: Int = 0,
+    val pc: PcState = PcState(),
 )
 
+/**
+ * The PCs this device can use, and the one this chat (or the new chat being written) works on.
+ * Nothing PC-related shows unless a PC is online or the chat is bound to one.
+ */
+data class PcState(
+    /** Online PCs, with or without remote use switched on. */
+    val hosts: List<RemoteHost> = emptyList(),
+    /** The chat's PC (hostId), whether or not it's online. */
+    val hostId: String? = null,
+    /** The chat's folder on that PC, if one was picked. */
+    val folder: String? = null,
+    /** The chat's PC when it's online. */
+    val host: RemoteHost? = null,
+    /** The chat's PC's name, also when it's offline (null if this device never saw it). */
+    val name: String? = null,
+) {
+    val visible: Boolean get() = hosts.isNotEmpty() || hostId != null
+    val bound: Boolean get() = hostId != null
+    /** The chat's PC is online and lets this device use it. */
+    val ready: Boolean get() = host?.remote == true
+    /** The folder tools run in: the chat's, else the PC's default. */
+    val workingFolder: String? get() = folder ?: host?.defaultFolder
+
+    /**
+     * The PC that folder and session commands act on: the chat's when it's ready, or for a chat without a PC
+     * the only online PC that allows remote use.
+     */
+    val target: RemoteHost?
+        get() = if (bound) host?.takeIf { it.remote } else hosts.filter { it.remote }.singleOrNull()
+}
+
 /** Draft state for a chat that hasn't been sent yet. */
-private data class NewChatDraft(val assistantId: String = BuiltinAssistants.DEFAULT_ID, val model: ModelRef? = null, val params: GenParams? = null)
+private data class NewChatDraft(
+    val assistantId: String = BuiltinAssistants.DEFAULT_ID,
+    val model: ModelRef? = null,
+    val params: GenParams? = null,
+    val computerHost: String? = null,
+    val computerFolder: String? = null,
+)
 
 class ChatViewModel(private val c: AppContainer) : ViewModel() {
     private val conversationId = MutableStateFlow<String?>(null)
@@ -136,8 +177,17 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
 
-    val state: StateFlow<ChatUiState> = combine(baseState, toolsFlow) { s, (search, servers, skills) ->
-        s.copy(searchAvailable = search, mcpServers = servers, skillCount = skills)
+    val state: StateFlow<ChatUiState> = combine(baseState, toolsFlow, c.remote.hosts, c.remote.knownNames, newDraft) { s, (search, servers, skills), hosts, names, draft ->
+        val conv = s.conversation
+        val hostId = if (conv != null) conv.computerHost else draft.computerHost
+        val pc = PcState(
+            hosts = hosts.values.sortedBy { it.name.lowercase() },
+            hostId = hostId,
+            folder = if (conv != null) conv.computerFolder else draft.computerFolder,
+            host = hostId?.let { hosts[it] },
+            name = hostId?.let { hosts[it]?.name ?: names[it] },
+        )
+        s.copy(searchAvailable = search, mcpServers = servers, skillCount = skills, pc = pc)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
 
     private data class Quint(
@@ -195,7 +245,10 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
         viewModelScope.launch {
             try {
                 val spec = if (s.conversation == null) {
-                    NewChatSpec(s.assistant.id, ModelRef(model.providerId, model.model.id), s.params)
+                    NewChatSpec(
+                        s.assistant.id, ModelRef(model.providerId, model.model.id), s.params,
+                        computerHost = s.pc.hostId, computerFolder = s.pc.folder,
+                    )
                 } else {
                     null
                 }
@@ -259,6 +312,36 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
     fun setSystemPrompt(prompt: String) {
         val conv = state.value.conversation ?: return
         viewModelScope.launch { c.conversations.setSystemPrompt(conv.id, prompt) }
+    }
+
+    // ---- PC ----
+
+    /** Binds the chat to [hostId] and [folder] on it, or to no PC (null). A new chat gets them when it's created. */
+    fun setPc(hostId: String?, folder: String?) {
+        val conv = state.value.conversation
+        if (conv != null) {
+            viewModelScope.launch { c.conversations.setComputer(conv.id, hostId, folder) }
+        } else {
+            newDraft.update { it.copy(computerHost = hostId, computerFolder = folder?.takeIf { hostId != null }) }
+        }
+    }
+
+    /**
+     * Continues a Claude Code or Codex session: a new chat with its messages, on the same PC and folder,
+     * with the composer's model, which then opens. Throws [io.dtsoftware.facet.remote.RemoteException] or
+     * [IllegalArgumentException] with a message for the user.
+     */
+    suspend fun continueSession(agent: CodingAgent, hostId: String, folder: String, sessionId: String): Boolean {
+        val session = c.remote.readAgentSession(hostId, agent.id, folder, sessionId)
+        val s = state.value
+        val (conversation, messages) = AgentImport.build(
+            session, agent, hostId, folder,
+            s.model?.let { ModelRef(it.providerId, it.model.id) }, s.params, io.dtsoftware.facet.core.util.Clock.now(),
+        )
+        c.conversations.insertWithMessages(conversation, messages)
+        conversationId.value = conversation.id
+        clearDraftAttachments()
+        return session.truncated
     }
 
     // ---- message actions ----

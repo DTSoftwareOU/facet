@@ -82,6 +82,11 @@ import kotlin.coroutines.resumeWithException
 @Serializable data class PushRes(val accepted: List<Accepted> = emptyList(), val rejected: List<Rejected> = emptyList(), val cursor: Long = 0)
 @Serializable data class PullRes(val records: List<RecordDto> = emptyList(), val cursor: Long = 0, val hasMore: Boolean = false, val reset: Boolean = false)
 
+/** Another session of this account with an open change stream (docs/REMOTE.md). */
+@Serializable data class PeerDto(val sessionId: String, val deviceName: String = "", val platform: String = "")
+@Serializable data class PeersRes(val peers: List<PeerDto> = emptyList())
+@Serializable data class RelayReq(val to: String, val msg: String)
+
 class ApiException(val status: Int, val code: String, message: String, val retryAfter: Long? = null) : IOException(message)
 
 /** Thin, stateless client for the Facet sync server. Authentication is handled by [AuthManager]. */
@@ -139,6 +144,14 @@ class SyncApi(private val http: OkHttpClient) {
     suspend fun deleteBlob(base: String, token: String, id: String) {
         execute(request(base, "/v1/blobs/$id", token).delete().build()).use { it.ensureOk() }
     }
+
+    /** Forwards an encrypted envelope (b64) to another session. Throws [ApiException] 404 `peer_offline` when it has no open stream. */
+    suspend fun relay(base: String, token: String, to: String, msg: String) {
+        send(base, "POST", "/v1/relay", token, AppJson.encodeToString(RelayReq(to, msg)))
+    }
+
+    /** The account's other sessions that have an open stream right now. */
+    suspend fun relayPeers(base: String, token: String): List<PeerDto> = get<PeersRes>(base, "/v1/relay/peers", token).peers
 
     /** Opens the SSE change stream. Caller reads `response.body.source()` and closes the call. */
     fun streamCall(streamHttp: OkHttpClient, base: String, token: String): Call =

@@ -78,6 +78,19 @@ class SyncEngine(
     private var debounceJob: Job? = null
     private var streamJob: Job? = null
     @Volatile private var foreground = false
+    /** Reasons to keep the stream open in the background: a pending remote call, a reply that uses a PC. */
+    private val streamHolds = java.util.concurrent.atomic.AtomicInteger(0)
+    private val streamGeneration = java.util.concurrent.atomic.AtomicLong(0)
+
+    private val _streamConnected = MutableStateFlow(false)
+    /** True while the change stream is open (after its `ready` event). */
+    val streamConnected: StateFlow<Boolean> = _streamConnected.asStateFlow()
+
+    /**
+     * Receives the stream's device-to-device events (docs/REMOTE.md): `ready`, `presence` and `relay` with their
+     * JSON data, and `closed` when an open stream ends. Called on a background thread.
+     */
+    @Volatile var streamListener: ((event: String, data: String) -> Unit)? = null
     private var lastAccountRefresh = 0L
     @Volatile private var storageFull = false
     @Volatile private var uploadedBytes = 0L
@@ -611,8 +624,25 @@ class SyncEngine(
 
     // ---- live updates ----
 
+    /**
+     * Keeps the change stream open, even with Facet in the background, until the returned function is called
+     * (docs/REMOTE.md: controllers keep their stream open while they wait for a result).
+     */
+    fun holdStream(): () -> Unit {
+        streamHolds.incrementAndGet()
+        updateStream()
+        val released = java.util.concurrent.atomic.AtomicBoolean(false)
+        return {
+            if (released.compareAndSet(false, true)) {
+                streamHolds.decrementAndGet()
+                updateStream()
+            }
+        }
+    }
+
+    @Synchronized
     private fun updateStream() {
-        val want = foreground && auth.isSignedIn
+        val want = (foreground || streamHolds.get() > 0) && auth.isSignedIn
         if (want && streamJob?.isActive != true) {
             streamJob = scope.launch { runStream() }
         } else if (!want) {
@@ -639,19 +669,29 @@ class SyncEngine(
                             }
                             if (!resp.isSuccessful) return@withContext
                             backoff = 1_000L
-                            val source = resp.body.source()
-                            var event = ""
-                            while (true) {
-                                val line = source.readUtf8Line() ?: break
-                                when {
-                                    line.startsWith("event:") -> event = line.substring(6).trim()
-                                    line.startsWith("data:") -> {
-                                        val remote = runCatching {
-                                            AppJson.parseToJsonElement(line.substring(5).trim()).jsonObject["cursor"]!!.jsonPrimitive.long
-                                        }.getOrNull()
-                                        if ((event == "ready" || event == "changed") && remote != null && remote != cursor) requestSync(250)
+                            val generation = streamGeneration.incrementAndGet()
+                            val reader = io.dtsoftware.facet.core.net.SseReader(resp.body.source())
+                            try {
+                                while (true) {
+                                    val ev = reader.next() ?: break
+                                    when (ev.event) {
+                                        "ready", "changed" -> {
+                                            val remote = runCatching {
+                                                AppJson.parseToJsonElement(ev.data).jsonObject["cursor"]!!.jsonPrimitive.long
+                                            }.getOrNull()
+                                            if (remote != null && remote != cursor) requestSync(250)
+                                            if (ev.event == "ready") {
+                                                _streamConnected.value = true
+                                                notifyStream("ready", ev.data)
+                                            }
+                                        }
+                                        "presence", "relay" -> notifyStream(ev.event!!, ev.data)
                                     }
-                                    line.isEmpty() -> event = ""
+                                }
+                            } finally {
+                                if (streamGeneration.get() == generation && _streamConnected.value) {
+                                    _streamConnected.value = false
+                                    notifyStream("closed", "")
                                 }
                             }
                         }
@@ -666,6 +706,14 @@ class SyncEngine(
             if (!auth.isSignedIn) return
             delay(backoff)
             backoff = (backoff * 2).coerceAtMost(60_000)
+        }
+    }
+
+    private fun notifyStream(event: String, data: String) {
+        try {
+            streamListener?.invoke(event, data)
+        } catch (e: Exception) {
+            Log.w(TAG, "stream listener failed", e)
         }
     }
 

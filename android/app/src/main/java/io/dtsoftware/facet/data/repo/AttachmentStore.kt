@@ -271,9 +271,26 @@ class AttachmentStore(
     private fun compact(bytes: ByteArray, mime: String): Pair<ByteArray, String> = when {
         mime == "audio/wav" || mime == "audio/x-wav" ->
             io.dtsoftware.facet.core.media.AudioCompressor.wavToM4a(bytes, context.cacheDir)?.let { it to "audio/mp4" } ?: (bytes to mime)
-        mime.startsWith("image/") && mime != "image/gif" && mime != "image/svg+xml" && bytes.size > COMPACT_IMAGE_BYTES ->
+        // Images that carry C2PA content credentials stay untouched: re-encoding would strip the
+        // provider's machine-readable "made by AI" marking (EU AI Act Art. 50(2)).
+        mime.startsWith("image/") && mime != "image/gif" && mime != "image/svg+xml" && bytes.size > COMPACT_IMAGE_BYTES &&
+            !hasContentCredentials(bytes) ->
             compactImage(bytes)?.let { it to "image/webp" } ?: (bytes to mime)
         else -> bytes to mime
+    }
+
+    /**
+     * True when a file carries C2PA content credentials: a JUMBF box labelled "c2pa" (JPEG APP11,
+     * WebP, AVIF, MP4) or a PNG "caBX" chunk.
+     */
+    internal fun hasContentCredentials(bytes: ByteArray): Boolean {
+        for (i in 0 until bytes.size - 3) {
+            if (bytes[i] != 'c'.code.toByte()) continue
+            val b1 = bytes[i + 1]; val b2 = bytes[i + 2]; val b3 = bytes[i + 3]
+            if (b1 == '2'.code.toByte() && b2 == 'p'.code.toByte() && b3 == 'a'.code.toByte()) return true
+            if (b1 == 'a'.code.toByte() && b2 == 'B'.code.toByte() && b3 == 'X'.code.toByte()) return true
+        }
+        return false
     }
 
     /** Re-encodes a large render as WebP (visually lossless at quality 90, typically 5-10x smaller than PNG). */

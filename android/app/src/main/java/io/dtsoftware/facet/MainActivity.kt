@@ -25,9 +25,14 @@ class MainActivity : ComponentActivity() {
     private val launchRequests = MutableStateFlow<LaunchRequest?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
         val container = (application as FacetApp).container
+        if (savedInstanceState == null) {
+            // The update check keeps the splash up for at most 1.5 s, so a prompt can be the first thing shown.
+            val updateGate = container.updates.launchCheck()
+            splash.setKeepOnScreenCondition { updateGate.holding }
+        }
         launchRequests.value = parseIntent(intent)
 
         setContent {
