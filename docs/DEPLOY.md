@@ -44,7 +44,7 @@ sudo ufw enable
 
 ```sh
 sudo mkdir -p /opt/facet && sudo chown "$USER" /opt/facet
-git clone <your repo URL> /opt/facet
+git clone https://github.com/DTSoftwareOU/facet.git /opt/facet
 cd /opt/facet/deploy
 ```
 

@@ -1,4 +1,4 @@
-import { Code2, Download, ExternalLink, FileText, Globe, RefreshCw, Scale } from 'lucide-react';
+import { Code2, Download, ExternalLink, FileText, Globe, RefreshCw, Scale, ScrollText } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { platform, type UpdateState } from '../../platform';
 import { Gem } from '../components/Gem';
@@ -6,6 +6,7 @@ import { Button, Dialog, Divider, Group, Row } from '../components/primitives';
 import type { PageProps } from './SettingsDialog';
 
 const SITE = 'https://facet.dtsoftware.io';
+const SOURCE = 'https://github.com/DTSoftwareOU/facet';
 
 const LICENSES: [string, string][] = [
   ['React', 'MIT'], ['Dexie.js', 'Apache-2.0'], ['markdown-it', 'MIT'], ['highlight.js', 'BSD-3-Clause'], ['KaTeX', 'MIT'],
@@ -68,7 +69,9 @@ export function AboutPage(_props: PageProps) {
         <Divider />
         <Row icon={<Scale size={20} />} title="Terms of service" onClick={() => open('/terms')} trailing={<ExternalLink size={16} className="c-3" />} />
         <Divider />
-        <Row icon={<Code2 size={20} />} title="Open-source licenses" subtitle="Facet is licensed under Apache 2.0" onClick={() => setLicenses(true)} />
+        <Row icon={<Code2 size={20} />} title="Source code" subtitle="github.com/DTSoftwareOU/facet" onClick={() => p.openExternal(SOURCE)} trailing={<ExternalLink size={16} className="c-3" />} />
+        <Divider />
+        <Row icon={<ScrollText size={20} />} title="Open-source licenses" subtitle="Facet is licensed under Apache 2.0" onClick={() => setLicenses(true)} />
       </Group>
       {licenses && (
         <Dialog title="Open-source licenses" onClose={() => setLicenses(false)} footer={<Button onClick={() => setLicenses(false)}>Done</Button>}>

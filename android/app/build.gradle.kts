@@ -27,7 +27,7 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         buildConfigField("String", "DEFAULT_SYNC_URL", "\"https://facet.dtsoftware.io\"")
-        buildConfigField("String", "SOURCE_URL", "\"https://github.com/dtsoftware/facet\"")
+        buildConfigField("String", "SOURCE_URL", "\"https://github.com/DTSoftwareOU/facet\"")
         buildConfigField("String", "WEBSITE_URL", "\"https://facet.dtsoftware.io\"")
     }
 

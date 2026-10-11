@@ -1,7 +1,7 @@
 // Facet site — progressive enhancement only. No tracking, no external requests.
 (() => {
-  // Source repository. Placeholder: replace with the real repository URL before launch.
-  const REPO_URL = 'https://github.com/dtsoftware/facet';
+  // Source repository.
+  const REPO_URL = 'https://github.com/DTSoftwareOU/facet';
 
   document.querySelectorAll('[data-repo-path]').forEach((a) => {
     a.href = REPO_URL + a.getAttribute('data-repo-path');
