@@ -15,7 +15,7 @@ import { PricingCatalog } from './llm/pricing';
 import { LocalQuirkStore } from './llm/quirks';
 import { platform } from './platform';
 import { shellStrings } from './platform/shellStrings';
-import { Computers, type ChatComputer, type ComputerFields, type ComputerState } from './remote/computers';
+import { computerNote, Computers, type ChatComputer, type ComputerFields, type ComputerState } from './remote/computers';
 import { HostService } from './remote/host';
 import { RemoteHub, type RelayTransport } from './remote/hub';
 import { msg } from './i18n';
@@ -74,13 +74,20 @@ export class App {
       settings: this.settings,
       media: this.media,
       computerFor: (id) => this.computerFor(id),
+      computerNote: (id) => this.computerNote(id),
+      computerUsed: (id, computer) => this.computerUsed(id, computer),
     });
     this.chat = new ChatEngine(
       this.conversations, this.providers, this.assistants, this.attachments, this.settings, this.pricing, this.sync, this.tools,
       (serverId, tool) => this.mcp.autoApprove(serverId, tool),
     );
     this.remote = new RemoteHub(this.relayTransport());
-    this.computers = new Computers(this.remote, () => this.defaultFolder(), () => this.recentFolders());
+    this.computers = new Computers(this.remote, () => this.defaultFolder(), () => this.recentFolders(), {
+      lastUsed: () => this.settings.local.lastComputerHost,
+      names: () => this.settings.local.computerNames ?? {},
+      remember: ({ used, names }) =>
+        this.settings.updateLocal((l) => ({ ...l, lastComputerHost: used ?? l.lastComputerHost, computerNames: names ?? l.computerNames })),
+    });
     this.host = platform().host
       ? new HostService(this.remote, {
           defaultFolder: () => this.defaultFolder(),
@@ -189,6 +196,21 @@ export class App {
     const conv = conversationId ? await db().conversations.get(conversationId) : undefined;
     const state = await this.computers.resolve(conv ?? null);
     return state.kind === 'ready' ? state.computer : null;
+  }
+
+  /** What the model hears when the chat's PC can't be used right now (offline, or remote use off). */
+  async computerNote(conversationId: string | null | undefined): Promise<string | null> {
+    const conv = conversationId ? await db().conversations.get(conversationId) : undefined;
+    return computerNote(await this.computers.resolve(conv ?? null), this.computers.knownNames());
+  }
+
+  /** After a computer tool ran: a chat that hadn't chosen a PC stays on this one and its folder. */
+  async computerUsed(conversationId: string | null | undefined, computer: ChatComputer): Promise<void> {
+    if (!computer.local) this.computers.markUsed(computer.hostId);
+    if (!conversationId || !computer.folder || computer.hostId === 'local') return;
+    const conv = await db().conversations.get(conversationId);
+    if (!conv || conv.deleted || conv.computerHost) return;
+    await this.conversations.setComputer(conversationId, { host: computer.hostId, folder: computer.folder });
   }
 
   private relayKeyCache: Promise<CryptoKey | null> | null = null;

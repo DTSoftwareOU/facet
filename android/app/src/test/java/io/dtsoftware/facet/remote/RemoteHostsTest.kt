@@ -27,8 +27,11 @@ class RemoteHostsTest {
     private val relay = FakeRelay()
     private val known = object : KnownHostStore {
         val map = HashMap<String, String>()
+        var last: String? = null
         override fun names() = map.toMap()
         override fun remember(hostId: String, name: String) { map[hostId] = name }
+        override fun lastUsed() = last
+        override fun markUsed(hostId: String) { last = hostId }
     }
     private val remote = RemoteHosts(scope, relay, known)
 
@@ -72,6 +75,32 @@ class RemoteHostsTest {
         val second = relay.add(FakePc(relay, session = "sess-pc-2", hostId = "host-2", name = "LAPTOP"))
         relay.presence(second.session, true)
         remote.awaitHost("host-2")
+    }
+
+    @Test
+    fun chatsWithoutAPcUseTheOnlineOneThatAllowsItThenTheOneUsedLast() = runBlocking {
+        val alpha = relay.add(FakePc(relay, session = "sess-a", hostId = "host-a", name = "ALPHA", remote = false))
+        val bravo = relay.add(FakePc(relay, session = "sess-b", hostId = "host-b", name = "BRAVO"))
+        val charlie = relay.add(FakePc(relay, session = "sess-c", hostId = "host-c", name = "CHARLIE"))
+        assertNull(remote.automatic())
+        listOf(alpha, bravo, charlie).forEach { it.announce() }
+        eventually { remote.hosts.value.size == 3 }
+        assertEquals("host-b", remote.automatic()?.hostId)
+        remote.markUsed("host-c")
+        assertEquals("host-c", remote.automatic()?.hostId)
+        assertEquals("host-c", known.last)
+        assertEquals("host-c", remote.lastUsed.value)
+
+        // Only a PC with remote use off is left: it's still the chat's PC, so the app can say how to turn it on.
+        relay.presence(bravo.session, false)
+        relay.presence(charlie.session, false)
+        eventually { remote.hosts.value.size == 1 }
+        assertEquals("host-a", remote.automatic()?.hostId)
+        // A PC that can't run tools is never picked.
+        alpha.features = listOf("files")
+        alpha.announce()
+        eventually { remote.hosts.value["host-a"]?.features == listOf("files") }
+        assertNull(remote.automatic())
     }
 
     @Test

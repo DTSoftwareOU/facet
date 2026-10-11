@@ -34,6 +34,9 @@ class PeerOfflineException : Exception("That device isn't connected.")
 interface KnownHostStore {
     fun names(): Map<String, String>
     fun remember(hostId: String, name: String)
+    /** The PC this device used last: chats that haven't chosen one prefer it. */
+    fun lastUsed(): String? = null
+    fun markUsed(hostId: String) {}
 }
 
 class PrefsKnownHostStore(context: Context) : KnownHostStore {
@@ -48,7 +51,14 @@ class PrefsKnownHostStore(context: Context) : KnownHostStore {
         prefs.edit().putString(KEY, AppJson.encodeToString(current + (hostId to name))).apply()
     }
 
+    override fun lastUsed(): String? = prefs.getString(KEY_LAST, null)
+
+    override fun markUsed(hostId: String) {
+        prefs.edit().putString(KEY_LAST, hostId).apply()
+    }
+
     private companion object {
         const val KEY = "host_names"
+        const val KEY_LAST = "last_used_host"
     }
 }

@@ -67,7 +67,7 @@ export function ChatScreen({ route }: { route: Route }) {
   const [draftModel, setDraftModel] = useState<ModelRef | null>(null);
   const [draftParams, setDraftParams] = useState<GenParams | null>(null);
   const [draftAssistant, setDraftAssistant] = useState<string | null>(null);
-  /** A new chat's PC and folder: undefined until the user picks (then the Windows app uses this PC). */
+  /** A new chat's PC and folder: undefined until the user picks (automatic: this PC in the Windows app, else your online PC). */
   const [draftComputer, setDraftComputer] = useState<ComputerBinding | null | undefined>(undefined);
   const [computerDialog, setComputerDialog] = useState(false);
   const [resume, setResume] = useState<{ agent: AgentKind; computer: ChatComputer } | null>(null);
@@ -104,7 +104,7 @@ export function ChatScreen({ route }: { route: Route }) {
   const model = resolveModel(catalog, modelRef);
   const params: GenParams = conv ? parseParams(conv.paramsJson) : draftParams ?? (draftAssistant ? assistant.params : null) ?? defaults.params;
 
-  // ---- the chat's computer: this PC, another PC of the account, or none (docs/REMOTE.md) ----
+  // ---- the chat's computer: this PC, another PC of the account (chosen or automatic), or none (docs/REMOTE.md) ----
   const hosts = useHosts();
   const otherPcs = hosts.filter((h) => h.hostId !== app.computers.hostId);
   const computerFields = conv
@@ -366,7 +366,7 @@ export function ChatScreen({ route }: { route: Route }) {
         {platform().kind === 'web' ? t('AI can make mistakes. Chats are end-to-end encrypted, and replies come straight from the provider you choose.') : t('AI can make mistakes. Check important answers.')}
       </div>
 
-      {computerDialog && <ComputerDialog binding={binding} onPick={setComputer} onClose={() => setComputerDialog(false)} />}
+      {computerDialog && <ComputerDialog binding={binding} usesPc={!!computerState && computerState.kind !== 'none'} onPick={setComputer} onClose={() => setComputerDialog(false)} />}
       {resume && (
         <ResumeDialog
           agent={resume.agent}

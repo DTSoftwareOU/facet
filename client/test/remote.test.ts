@@ -3,9 +3,11 @@ import { ConversationRepository, MessageTree } from '../src/data/conversations';
 import { db } from '../src/data/db';
 import { importAgentSession, resumeInstructions } from '../src/domain/resume';
 import { defaultParams } from '../src/llm/types';
+import { computerNote, Computers, NO_COMPUTER, NO_COMPUTER_BINDING, type ComputerMemory } from '../src/remote/computers';
 import { RemoteHub, type HostHandler, type RelayPeer, type RelayTransport } from '../src/remote/hub';
 import { RemoteError, type RemoteMessage } from '../src/remote/protocol';
 import { relayKey } from '../src/sync/relay';
+import { FakeNet, installPlatform } from './mcp/fakes';
 
 /** An in-memory relay between hubs: the server's role, minus HTTP. */
 class FakeRelay {
@@ -44,12 +46,12 @@ class FakeRelay {
 }
 
 /** A minimal PC: announces itself and answers a few methods. */
-function fakeHost(hostId: string, opts: { remote?: boolean; slow?: boolean } = {}) {
+function fakeHost(hostId: string, opts: { remote?: boolean; slow?: boolean; name?: string } = {}) {
   const cancelled: string[] = [];
   const make = (hub: RemoteHub): HostHandler => ({
     async handle(from: string, m: RemoteMessage) {
       if (m.type === 'hello') {
-        await hub.send(from, { type: 'host', re: m.id, hostId, name: 'OFFICE-PC', os: 'Windows 11', version: '1.1.0', remote: opts.remote ?? true, home: 'C:\\Users\\alex', defaultFolder: 'C:\\Users\\alex\\Documents', recentFolders: [], features: ['computer'] });
+        await hub.send(from, { type: 'host', re: m.id, hostId, name: opts.name ?? 'OFFICE-PC', os: 'Windows 11', version: '1.1.0', remote: opts.remote ?? true, home: 'C:\\Users\\alex', defaultFolder: 'C:\\Users\\alex\\Documents', recentFolders: [], features: ['computer'] });
         return;
       }
       if (m.type === 'cancel') {
@@ -192,6 +194,86 @@ describe('RemoteHub', () => {
     expect(phone.host('host-1')?.remote).toBe(false);
     phone.reset();
     expect(phone.hosts).toEqual([]);
+  });
+});
+
+/** Local preferences for Computers, in memory. */
+function memory() {
+  const state = { last: null as string | null, names: {} as Record<string, string> };
+  const mem: ComputerMemory = {
+    lastUsed: () => state.last,
+    names: () => state.names,
+    remember: ({ used, names }) => {
+      if (used) state.last = used;
+      if (names) state.names = names;
+    },
+  };
+  return { state, mem };
+}
+
+describe('Computers', () => {
+  it('uses your online PC in chats that have not chosen one, unless they opted out', async () => {
+    installPlatform(new FakeNet());
+    const relay = new FakeRelay();
+    relay.join('pc', 'PC', fakeHost('host-1').make);
+    const phone = relay.join('phone', 'Phone');
+    const { state, mem } = memory();
+    const computers = new Computers(phone, async () => '', async () => [], mem);
+    await computers.start();
+    expect(await computers.resolve(null)).toEqual({ kind: 'none', automatic: true });
+    // No PC ever seen: nothing to tell the model.
+    expect(computerNote(await computers.resolve(null), computers.knownNames())).toBeNull();
+
+    await phone.discover();
+    await tick();
+    const auto = await computers.resolve({ computerHost: null, computerFolder: null, workspace: null });
+    expect(auto.kind === 'ready' && [auto.automatic, auto.computer.local, auto.computer.hostId, auto.computer.name, auto.computer.folder]).toEqual([
+      true, false, 'host-1', 'OFFICE-PC', 'C:\\Users\\alex\\Documents',
+    ]);
+    expect(computerNote(auto)).toBeNull();
+    expect(state.names).toEqual({ 'host-1': 'OFFICE-PC' });
+    expect(await computers.resolve({ computerHost: NO_COMPUTER, computerFolder: null, workspace: null })).toEqual({ kind: 'none' });
+
+    // The PC goes away: a chat bound to it is offline (named), and an automatic chat tells the model so.
+    relay.leave('pc');
+    const bound = await computers.resolve({ computerHost: 'host-1', computerFolder: 'C:\\code', workspace: null });
+    expect(bound).toEqual({ kind: 'offline', hostId: 'host-1', folder: 'C:\\code', name: 'OFFICE-PC' });
+    expect(computerNote(bound)).toContain("This chat works on the user's PC OFFICE-PC, which is offline right now");
+    expect(computerNote(await computers.resolve(null), computers.knownNames())).toContain("The user's PC (OFFICE-PC) isn't online right now");
+    // Opted out: no note.
+    expect(computerNote(await computers.resolve({ computerHost: NO_COMPUTER, computerFolder: null, workspace: null }), computers.knownNames())).toBeNull();
+  });
+
+  it('prefers PCs that allow remote use, then the one used last, and explains when remote use is off', async () => {
+    installPlatform(new FakeNet());
+    const relay = new FakeRelay();
+    relay.join('pc-a', 'A', fakeHost('host-a', { name: 'ALPHA', remote: false }).make);
+    relay.join('pc-b', 'B', fakeHost('host-b', { name: 'BRAVO' }).make);
+    relay.join('pc-c', 'C', fakeHost('host-c', { name: 'CHARLIE' }).make);
+    const phone = relay.join('phone', 'Phone');
+    const { mem } = memory();
+    const computers = new Computers(phone, async () => '', async () => [], mem);
+    await phone.discover();
+    await tick();
+    expect(computers.automaticHost()?.name).toBe('BRAVO');
+    computers.markUsed('host-c');
+    expect(computers.automaticHost()?.name).toBe('CHARLIE');
+
+    relay.leave('pc-b');
+    relay.leave('pc-c');
+    const off = await computers.resolve(null);
+    expect(off.kind === 'disabled' && [off.automatic, off.host.name]).toEqual([true, 'ALPHA']);
+    expect(computerNote(off)).toContain('turn on "Let your other devices use this PC" in Facet AI on ALPHA');
+  });
+
+  it('stores "no PC" without a folder', async () => {
+    const conversations = new ConversationRepository();
+    const c = await conversations.create(null, null, null, defaultParams(), null, NO_COMPUTER_BINDING);
+    expect([c.computerHost, c.computerFolder]).toEqual([NO_COMPUTER, null]);
+    await conversations.setComputer(c.id, { host: 'host-1', folder: 'D:\\site' });
+    expect((await conversations.get(c.id))?.computerHost).toBe('host-1');
+    await conversations.setComputer(c.id, null);
+    expect((await conversations.get(c.id))?.computerHost).toBeNull();
   });
 });
 

@@ -48,6 +48,10 @@ class RemoteHosts(
     /** Names of PCs seen on this device, including offline ones. */
     val knownNames: StateFlow<Map<String, String>> = _names.asStateFlow()
 
+    private val _lastUsed = MutableStateFlow(known?.lastUsed())
+    /** The PC this device used last (chats that haven't chosen a PC prefer it). */
+    val lastUsed: StateFlow<String?> = _lastUsed.asStateFlow()
+
     private class Pending(val sessionId: String, val result: CompletableDeferred<JsonObject>)
     private class Cached<T>(val sessionId: String, val version: String, val value: T)
 
@@ -76,6 +80,16 @@ class RemoteHosts(
 
     /** The PC's name, from the online host or remembered; null when this device never saw it. */
     fun nameOf(hostId: String): String? = _hosts.value[hostId]?.name ?: _names.value[hostId]
+
+    /** The PC a chat that hasn't chosen one uses now (docs/REMOTE.md); see [pickAutomatic]. */
+    fun automatic(hosts: Map<String, RemoteHost> = _hosts.value): RemoteHost? = pickAutomatic(hosts.values, _lastUsed.value)
+
+    /** Notes that this device used [hostId], so chats that haven't chosen a PC prefer it. */
+    fun markUsed(hostId: String) {
+        if (hostId == NO_PC || _lastUsed.value == hostId) return
+        _lastUsed.value = hostId
+        known?.markUsed(hostId)
+    }
 
     // ---- stream events ----
 
@@ -330,6 +344,20 @@ class RemoteHosts(
     companion object {
         /** How long a call waits for the change stream to (re)connect before giving up. */
         const val CONNECT_TIMEOUT_MS = 15_000L
+
+        /** `computerHost` of a chat that doesn't use a PC ("Don't use a PC"). Host ids are 16+ characters, so it can't clash. */
+        const val NO_PC = "none"
+
+        /**
+         * The PC for a chat that hasn't chosen one: an online PC that can run tools, preferring ones that
+         * allow remote use, then the one this device used last, then by name.
+         */
+        fun pickAutomatic(hosts: Collection<RemoteHost>, lastUsed: String?): RemoteHost? {
+            val pcs = hosts.filter { it.features.isEmpty() || it.has(RemoteFeature.COMPUTER) }
+            if (pcs.isEmpty()) return null
+            val pool = pcs.filter { it.remote }.ifEmpty { pcs }
+            return pool.firstOrNull { it.hostId == lastUsed } ?: pool.minByOrNull { it.name.lowercase() }
+        }
 
         fun turnOnHint(pcName: String) = Strings.get(R.string.remote_turn_on_hint, pcName)
     }

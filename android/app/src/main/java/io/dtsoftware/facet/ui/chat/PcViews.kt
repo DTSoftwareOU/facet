@@ -93,7 +93,7 @@ fun PcChip(pc: PcState, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val name = pc.name ?: stringResource(R.string.pcview_your_pc)
     val host = pc.host
     val (label, description) = when {
-        !pc.bound -> (pc.hosts.singleOrNull()?.name ?: stringResource(R.string.pcview_use_a_pc)) to stringResource(R.string.pcview_use_a_pc_description)
+        !pc.usesPc -> stringResource(R.string.pcview_use_a_pc) to stringResource(R.string.pcview_use_a_pc_description)
         host == null -> stringResource(R.string.pcview_pc_offline, name) to stringResource(R.string.pcview_pc_offline_description, name)
         !host.remote -> stringResource(R.string.pcview_access_off, name) to RemoteHosts.turnOnHint(name)
         else -> {
@@ -104,7 +104,7 @@ fun PcChip(pc: PcState, onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
     val chooseLabel = stringResource(R.string.pcview_choose_pc_or_folder)
     val active = pc.ready
-    val muted = pc.bound && !pc.ready
+    val muted = pc.usesPc && !pc.ready
     val bg by animateColorAsState(if (active) c.primaryContainer else Color.Transparent, label = "pcChipBg")
     val fg by animateColorAsState(
         when {
@@ -145,7 +145,7 @@ private sealed interface PcPage {
 
 /**
  * Choose the chat's PC and folder, or none. [startWithFolders] opens straight on the folder browser (/folder).
- * [onBind] sets the chat's computerHost and computerFolder (both null for "Don't use a PC").
+ * [onBind] sets the chat's computerHost and computerFolder ([RemoteHosts.NO_PC] and null for "Don't use a PC").
  */
 @Composable
 fun PcSheet(
@@ -228,7 +228,7 @@ private fun PcMain(
         }
 
         // The online PCs, plus the chat's PC when it's offline.
-        val offlineBound = pc.hostId?.takeIf { pc.host == null }
+        val offlineBound = pc.hostId?.takeIf { pc.bound && pc.host == null }
         SettingsGroup(title = stringResource(R.string.pcview_pcs)) {
             pc.hosts.forEachIndexed { i, h ->
                 if (i > 0) GroupDivider()
@@ -239,10 +239,10 @@ private fun PcMain(
                         h.os.isNotBlank() -> stringResource(R.string.pcview_online_os, h.os)
                         else -> stringResource(R.string.pcview_online)
                     },
-                    selected = h.hostId == pc.hostId,
+                    selected = h.hostId == pc.host?.hostId,
                     online = true,
                     available = h.remote,
-                    onClick = if (h.remote && h.hostId != pc.hostId) ({ onBind(h.hostId, h.defaultFolder) }) else null,
+                    onClick = if (h.remote && !(pc.bound && h.hostId == pc.hostId)) ({ onBind(h.hostId, h.defaultFolder) }) else null,
                 )
             }
             if (offlineBound != null) {
@@ -251,7 +251,7 @@ private fun PcMain(
             }
         }
 
-        if (pc.bound) {
+        if (pc.usesPc) {
             val folder = pc.workingFolder
             val host = pc.host?.takeIf { it.remote }
             SettingsGroup(title = stringResource(R.string.pcview_folder)) {
@@ -273,7 +273,7 @@ private fun PcMain(
                 SettingsRow(
                     stringResource(R.string.pcview_dont_use_pc), subtitle = stringResource(R.string.pcview_dont_use_pc_subtitle), icon = R.drawable.ic_monitor_off,
                     onClick = {
-                        onBind(null, null)
+                        onBind(RemoteHosts.NO_PC, null)
                         onDismiss()
                     },
                     showChevron = false,

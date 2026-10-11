@@ -28,13 +28,28 @@ class PcTools(
     private val conversations: ConversationRepository,
     private val settings: SettingsStore,
 ) {
-    /** Adds the PC's tools and the computer instructions when [conversation] is bound to an online PC that allows remote use. */
+    /**
+     * Adds the PC's tools and the computer instructions when [conversation]'s PC (the one it chose, or for a chat
+     * that hasn't chosen, the one online now) allows remote use. When it can't be used, the model is told why,
+     * so it can say what to do instead of claiming it has no access.
+     */
     suspend fun addTools(defs: MutableList<ToolDef>, addendum: MutableList<String>, conversation: ConversationEntity?) {
-        val hostId = conversation?.computerHost ?: return
-        val host = remote.hosts.value[hostId]?.takeIf { it.remote && (it.features.isEmpty() || it.has(RemoteFeature.COMPUTER)) } ?: return
+        val chosen = conversation?.computerHost
+        if (chosen == RemoteHosts.NO_PC) return
+        val host = if (chosen != null) remote.hosts.value[chosen] else remote.automatic()
+        if (host == null) {
+            val note = if (chosen != null) offlineNote(remote.nameOf(chosen)) else automaticOfflineNote(remote.knownNames.value.values.toList())
+            note?.let { addendum += it }
+            return
+        }
+        if (!host.remote) {
+            addendum += disabledNote(host.name)
+            return
+        }
+        if (host.features.isNotEmpty() && !host.has(RemoteFeature.COMPUTER)) return
         // The PC isn't answering: offer no computer tools rather than fail the reply.
-        val tools = runCatching { remote.computerTools(hostId) }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return
-        val info = runCatching { remote.computerInfo(hostId) }.getOrNull()
+        val tools = runCatching { remote.computerTools(host.hostId) }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return
+        val info = runCatching { remote.computerInfo(host.hostId) }.getOrNull()
         val approval = settings.local.value.pcApproval
         defs += toolDefs(tools, host, approval, defs.map { it.spec.name }.toSet())
         addendum += addendum(info, host, workingFolder(conversation, host))
@@ -49,7 +64,11 @@ class PcTools(
         val conversation = ctx.conversationId?.let { conversations.get(it) }
         val tool = def.remoteName ?: def.spec.name
         return try {
-            val r = remote.computerCall(hostId, tool, argumentsJson, workingFolder(conversation, host), ctx.callId ?: Ids.new())
+            val cwd = workingFolder(conversation, host)
+            val r = remote.computerCall(hostId, tool, argumentsJson, cwd, ctx.callId ?: Ids.new())
+            remote.markUsed(hostId)
+            // A chat that hadn't chosen a PC stays on this one and its folder.
+            if (conversation != null && conversation.computerHost == null && cwd.isNotEmpty()) conversations.setComputer(conversation.id, hostId, cwd)
             ToolOutcome(
                 r.content.ifBlank { if (r.isError) "The tool failed without a message." else "(No output.)" },
                 r.isError,
@@ -84,6 +103,33 @@ class PcTools(
                     ToolKind.COMPUTER, serverId = host.hostId, serverName = host.name, remoteName = t.name, needsApproval = needsApproval,
                 )
             }
+        }
+
+        /** A PC name as plain text for the model's instructions. */
+        private fun plainName(name: String): String =
+            name.replace(Regex("[\\u0000-\\u001f\\u007f\"]"), " ").trim().take(64).ifEmpty { "the PC" }
+
+        /** The chat's PC is online but doesn't allow other devices to use it (registry.ts `computerNote`). */
+        fun disabledNote(pcName: String): String {
+            val pc = plainName(pcName)
+            return "## Computer\nThe user's PC $pc is online, but Facet AI on it doesn't let other devices use it, so you can't see its files or run commands on it from here. " +
+                "If the user asks for something on that PC, tell them to turn on \"Let your other devices use this PC\" in Facet AI on $pc " +
+                "(in the menu of the Facet AI icon in the Windows notification area, or Settings, Computer access), then ask again."
+        }
+
+        /** The PC the chat chose is offline. */
+        fun offlineNote(pcName: String?): String {
+            val pc = pcName?.let { "PC ${plainName(it)}" } ?: "PC"
+            return "## Computer\nThis chat works on the user's $pc, which is offline right now, so you can't see its files or run commands on it. " +
+                "If the user asks for something on that PC, tell them to start Facet AI on it, signed in to the same account, and ask again."
+        }
+
+        /** No PC is online for a chat that hasn't chosen one, though this device has seen [knownNames] before. */
+        fun automaticOfflineNote(knownNames: List<String>): String? {
+            if (knownNames.isEmpty()) return null
+            val pcs = knownNames.take(3).joinToString(", ") { plainName(it) }
+            return "## Computer\nThe user's PC ($pcs) isn't online right now, so you can't see its files or run commands on it. " +
+                "If the user asks for something on their computer, tell them to start Facet AI on that PC, signed in to the same account, and ask again."
         }
 
         /** The chat's folder on the PC, else the PC's default folder. */

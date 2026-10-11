@@ -279,8 +279,8 @@ class ChatEngine(
 
         _live.update { it + (reply.id to LiveTurn(reply.id, conversationId)) }
         _active.update { it + conversationId }
-        // A chat that works on a PC keeps the relay stream open for the whole reply, also in the background.
-        val releaseStream = if (conv.computerHost != null) sync.holdStream() else null
+        // A chat that may work on a PC (chosen, or automatically) keeps the relay stream open for the whole reply, also in the background.
+        val releaseStream = if (conv.computerHost != io.dtsoftware.facet.remote.RemoteHosts.NO_PC) sync.holdStream() else null
         val job = scope.launch {
             try {
                 generate(conversationId, reply, provider, model)

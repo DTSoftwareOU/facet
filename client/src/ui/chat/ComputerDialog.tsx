@@ -8,7 +8,7 @@ import { getApp } from '../../app';
 import type { ComputerBinding } from '../../data/entities';
 import { formatList, t } from '../../i18n';
 import type { FolderEntry, FolderListing } from '../../platform/platform';
-import type { ChatComputer } from '../../remote/computers';
+import { NO_COMPUTER_BINDING, type ChatComputer } from '../../remote/computers';
 import { Button, Dialog, Divider, Group, IconButton, Row, Spinner } from '../components/primitives';
 import { useHosts } from '../hooks';
 
@@ -27,9 +27,11 @@ async function computerFor(hostId: string): Promise<ChatComputer | null> {
   return app.computers.remote(hostId);
 }
 
-export function ComputerDialog({ binding, onPick, onClose }: {
+export function ComputerDialog({ binding, usesPc, onPick, onClose }: {
   binding: ComputerBinding | null;
-  onPick: (binding: ComputerBinding | null) => void;
+  /** The chat uses a PC now (chosen, or automatically), so it can opt out. */
+  usesPc: boolean;
+  onPick: (binding: ComputerBinding) => void;
   onClose: () => void;
 }) {
   const app = getApp();
@@ -61,8 +63,8 @@ export function ComputerDialog({ binding, onPick, onClose }: {
       size="narrow"
       footer={
         <>
-          {binding && (
-            <Button variant="text" onClick={() => { onPick(null); onClose(); }}>
+          {usesPc && (
+            <Button variant="text" onClick={() => { onPick(NO_COMPUTER_BINDING); onClose(); }}>
               {t('Don’t use a PC')}
             </Button>
           )}

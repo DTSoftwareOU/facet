@@ -24,8 +24,8 @@ android {
         applicationId = "io.dtsoftware.facet"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.3.0"
         buildConfigField("String", "DEFAULT_SYNC_URL", "\"https://facet.dtsoftware.io\"")
         buildConfigField("String", "SOURCE_URL", "\"https://github.com/DTSoftwareOU/facet\"")
         buildConfigField("String", "WEBSITE_URL", "\"https://facet.dtsoftware.io\"")

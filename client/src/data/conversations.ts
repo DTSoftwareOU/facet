@@ -118,7 +118,7 @@ export class ConversationRepository {
       id: newId(now), title: t('New chat'), titleSet: false, assistantId, folderId, providerId, modelId,
       paramsJson: toJson(params), systemPrompt: null, currentLeafId: null, pinned: false, archived: 0,
       createdAt: now, lastActivityAt: now, updatedAt: now, deleted: 0, dirty: 1,
-      computerHost: computer?.host ?? null, computerFolder: computer?.folder ?? null,
+      computerHost: computer?.host ?? null, computerFolder: computer?.folder || null,
     };
     await db().conversations.put(c);
     return c;
@@ -160,9 +160,9 @@ export class ConversationRepository {
     return this.update(id, (c) => ({ ...c, currentLeafId: leafId }));
   }
 
-  /** The PC and folder the chat's computer tools work in (synced), or none. */
+  /** The PC and folder the chat's computer tools work in (synced): null = automatic, NO_COMPUTER_BINDING = no PC. */
   setComputer(id: string, computer: ComputerBinding | null) {
-    return this.update(id, (c) => ({ ...c, computerHost: computer?.host ?? null, computerFolder: computer?.folder ?? null, workspace: null }));
+    return this.update(id, (c) => ({ ...c, computerHost: computer?.host ?? null, computerFolder: computer?.folder || null, workspace: null }));
   }
 
   /** Soft-deletes a conversation with its messages and attachments (tombstones sync to other devices). */

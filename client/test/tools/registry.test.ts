@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, FacetDb, setDb } from '../../src/data/db';
 import type { AttachmentEntity, McpServerEntity } from '../../src/data/entities';
+import type { ChatComputer } from '../../src/remote/computers';
 import { DEFAULT_LOCAL, defaultSynced, type LocalPrefs, type SettingsStore, type SyncedPrefs } from '../../src/data/prefs';
 import { defaultCaps, defaultParams, type ModelCaps, type GenParams } from '../../src/llm/types';
 import { platform, type ComputerBridge } from '../../src/platform';
@@ -21,7 +22,12 @@ let search: SearchConfig | null;
 const settings = { get synced() { return synced; }, get local() { return local; } } as unknown as SettingsStore;
 
 /** The app resolves a chat's computer (remote/computers.ts); here: this PC's bridge in the chat's folder. */
-function registry(extra: { media?: MediaToolService; workspaceFor?: (id: string | null | undefined) => Promise<string> } = {}) {
+function registry(extra: {
+  media?: MediaToolService;
+  workspaceFor?: (id: string | null | undefined) => Promise<string>;
+  computerNote?: (id: string | null | undefined) => Promise<string | null>;
+  computerUsed?: (id: string | null | undefined, computer: ChatComputer) => Promise<void>;
+} = {}) {
   const { workspaceFor, ...rest } = extra;
   return new ToolRegistry({
     search: new WebSearch(),
@@ -257,6 +263,26 @@ describe('computer tools', () => {
     expect(calls[1].name).toBe('fetch_page');
     expect(calls[1].args).toBe('{}');
     expect(calls[1].ctx.callId).toHaveLength(22); // a fresh id when the engine gives none
+  });
+
+  it('tells the model why the PC is unavailable, and reports each use', async () => {
+    const computerNote = vi.fn(async () => '## Computer\nThe PC is offline.');
+    const p = await registry({ computerNote }).prepare(params(), caps(), 'c1');
+    expect(p.defs.filter((d) => d.kind === 'COMPUTER')).toEqual([]);
+    expect(p.systemAddendum).toBe('## Computer\nThe PC is offline.');
+    expect(computerNote).toHaveBeenCalledWith('c1');
+    // Off in Settings: no tools and no note.
+    local = { ...local, computerTools: false };
+    expect((await registry({ computerNote }).prepare(params(), caps(), 'c1')).systemAddendum).toBeNull();
+    local = { ...local, computerTools: true };
+
+    installPlatform(net, { computer: computer() });
+    const used: [string | null | undefined, string][] = [];
+    const r = registry({ computerNote, computerUsed: async (id, c) => void used.push([id, c.hostId]) });
+    const ready = await r.prepare(params(), caps(), 'c1');
+    expect(ready.systemAddendum).not.toContain('The PC is offline.');
+    await r.execute(ready.byName.get('read_file')!, '{"path":"a.txt"}', { conversationId: 'c1' });
+    expect(used).toEqual([['c1', 'me']]);
   });
 
   it('cancels the running command when the reply is stopped', async () => {

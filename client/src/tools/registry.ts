@@ -52,6 +52,10 @@ export interface ToolRegistryDeps {
   media?: MediaToolService;
   /** The computer a chat's tools run on (this PC, or a PC reached through the relay), if any. */
   computerFor?: (conversationId: string | null | undefined) => Promise<ChatComputer | null>;
+  /** When the chat has no computer right now: what to tell the model (e.g. the PC is offline), if anything. */
+  computerNote?: (conversationId: string | null | undefined) => Promise<string | null>;
+  /** A computer tool ran for the chat (a chat that hadn't chosen a PC then stays on this one). */
+  computerUsed?: (conversationId: string | null | undefined, computer: ChatComputer) => Promise<void>;
 }
 
 export const WEB_SEARCH = 'web_search';
@@ -257,7 +261,11 @@ export class ToolRegistry {
     const local = this.deps.settings.local;
     if (!local.computerTools) return;
     const target = await this.computer(conversationId);
-    if (!target) return;
+    if (!target) {
+      const note = await this.deps.computerNote?.(conversationId).catch(() => null);
+      if (note) addendum.push(note);
+      return;
+    }
     let tools;
     let info: ComputerInfo | null;
     try {
@@ -403,6 +411,7 @@ export class ToolRegistry {
     ctx.signal?.addEventListener('abort', onAbort, { once: true });
     try {
       const r = await computer.call(remote, argumentsJson, { cwd, callId });
+      await this.deps.computerUsed?.(ctx.conversationId, target).catch(() => {});
       return { content: r.content, isError: r.isError, label: r.label ? localizeComputerLabel(r.label) : `${COMPUTER_SERVER_NAME}: ${remote}` };
     } finally {
       ctx.signal?.removeEventListener('abort', onAbort);

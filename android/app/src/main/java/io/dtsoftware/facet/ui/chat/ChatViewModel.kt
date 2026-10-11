@@ -25,6 +25,7 @@ import io.dtsoftware.facet.llm.ProviderKind
 import io.dtsoftware.facet.remote.AgentImport
 import io.dtsoftware.facet.remote.CodingAgent
 import io.dtsoftware.facet.remote.RemoteHost
+import io.dtsoftware.facet.remote.RemoteHosts
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -74,34 +75,37 @@ data class ChatUiState(
 )
 
 /**
- * The PCs this device can use, and the one this chat (or the new chat being written) works on.
- * Nothing PC-related shows unless a PC is online or the chat is bound to one.
+ * The PCs this device can use, and the one this chat (or the new chat being written) works on: the PC it
+ * chose, or for a chat that hasn't chosen, the one online now ([RemoteHosts.pickAutomatic]).
+ * Nothing PC-related shows unless a PC is online or the chat chose one.
  */
 data class PcState(
     /** Online PCs, with or without remote use switched on. */
     val hosts: List<RemoteHost> = emptyList(),
-    /** The chat's PC (hostId), whether or not it's online. */
+    /** The chat's stored PC: a hostId, null (automatic) or [RemoteHosts.NO_PC]. */
     val hostId: String? = null,
     /** The chat's folder on that PC, if one was picked. */
     val folder: String? = null,
-    /** The chat's PC when it's online. */
+    /** The PC the chat uses now, when it's online: the chosen one, or the automatic one. */
     val host: RemoteHost? = null,
-    /** The chat's PC's name, also when it's offline (null if this device never saw it). */
+    /** That PC's name, also when a chosen PC is offline (null if this device never saw it). */
     val name: String? = null,
 ) {
-    val visible: Boolean get() = hosts.isNotEmpty() || hostId != null
-    val bound: Boolean get() = hostId != null
+    /** The chat said "Don't use a PC". */
+    val off: Boolean get() = hostId == RemoteHosts.NO_PC
+    /** The chat chose a PC. */
+    val bound: Boolean get() = hostId != null && !off
+    /** The chat uses a PC now: one it chose (online or not), or an online one automatically. */
+    val usesPc: Boolean get() = bound || (!off && host != null)
+    val visible: Boolean get() = hosts.isNotEmpty() || bound
     /** The chat's PC is online and lets this device use it. */
     val ready: Boolean get() = host?.remote == true
     /** The folder tools run in: the chat's, else the PC's default. */
-    val workingFolder: String? get() = folder ?: host?.defaultFolder
+    val workingFolder: String? get() = (if (bound) folder else null) ?: host?.defaultFolder
 
-    /**
-     * The PC that folder and session commands act on: the chat's when it's ready, or for a chat without a PC
-     * the only online PC that allows remote use.
-     */
+    /** The PC that folder and session commands act on: the chat's PC when it's ready. */
     val target: RemoteHost?
-        get() = if (bound) host?.takeIf { it.remote } else hosts.filter { it.remote }.singleOrNull()
+        get() = host?.takeIf { it.remote }
 }
 
 /** Draft state for a chat that hasn't been sent yet. */
@@ -182,12 +186,18 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
     val state: StateFlow<ChatUiState> = combine(baseState, toolsFlow, c.remote.hosts, c.remote.knownNames, newDraft) { s, (search, servers, skills), hosts, names, draft ->
         val conv = s.conversation
         val hostId = if (conv != null) conv.computerHost else draft.computerHost
+        // A chat that hasn't chosen a PC uses the one online now.
+        val using = when (hostId) {
+            null -> c.remote.automatic(hosts)?.hostId
+            RemoteHosts.NO_PC -> null
+            else -> hostId
+        }
         val pc = PcState(
             hosts = hosts.values.sortedBy { it.name.lowercase() },
             hostId = hostId,
             folder = if (conv != null) conv.computerFolder else draft.computerFolder,
-            host = hostId?.let { hosts[it] },
-            name = hostId?.let { hosts[it]?.name ?: names[it] },
+            host = using?.let { hosts[it] },
+            name = using?.let { hosts[it]?.name ?: names[it] },
         )
         s.copy(searchAvailable = search, mcpServers = servers, skillCount = skills, pc = pc)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChatUiState())
@@ -318,8 +328,12 @@ class ChatViewModel(private val c: AppContainer) : ViewModel() {
 
     // ---- PC ----
 
-    /** Binds the chat to [hostId] and [folder] on it, or to no PC (null). A new chat gets them when it's created. */
+    /**
+     * Binds the chat to [hostId] and [folder] on it, to no PC ([RemoteHosts.NO_PC]), or back to automatic (null).
+     * A new chat gets them when it's created.
+     */
     fun setPc(hostId: String?, folder: String?) {
+        hostId?.let { c.remote.markUsed(it) }
         val conv = state.value.conversation
         if (conv != null) {
             viewModelScope.launch { c.conversations.setComputer(conv.id, hostId, folder) }

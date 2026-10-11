@@ -38,6 +38,7 @@ import io.dtsoftware.facet.llm.StreamEvent
 import io.dtsoftware.facet.remote.FakePc
 import io.dtsoftware.facet.remote.FakeRelay
 import io.dtsoftware.facet.remote.RemoteHosts
+import org.junit.Assert.assertNull
 import io.dtsoftware.facet.remote.RemoteMethod
 import io.dtsoftware.facet.remote.eventually
 import java.util.Collections
@@ -237,23 +238,48 @@ class PcToolLoopTest {
     }
 
     @Test
-    fun onlyChatsBoundToAnAvailablePcGetItsTools() = runBlocking {
+    fun aChatWithoutAPcUsesTheOnlineOneAndStaysOnIt() = runBlocking {
+        val env = Env()
+        env.settings.updateLocal { it.copy(pcApproval = ToolApproval.NEVER) }
+        env.online()
+        val convId = env.send(env.client("read_file", """{"path":"notes.txt"}"""), "What's in my notes?", host = null)
+        env.awaitIdle()
+        val (_, params) = env.pc.calls.last { it.first == RemoteMethod.COMPUTER_CALL }
+        assertEquals("C:\\Users\\alex\\Documents", (params["cwd"] as JsonPrimitive).content)
+        val conv = env.conversations.get(convId)!!
+        assertEquals("host-1", conv.computerHost)
+        assertEquals("C:\\Users\\alex\\Documents", conv.computerFolder)
+        assertEquals("host-1", env.remote.lastUsed.value)
+        assertTrue(env.conversations.messages(convId).last { it.role == "assistant" }.content.contains("Done: 3 passed"))
+    }
+
+    @Test
+    fun chatsUseTheirPcOrTheOnlineOneAndTellTheModelWhenItCant() = runBlocking {
         val env = Env()
         env.online()
         env.client()
         val caps = ModelCaps(tools = true)
+        suspend fun prepare(conv: io.dtsoftware.facet.data.db.ConversationEntity?, params: GenParams = GenParams(), c: ModelCaps = caps) =
+            env.tools.prepare(params, c, conv)
         suspend fun computerTools(conv: io.dtsoftware.facet.data.db.ConversationEntity?, params: GenParams = GenParams(), c: ModelCaps = caps) =
-            env.tools.prepare(params, c, conv).defs.filter { it.kind == ToolKind.COMPUTER }
+            prepare(conv, params, c).defs.filter { it.kind == ToolKind.COMPUTER }
         val p = env.providers.all().first()
         val bound = env.conversations.create(null, p.id, "m1", GenParams(), computerHost = "host-1", computerFolder = "C:\\Users\\alex\\app")
         val plain = env.conversations.create(null, p.id, "m1", GenParams())
+        val noPc = env.conversations.create(null, p.id, "m1", GenParams(), computerHost = RemoteHosts.NO_PC)
         assertEquals(3, computerTools(bound).size)
-        // Not bound, tools off, or a model without tools: none.
-        assertTrue(computerTools(plain).isEmpty())
+        // A chat that hasn't chosen a PC uses the one online, in its default folder.
+        assertEquals(3, computerTools(plain).size)
+        assertTrue(prepare(plain).systemAddendum!!.contains("The working folder for this chat is C:\\Users\\alex\\Documents;"))
+        // "Don't use a PC", tools off, or a model without tools: none.
+        assertTrue(computerTools(noPc).isEmpty())
+        assertNull(prepare(noPc).systemAddendum)
         assertTrue(computerTools(bound, GenParams(tools = false)).isEmpty())
         assertTrue(computerTools(bound, c = ModelCaps(tools = false)).isEmpty())
-        // Bound to another PC that isn't online: none.
-        assertTrue(computerTools(bound.copy(computerHost = "host-2")).isEmpty())
+        // Bound to another PC that isn't online: none, and the model hears that it's offline.
+        val elsewhere = bound.copy(computerHost = "host-2")
+        assertTrue(computerTools(elsewhere).isEmpty())
+        assertTrue(prepare(elsewhere).systemAddendum!!.contains("This chat works on the user's PC, which is offline right now"))
 
         // Ask before: changes (default), every action, or never.
         val byName = computerTools(bound).associateBy { it.remoteName }
@@ -264,10 +290,13 @@ class PcToolLoopTest {
         env.settings.updateLocal { it.copy(pcApproval = ToolApproval.NEVER) }
         assertTrue(computerTools(bound).none { it.needsApproval })
 
-        // Remote use switched off on the PC: none.
+        // Remote use switched off on the PC: none, and the model hears how to turn it on.
         env.pc.remote = false
         env.pc.announce()
         eventually { env.remote.hosts.value["host-1"]?.remote == false }
         assertTrue(computerTools(bound).isEmpty())
+        assertTrue(computerTools(plain).isEmpty())
+        assertTrue(prepare(plain).systemAddendum!!.contains("turn on \"Let your other devices use this PC\" in Facet AI on OFFICE-PC"))
+        assertNull(prepare(noPc).systemAddendum)
     }
 }

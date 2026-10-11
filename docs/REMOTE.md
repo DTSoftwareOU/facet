@@ -3,8 +3,8 @@
 When the Facet app for Windows is running and signed in, the account's other devices (the
 Android app, the web app) can use that PC: run commands and read and edit files in a folder on
 it, browse its folders, and continue Claude Code and Codex sessions from those folders. The PC is
-the **host**; the phone or browser is the **controller**. When no host is online, controllers
-work as a normal chatbot.
+the **host**; the phone or browser is the **controller**. Chats use the PC automatically while it
+is online; when no host is online, controllers work as a normal chatbot.
 
 Messages between devices go through the sync server's relay, **end-to-end encrypted** with a key
 derived from the vault key. The server routes ciphertext between sessions of the same account; it
@@ -123,14 +123,27 @@ Controllers keep their stream open while they wait for a result, even in the bac
 
 Conversation records gain two optional, synced fields:
 
-- `computerHost`: the `hostId` of the PC the chat works on, or absent.
+- `computerHost`: the `hostId` of the PC the chat works on; absent when the chat hasn't chosen one
+  (automatic); `"none"` when the user picked **Don't use a PC**. Host ids are at least 16
+  characters, so `"none"` can't clash with one.
 - `computerFolder`: the folder on that PC (an absolute path).
 
 On that PC the chat's working folder is `computerFolder`. On other devices the chat offers the
 PC's computer tools while that host is online with remote use on, and works without them
 otherwise. In the Windows app, picking a folder for a chat sets both fields to the PC's own
-`hostId` and the folder. A chat without these fields uses the Windows app's default folder there
-and no PC elsewhere until the user picks one.
+`hostId` and the folder, and new chats start in the default folder.
+
+A chat that hasn't chosen a PC uses this PC in the Windows app. On other devices it uses the PC
+that is online now: among online hosts with the `computer` feature, the ones with remote use on
+first, then the one this device used last, then the first by name. The first time a computer tool
+runs in such a chat, the controller stores that PC and folder in the chat, so it keeps working on
+the same machine. `"none"` turns the PC off for the chat on every device.
+
+When the chat's PC can't be used, the model still hears why, so it can tell the user what to do
+instead of saying it has no access to the computer: the PC is online with remote use off (turn on
+**Let your other devices use this PC** on it), the chosen PC is offline, or no PC is online for an
+automatic chat although this device has seen one before (start Facet AI on it). These notes go
+into the system prompt only when tools are on and the model can use them.
 
 Controllers run the tool loop themselves: the model is called from the phone or browser with the
 user's keys; only the tools run on the PC. Approvals are shown on the controller, by its own
@@ -152,7 +165,7 @@ Typing `/` at the start of an empty message box opens a command list that filter
 | `/new` | Start a new chat | always |
 | `/model` | Choose the model | always |
 | `/folder` | Choose the chat's working folder (on the PC, from a controller) | the chat can use a computer |
-| `/pc` | Choose which PC the chat uses, or none | controllers, a host is online |
+| `/pc` | Choose which PC the chat uses (it uses the online one until you do), or none | controllers, a host is online |
 | `/resume-from-claude` | Continue a Claude Code session from the chat's folder | the chat can use a computer |
 | `/resume-from-codex` | Continue a Codex session from the chat's folder | the chat can use a computer |
 

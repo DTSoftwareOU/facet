@@ -34,6 +34,10 @@ export interface LocalPrefs {
   defaultWorkspace: string;
   /** Interface language: a locale code (src/i18n), or 'auto' to follow the system. */
   language: LanguagePref;
+  /** The PC (host id) this device used last: chats that haven't chosen one prefer it. */
+  lastComputerHost: string | null;
+  /** Names of the account's PCs this device has seen, by host id (to name one that's offline). */
+  computerNames: Record<string, string>;
 }
 
 export const DEFAULT_LOCAL: LocalPrefs = {
@@ -54,6 +58,8 @@ export const DEFAULT_LOCAL: LocalPrefs = {
   computerApproval: 'WRITES',
   defaultWorkspace: '',
   language: 'auto',
+  lastComputerHost: null,
+  computerNames: {},
 };
 
 /** A model reference: a configured provider plus a model id. */

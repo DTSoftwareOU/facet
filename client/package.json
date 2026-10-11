@@ -1,7 +1,7 @@
 {
   "name": "facet-client",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Facet for the web and Windows: the same end-to-end encrypted chat app as Android.",
   "license": "Apache-2.0",
   "type": "module",
