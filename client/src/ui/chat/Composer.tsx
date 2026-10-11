@@ -3,6 +3,7 @@ import { ArrowUp, Brain, FolderOpen, Globe, Library, Mic, Monitor, MonitorOff, P
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { getApp } from '../../app';
 import type { AttachmentEntity } from '../../data/entities';
+import { t, tm } from '../../i18n';
 import { EFFORT_INFO, type GenParams } from '../../llm/types';
 import type { ComputerState } from '../../remote/computers';
 import { isSearchKind } from '../../tools/types';
@@ -24,9 +25,15 @@ export interface SlashCommand {
   run: () => void;
 }
 
-/** "Code review" → "code-review", for saved prompts as commands. */
+/**
+ * "Code review" → "code-review", for saved prompts as commands. Latin accents are dropped
+ * ("Café" → "cafe"); other scripts keep their letters, so a Hindi or Japanese title still makes a command.
+ */
 export function commandName(title: string): string {
-  return title.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'prompt';
+  return (
+    title.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').normalize('NFC')
+      .replace(/[^\p{L}\p{M}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '') || 'prompt'
+  );
 }
 
 type SlashItem =
@@ -68,7 +75,7 @@ function DraftThumb({ a, onRemove }: { a: AttachmentEntity; onRemove: () => void
   return (
     <div className="composer-att">
       {a.kind === 'image' && url ? <img src={url} alt={a.name} /> : <FileChip att={a} />}
-      <button type="button" className="x" aria-label={`Remove ${a.name}`} onClick={onRemove}>
+      <button type="button" className="x" aria-label={t('Remove {name}', { name: a.name })} onClick={onRemove}>
         <X size={13} />
       </button>
     </div>
@@ -139,15 +146,15 @@ export const Composer = forwardRef<ComposerHandle, {
 
   useImperativeHandle(ref, () => ({
     focus: () => area.current?.focus(),
-    setText: (t) => {
-      setText(t);
+    setText: (value) => {
+      setText(value);
       setTimeout(() => area.current?.focus(), 0);
     },
     addFiles: (files) => void addFiles(files),
   }), [addFiles]);
 
   const dictation = useDictation(
-    useCallback((t: string) => setText((cur) => (cur.trim() ? cur.replace(/\s*$/, ' ') + t : t)), []),
+    useCallback((spoken: string) => setText((cur) => (cur.trim() ? cur.replace(/\s*$/, ' ') + spoken : spoken)), []),
     useCallback((m: string) => toast(m), [toast]),
   );
 
@@ -226,7 +233,7 @@ export const Composer = forwardRef<ComposerHandle, {
     if (files.length) void addFiles(files);
   };
 
-  const effortLabel = params.effort ? EFFORT_INFO[params.effort].label : 'Auto';
+  const effortLabel = params.effort ? tm(EFFORT_INFO[params.effort].label) : t('Auto');
 
   return (
     <div className="composer-wrap">
@@ -242,7 +249,7 @@ export const Composer = forwardRef<ComposerHandle, {
         onDrop={onDrop}
       >
         {slash && slash.length > 0 && (
-          <div className="slash-menu" role="listbox" aria-label="Commands and saved prompts">
+          <div className="slash-menu" role="listbox" aria-label={t('Commands and saved prompts')}>
             {slash.map((item, i) => (
               <button
                 key={item.key}
@@ -259,8 +266,8 @@ export const Composer = forwardRef<ComposerHandle, {
               >
                 {item.kind === 'command' ? item.icon : <Library size={16} />}
                 <span className="col" style={{ minWidth: 0 }}>
-                  <span className="t-label-l ellipsis">/{item.name}</span>
-                  <span className="t-label-s c-3 ellipsis" style={{ fontWeight: 400 }}>{item.kind === 'command' ? item.description : item.body}</span>
+                  <span className="t-label-l ellipsis"><bdi>/{item.name}</bdi></span>
+                  <span className="t-label-s c-3 ellipsis" style={{ fontWeight: 400 }}><bdi>{item.kind === 'command' ? item.description : item.body}</bdi></span>
                 </span>
               </button>
             ))}
@@ -278,22 +285,23 @@ export const Composer = forwardRef<ComposerHandle, {
           ref={area}
           rows={1}
           value={text}
-          placeholder={dictation.state === 'recording' ? 'Listening…' : dictation.state === 'transcribing' ? 'Transcribing…' : 'Ask anything'}
+          placeholder={dictation.state === 'recording' ? t('Listening…') : dictation.state === 'transcribing' ? t('Transcribing…') : t('Ask anything')}
           onChange={(e) => {
             setText(e.target.value);
             setSlashIndex(0);
           }}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
-          aria-label="Message"
+          aria-label={t('Message')}
+          dir="auto"
         />
         <div className="composer-bar">
-          <IconButton label="Add files and more" onClick={plusMenu.open}>
+          <IconButton label={t('Add files and more')} onClick={plusMenu.open}>
             <Plus size={20} />
           </IconButton>
           {canSearch && (
             <button type="button" className={'chip' + (params.webSearch ? ' on' : '')} onClick={() => onParams({ ...params, webSearch: !params.webSearch })} aria-pressed={params.webSearch}>
-              <Globe size={17} /> Search
+              <Globe size={17} /> {t('Search')}
             </button>
           )}
           {caps && caps.reasoning.kind !== 'NONE' && caps.reasoning.efforts.length > 0 && (
@@ -303,14 +311,14 @@ export const Composer = forwardRef<ComposerHandle, {
           )}
           {local.computerTools && caps?.tools && params.tools && computer && <ComputerChip state={computer} pcsOnline={pcsOnline} onClick={onComputer} />}
           {synced.yoloMode && caps?.tools && (
-            <button type="button" className="yolo-badge" title="YOLO mode is on: tools run without asking. Click to turn it off." onClick={() => app.settings.updateSynced((s) => ({ ...s, yoloMode: false }))}>
+            <button type="button" className="yolo-badge" title={t('YOLO mode is on: tools run without asking. Click to turn it off.')} onClick={() => app.settings.updateSynced((s) => ({ ...s, yoloMode: false }))}>
               <Rocket size={15} /> YOLO
             </button>
           )}
           <span className="grow" />
           {dictation.available && (
             <IconButton
-              label={dictation.state === 'recording' ? 'Stop dictation' : 'Dictate'}
+              label={dictation.state === 'recording' ? t('Stop dictation') : t('Dictate')}
               active={dictation.state !== 'idle'}
               disabled={dictation.state === 'transcribing'}
               onClick={() => (dictation.state === 'recording' ? dictation.stop() : void dictation.start())}
@@ -319,11 +327,11 @@ export const Composer = forwardRef<ComposerHandle, {
             </IconButton>
           )}
           {busy ? (
-            <button type="button" className="send-btn stop" aria-label="Stop" title="Stop (Esc)" onClick={onStop}>
+            <button type="button" className="send-btn stop" aria-label={t('Stop')} title={t('Stop (Esc)')} onClick={onStop}>
               <Square size={16} fill="currentColor" />
             </button>
           ) : (
-            <button type="button" className={'send-btn' + (canSend ? ' ready' : '')} aria-label="Send" title="Send" disabled={!canSend} onClick={send}>
+            <button type="button" className={'send-btn' + (canSend ? ' ready' : '')} aria-label={t('Send')} title={t('Send')} disabled={!canSend} onClick={send}>
               <ArrowUp size={21} />
             </button>
           )}
@@ -345,8 +353,8 @@ export const Composer = forwardRef<ComposerHandle, {
           anchor={effortMenu.anchor}
           onClose={effortMenu.close}
           items={[
-            { label: 'Auto', onSelect: () => onParams({ ...params, effort: null }) },
-            ...caps.reasoning.efforts.map((e) => ({ label: EFFORT_INFO[e].label, onSelect: () => onParams({ ...params, effort: e }) })),
+            { label: t('Auto'), onSelect: () => onParams({ ...params, effort: null }) },
+            ...caps.reasoning.efforts.map((e) => ({ label: tm(EFFORT_INFO[e].label), onSelect: () => onParams({ ...params, effort: e }) })),
           ]}
         />
       )}
@@ -355,9 +363,9 @@ export const Composer = forwardRef<ComposerHandle, {
           anchor={plusMenu.anchor}
           onClose={plusMenu.close}
           items={[
-            { label: 'Attach files', icon: <Paperclip size={17} />, onSelect: () => fileInput.current?.click() },
-            { label: 'Commands and saved prompts', icon: <Library size={17} />, onSelect: () => setText('/') },
-            ...(onComputer && local.computerTools ? [{ label: computer?.kind === 'ready' ? 'Choose working folder' : 'Work on a PC', icon: <FolderOpen size={17} />, onSelect: onComputer }] : []),
+            { label: t('Attach files'), icon: <Paperclip size={17} />, onSelect: () => fileInput.current?.click() },
+            { label: t('Commands and saved prompts'), icon: <Library size={17} />, onSelect: () => setText('/') },
+            ...(onComputer && local.computerTools ? [{ label: computer?.kind === 'ready' ? t('Choose working folder') : t('Work on a PC'), icon: <FolderOpen size={17} />, onSelect: onComputer }] : []),
           ]}
         />
       )}
@@ -375,30 +383,32 @@ function ComputerChip({ state, pcsOnline, onClick }: { state: ComputerState; pcs
     case 'ready':
       icon = state.computer.local ? <FolderOpen size={16} /> : <Monitor size={16} />;
       label = state.computer.local ? folderName(state.computer.folder) : `${state.computer.name} · ${folderName(state.computer.folder)}`;
-      title = `Working folder: ${state.computer.folder}${state.computer.local ? '' : ` on ${state.computer.name}`}`;
+      title = state.computer.local
+        ? t('Working folder: {path}', { path: state.computer.folder })
+        : t('Working folder: {path} on {pc}', { path: state.computer.folder, pc: state.computer.name });
       break;
     case 'disabled':
       icon = <MonitorOff size={16} />;
-      label = `${state.host.name}: remote use is off`;
-      title = `Turn on “Let your other devices use this PC” in Facet on ${state.host.name}: Settings → Computer access.`;
+      label = t('{pc}: remote use is off', { pc: state.host.name });
+      title = t('Turn on “Let your other devices use this PC” in Facet on {pc}: Settings → Computer access.', { pc: state.host.name });
       muted = true;
       break;
     case 'offline':
       icon = <MonitorOff size={16} />;
-      label = 'PC offline';
-      title = 'The PC this chat works on isn’t online. Open Facet on it to use its files and commands again.';
+      label = t('PC offline');
+      title = t('The PC this chat works on isn’t online. Open Facet on it to use its files and commands again.');
       muted = true;
       break;
     case 'none':
       if (!pcsOnline) return null;
       icon = <Monitor size={16} />;
-      label = 'Use a PC';
-      title = 'Let the model work in a folder on one of your PCs.';
+      label = t('Use a PC');
+      title = t('Let the model work in a folder on one of your PCs.');
       break;
   }
   return (
     <button type="button" className={'chip' + (muted ? ' muted' : '')} onClick={onClick ?? undefined} disabled={!onClick} title={title}>
-      {icon} <span className="ellipsis" style={{ maxWidth: 180 }}>{label}</span>
+      {icon} <span className="ellipsis" style={{ maxWidth: 180 }}><bdi>{label}</bdi></span>
     </button>
   );
 }

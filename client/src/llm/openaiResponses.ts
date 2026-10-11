@@ -1,6 +1,7 @@
 /** OpenAI Responses API adapter (`/v1/responses`, stateless `store:false`). Port of OpenAiResponsesClient.kt. */
 import { fromUtf8 } from '../core/bytes';
 import { isObject } from '../core/json';
+import { t } from '../i18n';
 import { displayName, hideDatedDuplicates, isOpenAiChatModel, mediaOutput, canRun, openAiCaps } from './catalog';
 import { extractMessage, fromHttp, fromNetwork, fromStream, HttpStatusError, TransportError, truncatedStream, unexpected } from './errors';
 import {
@@ -341,7 +342,7 @@ export class OpenAiResponsesClient implements LlmClient {
           else if (s.refusal) stop = 'REFUSAL';
           else if (s.toolCalls > 0 || (output ?? []).some((it) => str(it, 'type') === 'function_call')) stop = 'TOOL_USE';
           else stop = 'END';
-          if (stop === 'REFUSAL') yield { type: 'notice', text: `${s.model} declined to answer this request.` };
+          if (stop === 'REFUSAL') yield { type: 'notice', text: t('{model} declined to answer this request.', { model: s.model }) };
           const items = output && output.length > 0 ? output : s.outputItems;
           s.finished = true;
           yield {

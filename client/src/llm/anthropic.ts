@@ -1,6 +1,7 @@
 /** Anthropic Messages API adapter (raw HTTP, streaming). Port of AnthropicClient.kt. */
 import { b64, fromUtf8 } from '../core/bytes';
 import { isObject } from '../core/json';
+import { t } from '../i18n';
 import { claudeCaps, claudeCapsFromApi, displayName, normalizeId, parseClaude, type ThinkingOff } from './catalog';
 import {
   extractMessage,
@@ -336,7 +337,7 @@ export class AnthropicClient implements LlmClient {
             turn.emittedAnything = true;
             yield { type: 'started', model: turn.servedModel };
             if (model != null && !sameModel(model, turn.request.model)) {
-              yield { type: 'notice', text: `Answered by ${model} instead of ${turn.request.model} (automatic fallback).` };
+              yield { type: 'notice', text: t('Answered by {model} instead of {requested} (automatic fallback).', { model, requested: turn.request.model }) };
             }
           }
           const usage = obj(msg, 'usage');
@@ -380,8 +381,8 @@ export class AnthropicClient implements LlmClient {
               yield {
                 type: 'notice',
                 text: from != null && to != null
-                  ? `${from} declined this request; ${to} answered instead.`
-                  : 'Another model answered after the requested model declined.',
+                  ? t('{from} declined this request; {to} answered instead.', { from, to })
+                  : t('Another model answered after the requested model declined.'),
               };
               break;
             }
@@ -678,8 +679,10 @@ function isSignatureProblem(lower: string): boolean {
 }
 
 function refusalNotice(model: string, category: string | null): string {
-  const why = category == null ? '' : category === 'cyber' ? ' (cybersecurity safeguard)' : category === 'bio' ? ' (biology safeguard)' : ` (${category} safeguard)`;
-  return `${model} declined to answer this request${why}. Rephrase it or try another model.`;
+  if (category == null) return t('{model} declined to answer this request. Rephrase it or try another model.', { model });
+  if (category === 'cyber') return t('{model} declined to answer this request (cybersecurity safeguard). Rephrase it or try another model.', { model });
+  if (category === 'bio') return t('{model} declined to answer this request (biology safeguard). Rephrase it or try another model.', { model });
+  return t('{model} declined to answer this request ({category} safeguard). Rephrase it or try another model.', { model, category });
 }
 
 function sameModel(a: string, b: string): boolean {

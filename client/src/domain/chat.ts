@@ -8,6 +8,7 @@ import { fromUtf8 } from '../core/bytes';
 import { Dates } from '../core/format';
 import { newId } from '../core/ids';
 import { parseJson, toJson } from '../core/json';
+import { t, tn } from '../i18n';
 import type { AttachmentStore } from '../data/attachments';
 import { MessageTree, messageAttachments, type ConversationRepository } from '../data/conversations';
 import { attachmentRef, type AttachmentRef, type ComputerBinding, type ConversationEntity, type MessageEntity, type MessageStatus, type ProviderEntity } from '../data/entities';
@@ -34,6 +35,7 @@ import {
 } from '../llm/types';
 import type { SyncEngine } from '../sync/engine';
 import type { ToolRegistry, PreparedTools } from '../tools/registry';
+import { computerLabel, fetchLabel, mediaLabel, searchLabel, skillLabel } from '../tools/labels';
 import type { ToolCallRecord, ToolDef, ToolKind, ToolOutcome, ToolStep, ToolTrace } from '../tools/types';
 
 export type ToolStatus = 'PREPARING' | 'AWAITING_APPROVAL' | 'RUNNING' | 'DONE' | 'ERROR' | 'DENIED';
@@ -230,8 +232,8 @@ export class ChatEngine {
     if (!conv && newChat) {
       conv = await this.conversations.create(newChat.assistantId, newChat.model.providerId, newChat.model.modelId, newChat.params, newChat.folderId ?? null, computer);
     }
-    if (!conv) throw new ChatError('Choose a model to start chatting.');
-    if (this.isGenerating(conv.id)) throw new ChatError('Wait for the current reply to finish, or stop it.');
+    if (!conv) throw new ChatError(t('Choose a model to start chatting.'));
+    if (this.isGenerating(conv.id)) throw new ChatError(t('Wait for the current reply to finish, or stop it.'));
     const tree = new MessageTree(await this.conversations.messages(conv.id));
     const parent = tree.activePath(conv.currentLeafId).at(-1);
     const refs: AttachmentRef[] = [];
@@ -247,7 +249,7 @@ export class ChatEngine {
     };
     await this.conversations.insertMessage(user);
     if (!conv.titleSet && !parent) {
-      const provisional = (text.trim().split('\n')[0] ?? '').slice(0, 48).trim() || refs[0]?.name || 'New chat';
+      const provisional = (text.trim().split('\n')[0] ?? '').slice(0, 48).trim() || refs[0]?.name || t('New chat');
       await this.conversations.update(conv.id, (c) => ({ ...c, title: provisional }));
     }
     await this.startReply(conv.id, user);
@@ -260,7 +262,7 @@ export class ChatEngine {
     if (!target?.parentId) return;
     const user = await this.conversations.message(target.parentId);
     if (!user) return;
-    if (this.isGenerating(target.conversationId)) throw new ChatError('Wait for the current reply to finish, or stop it.');
+    if (this.isGenerating(target.conversationId)) throw new ChatError(t('Wait for the current reply to finish, or stop it.'));
     if (model) await this.conversations.setModel(target.conversationId, model.providerId, model.modelId);
     await this.startReply(target.conversationId, user);
   }
@@ -269,7 +271,7 @@ export class ChatEngine {
   async editAndResend(userMessageId: string, newText: string): Promise<void> {
     const original = await this.conversations.message(userMessageId);
     if (!original) return;
-    if (this.isGenerating(original.conversationId)) throw new ChatError('Wait for the current reply to finish, or stop it.');
+    if (this.isGenerating(original.conversationId)) throw new ChatError(t('Wait for the current reply to finish, or stop it.'));
     const now = Date.now();
     const edited: MessageEntity = { ...original, id: newId(now), content: newText.trim(), createdAt: now, updatedAt: now, dirty: 1 };
     await this.conversations.insertMessage(edited);
@@ -338,8 +340,8 @@ export class ChatEngine {
 
   private async resolveModel(conv: ConversationEntity): Promise<{ provider: ProviderEntity; model: ModelInfo }> {
     const provider = conv.providerId ? await this.providers.get(conv.providerId) : undefined;
-    if (!provider || provider.deleted || !provider.enabled) throw new ChatError('The provider for this chat was removed. Pick another model.');
-    if (!conv.modelId) throw new ChatError('Choose a model to continue.');
+    if (!provider || provider.deleted || !provider.enabled) throw new ChatError(t('The provider for this chat was removed. Pick another model.'));
+    if (!conv.modelId) throw new ChatError(t('Choose a model to continue.'));
     return { provider, model: this.providers.modelInfo(provider, conv.modelId) };
   }
 
@@ -469,7 +471,7 @@ export class ChatEngine {
         if (st.error || st.stop !== 'TOOL_USE' || calls.length === 0) break;
         const roundLimit = this.settings.synced.yoloMode ? YOLO_TOOL_ROUNDS : MAX_TOOL_ROUNDS;
         if (round >= roundLimit) {
-          publish((t) => ({ ...t, notice: `Stopped after ${roundLimit} rounds of tool use.` }));
+          publish((lt) => ({ ...lt, notice: tn('Stopped after {count} round of tool use.', 'Stopped after {count} rounds of tool use.', roundLimit) }));
           st.stop = 'END';
           break;
         }
@@ -496,8 +498,8 @@ export class ChatEngine {
       }
       if (e instanceof ChatError) st.error = { kind: 'BAD_REQUEST', message: e.message };
       else if (e instanceof LlmException) st.error = e.error;
-      else if (e instanceof TypeError) st.error = { kind: 'NETWORK', message: `Couldn’t reach ${provider.label}. Check your connection and try again.` };
-      else st.error = { kind: 'UNKNOWN', message: `Something went wrong: ${(e as Error)?.message ?? String(e)}` };
+      else if (e instanceof TypeError) st.error = { kind: 'NETWORK', message: t('Couldn’t reach {provider}. Check your connection and try again.', { provider: provider.label }) };
+      else st.error = { kind: 'UNKNOWN', message: t('Something went wrong: {reason}', { reason: (e as Error)?.message ?? String(e) }) };
     }
     st.endThinking();
     const status: MessageStatus = st.error ? 'ERROR' : st.stop === 'REFUSAL' ? 'REFUSED' : st.stop === 'MAX_TOKENS' ? 'TRUNCATED' : st.stop === 'CANCELLED' ? 'STOPPED' : 'DONE';
@@ -626,8 +628,8 @@ export class ChatEngine {
   /** Builds the provider request from the visible branch ending at [reply]'s parent. */
   private async buildRequest(conversationId: string, reply: MessageEntity, model: ModelInfo): Promise<ChatRequest> {
     const conv = await this.conversations.get(conversationId);
-    if (!conv) throw new ChatError('This chat no longer exists.');
-    if (!reply.parentId) throw new ChatError('Nothing to reply to.');
+    if (!conv) throw new ChatError(t('This chat no longer exists.'));
+    if (!reply.parentId) throw new ChatError(t('Nothing to reply to.'));
     const tree = new MessageTree(await this.conversations.messages(conversationId));
     const path = tree.pathTo(reply.parentId);
     const messages: ChatMessage[] = [];
@@ -771,11 +773,11 @@ export class ChatEngine {
 function preparingLabel(def: ToolDef | undefined, name: string): string {
   switch (def?.kind) {
     case 'SEARCH':
-      return 'Searching the web';
+      return t('Searching the web');
     case 'FETCH':
-      return 'Reading a page';
+      return t('Reading a page');
     case 'SKILL':
-      return 'Loading a skill';
+      return t('Loading a skill');
     case 'COMPUTER':
       return computerLabel(def.remoteName ?? name, '{}', false);
     default: {
@@ -799,55 +801,21 @@ function hostOf(url: string): string | null {
   }
 }
 
-function shortPath(p: string): string {
-  const parts = p.replace(/\\/g, '/').split('/').filter(Boolean);
-  return parts.length > 2 ? '…/' + parts.slice(-2).join('/') : p;
-}
-
-/** Labels for the Windows app's computer tools while they run; the bridge supplies the final label. */
-function computerLabel(tool: string, args: string, done: boolean): string {
-  const path = shortPath(argString(args, 'path'));
-  switch (tool) {
-    case 'run_command': {
-      const cmd = argString(args, 'command').split('\n')[0];
-      return (done ? 'Ran ' : 'Running ') + (cmd ? '`' + (cmd.length > 60 ? cmd.slice(0, 57) + '…' : cmd) + '`' : 'a command');
-    }
-    case 'read_file':
-      return (done ? 'Read ' : 'Reading ') + (path || 'a file');
-    case 'write_file':
-      return (done ? 'Wrote ' : 'Writing ') + (path || 'a file');
-    case 'edit_file':
-      return (done ? 'Edited ' : 'Editing ') + (path || 'a file');
-    case 'list_directory':
-      return (done ? 'Listed ' : 'Listing ') + (path || 'the folder');
-    case 'glob':
-      return (done ? 'Found files matching ' : 'Finding files matching ') + (argString(args, 'pattern') || '…');
-    case 'grep':
-      return (done ? 'Searched for ' : 'Searching for ') + `“${argString(args, 'pattern').slice(0, 40)}”`;
-    default:
-      return tool.replace(/_/g, ' ');
-  }
-}
-
 function runningLabel(def: ToolDef | undefined, args: string, done = false): string {
   switch (def?.kind) {
     case 'SEARCH':
-      return (done ? 'Searched' : 'Searching') + ` “${argString(args, 'query').slice(0, 60)}”`;
+      return searchLabel(argString(args, 'query').slice(0, 60), done);
     case 'FETCH':
-      return (done ? 'Read ' : 'Reading ') + (hostOf(argString(args, 'url')) ?? 'a page');
-    case 'SKILL': {
-      const name = argString(args, 'name');
-      return name ? (done ? 'Used skill ' : 'Using skill ') + name : (done ? 'Read ' : 'Reading ') + argString(args, 'path');
-    }
+      return fetchLabel(hostOf(argString(args, 'url')), done);
+    case 'SKILL':
+      return skillLabel(argString(args, 'name'), argString(args, 'path'), done);
     case 'MCP':
       return `${def.serverName}: ${def.remoteName}`;
-    case 'MEDIA': {
-      const what = def.output === 'IMAGE' ? 'an image' : def.output === 'VIDEO' ? 'a video' : def.output === 'SPEECH' ? 'speech' : def.output === 'MUSIC' ? 'music' : 'media';
-      return (done ? 'Created ' : 'Creating ') + what;
-    }
+    case 'MEDIA':
+      return mediaLabel(def.output, done);
     case 'COMPUTER':
       return computerLabel(def.remoteName ?? def.spec.name, args, done);
     default:
-      return 'Tool';
+      return t('Tool');
   }
 }

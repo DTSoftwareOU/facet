@@ -1,6 +1,7 @@
 /** The website: everything runs in the browser tab. */
 import { b64, buf, concat, randomBytes, unb64 } from '../core/bytes';
 import { db } from '../data/db';
+import { t } from '../i18n';
 import type { OAuthBridge, Platform, SecretBox } from './platform';
 
 /**
@@ -46,7 +47,7 @@ const webOAuth: OAuthBridge = {
     return new Promise<string>((resolve, reject) => {
       const popup = window.open(authUrl, 'facet-oauth', 'width=520,height=720');
       if (!popup) {
-        reject(new Error('The sign-in window was blocked. Allow pop-ups for this site and try again.'));
+        reject(new Error(t('The sign-in window was blocked. Allow pop-ups for this site and try again.')));
         return;
       }
       const origin = new URL(redirectUri).origin;
@@ -68,7 +69,7 @@ const webOAuth: OAuthBridge = {
       const timer = setInterval(() => {
         if (popup.closed) {
           done();
-          reject(new Error('The sign-in window was closed before it finished.'));
+          reject(new Error(t('The sign-in window was closed before it finished.')));
         }
       }, 700);
       window.addEventListener('message', onMessage);

@@ -2,6 +2,7 @@ import { Copy, Download, KeyRound, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getApp } from '../../app';
+import { t, tn } from '../../i18n';
 import { platform } from '../../platform';
 import { Gem } from '../components/Gem';
 import { Button, Field, IconButton, useToast } from '../components/primitives';
@@ -13,10 +14,10 @@ export function passwordOk(p: string): boolean {
 }
 
 export function passwordHint(p: string): string {
-  if (!p) return 'At least 10 characters. A passphrase of a few words works well.';
-  if (p.length < 10) return `${10 - p.length} more characters`;
-  if (p.length < 14) return 'Good. Longer is even stronger.';
-  return 'Strong';
+  if (!p) return t('At least 10 characters. A passphrase of a few words works well.');
+  if (p.length < 10) return tn('{count} more character', '{count} more characters', 10 - p.length);
+  if (p.length < 14) return t('Good. Longer is even stronger.');
+  return t('Strong');
 }
 
 /** A full-window card for account flows. */
@@ -31,7 +32,7 @@ export function AuthLayout({ onClose, children }: { onClose: () => void; childre
   return createPortal(
     <div className="scrim auth-scrim">
       <div className="auth-card" role="dialog" aria-modal="true">
-        <IconButton label="Close" className="auth-close" onClick={onClose}>
+        <IconButton label={t('Close')} className="auth-close" onClick={onClose}>
           <X size={20} />
         </IconButton>
         {children}
@@ -44,36 +45,37 @@ export function AuthLayout({ onClose, children }: { onClose: () => void; childre
 export function RecoveryCodeView({ code, reason, onDone }: { code: string; reason: 'new' | 'reset' | 'regenerated'; onDone: () => void }) {
   const toast = useToast();
   const [saved, setSaved] = useState(false);
-  const text = `Facet recovery code\n\n${code}\n\nKeep this somewhere safe. It unlocks your encrypted data if you forget your password.\n`;
+  // The code goes in as is (not through a placeholder), so the file holds exactly the characters to type back.
+  const text = `${t('Facet recovery code')}\n\n${code}\n\n${t('Keep this somewhere safe. It unlocks your encrypted data if you forget your password.')}\n`;
   return (
     <div className="col gap-16">
       <KeyRound size={36} className="c-warning" />
-      <h1 className="t-display" style={{ margin: 0 }}>Save your recovery code</h1>
+      <h1 className="t-display" style={{ margin: 0 }}>{t('Save your recovery code')}</h1>
       <p className="t-body c-2" style={{ margin: 0 }}>
         {reason === 'reset'
-          ? 'Your password was reset. Here is your new recovery code. Any older code no longer works.'
+          ? t('Your password was reset. Here is your new recovery code. Any older code no longer works.')
           : reason === 'regenerated'
-            ? 'Here is your new recovery code. Your previous code no longer works.'
-            : 'If you forget your password, this code is the only way to unlock your encrypted data. We can’t recover it for you.'}
+            ? t('Here is your new recovery code. Your previous code no longer works.')
+            : t('If you forget your password, this code is the only way to unlock your encrypted data. We can’t recover it for you.')}
       </p>
-      <div className="recovery-code mono" aria-label={code}>
+      <div className="recovery-code mono" dir="ltr" aria-label={code}>
         {code.split('-').slice(0, 4).join('-')}
         <br />
         {code.split('-').slice(4).join('-')}
       </div>
       <div className="row gap-8" style={{ flexWrap: 'wrap' }}>
-        <Button variant="tonal" onClick={() => { void navigator.clipboard.writeText(code); toast('Recovery code copied.'); }}>
-          <Copy size={17} /> Copy
+        <Button variant="tonal" onClick={() => { void navigator.clipboard.writeText(code); toast(t('Recovery code copied.')); }}>
+          <Copy size={17} /> {t('Copy')}
         </Button>
         <Button variant="tonal" onClick={() => platform().saveFile('facet-recovery-code.txt', new Blob([text], { type: 'text/plain' }))}>
-          <Download size={17} /> Save as file
+          <Download size={17} /> {t('Save as file')}
         </Button>
       </div>
       <label className="row gap-12" style={{ cursor: 'pointer' }}>
         <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--primary)' }} />
-        <span className="t-body">I saved my recovery code somewhere safe</span>
+        <span className="t-body">{t('I saved my recovery code somewhere safe')}</span>
       </label>
-      <Button block disabled={!saved} onClick={onDone}>Done</Button>
+      <Button block disabled={!saved} onClick={onDone}>{t('Done')}</Button>
     </div>
   );
 }
@@ -85,19 +87,19 @@ function ServerLine() {
   if (editing) {
     return (
       <div className="col gap-8">
-        <Field label="Sync server" hint="Self-hosting? Enter your server's address. Leave empty for the default.">
-          <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder={platform().defaultServerUrl} />
+        <Field label={t('Sync server')} hint={t("Self-hosting? Enter your server's address. Leave empty for the default.")}>
+          <input className="input" dir="ltr" value={url} onChange={(e) => setUrl(e.target.value)} placeholder={platform().defaultServerUrl} />
         </Field>
         <div className="row gap-8">
-          <Button small onClick={async () => { await app.auth.setServerUrl(url); setUrl(app.auth.serverUrl); setEditing(false); }}>Save</Button>
-          <Button small variant="text" onClick={() => setEditing(false)}>Cancel</Button>
+          <Button small onClick={async () => { await app.auth.setServerUrl(url); setUrl(app.auth.serverUrl); setEditing(false); }}>{t('Save')}</Button>
+          <Button small variant="text" onClick={() => setEditing(false)}>{t('Cancel')}</Button>
         </div>
       </div>
     );
   }
   return (
     <button type="button" className="t-label-m c-3" style={{ alignSelf: 'center' }} onClick={() => setEditing(true)}>
-      Sync server: {app.auth.serverUrl.replace(/^https:\/\//, '')} · Change
+      {t('Sync server: {address} · Change', { address: app.auth.serverUrl.replace(/^https:\/\//, '') })}
     </button>
   );
 }
@@ -129,7 +131,7 @@ function SignInUp({ initial, onForgot, onSignedUp, onDone }: { initial: 'signin'
         onDone();
       }
     } catch (e) {
-      setError((e as Error).message || 'Something went wrong.');
+      setError((e as Error).message || t('Something went wrong.'));
     } finally {
       setBusy(false);
     }
@@ -138,43 +140,43 @@ function SignInUp({ initial, onForgot, onSignedUp, onDone }: { initial: 'signin'
     <form className="col gap-16" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
       <Gem size={40} />
       <div className="col gap-8">
-        <h1 className="t-display" style={{ margin: 0 }}>{signUp ? 'Create your account' : 'Welcome back'}</h1>
+        <h1 className="t-display" style={{ margin: 0 }}>{signUp ? t('Create your account') : t('Welcome back')}</h1>
         <p className="t-body c-2" style={{ margin: 0 }}>
-          {signUp ? 'Your chats, assistants and keys are encrypted on this device before they sync. Not even we can read them.' : 'Sign in to sync your encrypted chats to this device.'}
+          {signUp ? t('Your chats, assistants and keys are encrypted on this device before they sync. Not even we can read them.') : t('Sign in to sync your encrypted chats to this device.')}
         </p>
       </div>
       {signUp && (
-        <Field label="Name (optional)">
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="What should we call you?" autoComplete="name" />
+        <Field label={t('Name (optional)')}>
+          <input className="input" dir="auto" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('What should we call you?')} autoComplete="name" />
         </Field>
       )}
-      <Field label="Email">
-        <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoFocus />
+      <Field label={t('Email')}>
+        <input className="input" dir="ltr" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoFocus />
       </Field>
-      <Field label="Password" hint={signUp ? passwordHint(password) : undefined}>
+      <Field label={t('Password')} hint={signUp ? passwordHint(password) : undefined}>
         <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={signUp ? 'new-password' : 'current-password'} />
       </Field>
       {signUp && (
-        <Field label="Confirm password" error={confirm && confirm !== password ? 'Passwords don’t match.' : undefined}>
+        <Field label={t('Confirm password')} error={confirm && confirm !== password ? t('Passwords don’t match.') : undefined}>
           <input className="input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
         </Field>
       )}
       {signUp && (
         <div className="notice" style={{ marginTop: 0 }}>
           <KeyRound size={18} className="c-warning" style={{ flex: 'none', marginTop: 2 }} />
-          <span>Because your data is end-to-end encrypted, we can’t reset your password for you. You’ll get a recovery code next. Keep it somewhere safe.</span>
+          <span>{t('Because your data is end-to-end encrypted, we can’t reset your password for you. You’ll get a recovery code next. Keep it somewhere safe.')}</span>
         </div>
       )}
-      {signUp && !open && <span className="field-error">This server isn’t accepting new accounts.</span>}
+      {signUp && !open && <span className="field-error">{t('This server isn’t accepting new accounts.')}</span>}
       {error && <span className="field-error" role="alert">{error}</span>}
       <Button type="submit" block busy={busy} disabled={!canSubmit}>
-        {busy ? (signUp ? 'Securing your account…' : 'Signing in…') : signUp ? 'Create account' : 'Sign in'}
+        {busy ? (signUp ? t('Securing your account…') : t('Signing in…')) : signUp ? t('Create account') : t('Sign in')}
       </Button>
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <button type="button" className="t-label-m c-primary" onClick={() => { setMode(signUp ? 'signin' : 'signup'); setError(null); }}>
-          {signUp ? 'Already have an account? Sign in' : 'New to Facet? Create an account'}
+          {signUp ? t('Already have an account? Sign in') : t('New to Facet? Create an account')}
         </button>
-        {!signUp && <button type="button" className="t-label-m c-2" onClick={onForgot}>Forgot password?</button>}
+        {!signUp && <button type="button" className="t-label-m c-2" onClick={onForgot}>{t('Forgot password?')}</button>}
       </div>
       <ServerLine />
     </form>
@@ -202,7 +204,7 @@ function Recover({ onDone }: { onDone: (code: string) => void }) {
     try {
       await fn();
     } catch (e) {
-      setError((e as Error).message || 'Something went wrong.');
+      setError((e as Error).message || t('Something went wrong.'));
     } finally {
       setBusy(false);
     }
@@ -210,54 +212,54 @@ function Recover({ onDone }: { onDone: (code: string) => void }) {
   const pwOk = passwordOk(password) && password === confirm;
   return (
     <div className="col gap-16">
-      <h1 className="t-display" style={{ margin: 0 }}>Reset your password</h1>
-      <Segmented options={['code', 'email'] as const as ('code' | 'email')[]} selected={mode} label={(m) => (m === 'code' ? 'Recovery code' : 'Email')} onSelect={(m) => { setMode(m); setError(null); }} />
-      <Field label="Email">
-        <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+      <h1 className="t-display" style={{ margin: 0 }}>{t('Reset your password')}</h1>
+      <Segmented options={['code', 'email'] as const as ('code' | 'email')[]} selected={mode} label={(m) => (m === 'code' ? t('Recovery code') : t('Email'))} onSelect={(m) => { setMode(m); setError(null); }} />
+      <Field label={t('Email')}>
+        <input className="input" dir="ltr" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
       </Field>
       {mode === 'code' ? (
         <>
-          <p className="t-body c-2" style={{ margin: 0 }}>Your data stays intact. You’ll get a new recovery code afterwards.</p>
-          <Field label="Recovery code">
-            <input className="input mono" value={recovery} onChange={(e) => setRecovery(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-…" />
+          <p className="t-body c-2" style={{ margin: 0 }}>{t('Your data stays intact. You’ll get a new recovery code afterwards.')}</p>
+          <Field label={t('Recovery code')}>
+            <input className="input mono" dir="ltr" value={recovery} onChange={(e) => setRecovery(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX-…" />
           </Field>
-          <Field label="New password" hint={passwordHint(password)}>
+          <Field label={t('New password')} hint={passwordHint(password)}>
             <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
           </Field>
-          <Field label="Confirm new password" error={confirm && confirm !== password ? 'Passwords don’t match.' : undefined}>
+          <Field label={t('Confirm new password')} error={confirm && confirm !== password ? t('Passwords don’t match.') : undefined}>
             <input className="input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
           </Field>
           {error && <span className="field-error" role="alert">{error}</span>}
           <Button block busy={busy} disabled={!email.includes('@') || !recovery.trim() || !pwOk} onClick={() => run(async () => onDone(await app.auth.recoverWithCode(email, recovery, password)))}>
-            Reset password
+            {t('Reset password')}
           </Button>
         </>
       ) : !emailEnabled ? (
-        <p className="t-body c-2" style={{ margin: 0 }}>This sync server can’t send email. Use your recovery code instead, or ask the server’s operator.</p>
+        <p className="t-body c-2" style={{ margin: 0 }}>{t('This sync server can’t send email. Use your recovery code instead, or ask the server’s operator.')}</p>
       ) : (
         <>
           <div className="notice error" style={{ marginTop: 0 }}>
             <TriangleAlert size={18} style={{ flex: 'none', marginTop: 2 }} />
-            <span>Without your recovery code, your encrypted data on the server can’t be unlocked, so it will be deleted. Chats on this device are uploaded again afterwards.</span>
+            <span>{t('Without your recovery code, your encrypted data on the server can’t be unlocked, so it will be deleted. Chats on this device are uploaded again afterwards.')}</span>
           </div>
           {!codeSent ? (
             <Button block busy={busy} disabled={!email.includes('@')} onClick={() => run(async () => { await app.auth.requestEmailReset(email); setCodeSent(true); })}>
-              Email me a code
+              {t('Email me a code')}
             </Button>
           ) : (
             <>
-              <p className="t-body c-2" style={{ margin: 0 }}>If an account exists for {email}, we sent an 8-digit code. It expires in 30 minutes.</p>
-              <Field label="Code from the email">
-                <input className="input mono" inputMode="numeric" value={emailCode} onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 8))} />
+              <p className="t-body c-2" style={{ margin: 0 }}>{t('If an account exists for {email}, we sent an 8-digit code. It expires in 30 minutes.', { email })}</p>
+              <Field label={t('Code from the email')}>
+                <input className="input mono" dir="ltr" inputMode="numeric" value={emailCode} onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 8))} />
               </Field>
-              <Field label="New password" hint={passwordHint(password)}>
+              <Field label={t('New password')} hint={passwordHint(password)}>
                 <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
               </Field>
-              <Field label="Confirm new password" error={confirm && confirm !== password ? 'Passwords don’t match.' : undefined}>
+              <Field label={t('Confirm new password')} error={confirm && confirm !== password ? t('Passwords don’t match.') : undefined}>
                 <input className="input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
               </Field>
               <Button block variant="danger" busy={busy} disabled={emailCode.length !== 8 || !pwOk} onClick={() => run(async () => onDone(await app.auth.confirmEmailReset(email, emailCode, password)))}>
-                Reset password and data
+                {t('Reset password and data')}
               </Button>
             </>
           )}
@@ -284,7 +286,7 @@ export function AuthDialog({ mode, onClose }: { mode: 'signin' | 'signup' | 'rec
           onForgot={() => setStep('recover')}
           onSignedUp={(code) => setStep({ code, reason: 'new' })}
           onDone={() => {
-            toast('Signed in. Syncing your chats…');
+            toast(t('Signed in. Syncing your chats…'));
             finish();
           }}
         />

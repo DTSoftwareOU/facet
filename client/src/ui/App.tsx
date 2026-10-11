@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { getApp } from '../app';
+import { t } from '../i18n';
 import { platform } from '../platform';
 import { AuthDialog } from './auth/AuthDialog';
 import { ChatScreen } from './chat/ChatScreen';
@@ -18,10 +19,10 @@ function useAppearance() {
   useEffect(() => {
     const mq = matchMedia('(prefers-color-scheme: dark)');
     const apply = () => {
-      const t = local.theme;
-      const dark = t === 'DARK' || t === 'BLACK' || (t === 'SYSTEM' && mq.matches);
-      document.documentElement.dataset.theme = t === 'BLACK' ? 'black' : dark ? 'dark' : 'light';
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'BLACK' ? '#000000' : dark ? '#11151B' : '#F5F6F8');
+      const theme = local.theme;
+      const dark = theme === 'DARK' || theme === 'BLACK' || (theme === 'SYSTEM' && mq.matches);
+      document.documentElement.dataset.theme = theme === 'BLACK' ? 'black' : dark ? 'dark' : 'light';
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'BLACK' ? '#000000' : dark ? '#11151B' : '#F5F6F8');
     };
     apply();
     mq.addEventListener('change', apply);
@@ -63,7 +64,7 @@ function useReplyNotifications() {
     const app = getApp();
     app.chat.onReplyFinished = (conversationId, title, preview) => {
       if (!local.notifyOnComplete || document.hasFocus()) return;
-      platform().notify(title || 'Response ready', preview, () => navigate({ name: 'chat', id: conversationId }));
+      platform().notify(title || t('Response ready'), preview, () => navigate({ name: 'chat', id: conversationId }));
     };
     return () => {
       app.chat.onReplyFinished = null;

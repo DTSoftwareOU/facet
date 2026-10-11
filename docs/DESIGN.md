@@ -146,3 +146,18 @@ centered on large screens. Vertical rhythm between turns 24 dp; between paragrap
 Plain verbs, sentence case, no filler. Buttons say what happens ("Add key", "Create account",
 "Save recovery code"). Errors say what happened and what to do ("OpenAI rejected this key.
 Check it in Providers."), never apologize. Empty states invite action.
+
+## Languages
+
+The web and Windows interface comes in 20 languages: English, Simplified Chinese, Hindi,
+Spanish, Arabic, French, Bengali, Brazilian Portuguese, Russian, Indonesian, Urdu, German,
+Japanese, Marathi, Telugu, Turkish, Tamil, Vietnamese, Korean and Italian. Settings →
+Appearance → Language picks one, or follows the system. Translations keep the voice above
+(plain, friendly, concise) with each language's own conventions for case, punctuation and form
+of address. Brand and product names (Facet, YOLO, MCP, provider and model names) stay as they
+are, and nothing sent to a model is translated.
+
+Arabic and Urdu read right to left: the layout mirrors (logical CSS properties, mirrored back
+arrows and chevrons), while code, keys and paths stay left to right, and each message and
+paragraph follows its own text direction. client/README.md ("Translations") covers marking
+strings and keeping the catalogs complete.

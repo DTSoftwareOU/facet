@@ -6,6 +6,7 @@
  */
 import { b64, utf8 } from '../core/bytes';
 import { isObject } from '../core/json';
+import { t } from '../i18n';
 import { platform } from '../platform';
 import {
   canonicalResource,
@@ -62,7 +63,7 @@ async function begin(
 ): Promise<McpPendingAuth> {
   const d = await discover(serverUrl, wwwAuthenticate);
   if (d.codeChallengeMethods != null && !d.codeChallengeMethods.includes('S256')) {
-    throw new McpException("This server's sign-in doesn't support PKCE (S256), so Facet can't sign in safely.");
+    throw new McpException(t('This server’s sign-in doesn’t support PKCE (S256), so Facet can’t sign in safely.'));
   }
   const reuse = previous != null && previous.clientId.trim() !== '' &&
     previous.authorizationEndpoint === d.authorizationEndpoint &&
@@ -74,7 +75,7 @@ async function begin(
   const verifier = randomUrlSafe(48);
   const state = randomUrlSafe(24);
   const authUrl = httpUrl(d.authorizationEndpoint);
-  if (!authUrl) throw new McpException('This server advertised an invalid sign-in address.');
+  if (!authUrl) throw new McpException(t('This server advertised an invalid sign-in address.'));
   const params: [string, string][] = [
     ['response_type', 'code'],
     ['client_id', clientId],
@@ -119,7 +120,7 @@ async function complete(pending: McpPendingAuth, code: string): Promise<McpOAuth
   try {
     res = await tokenRequest(o, form);
   } catch (e) {
-    if (e instanceof OAuthErrorException) throw new McpException(`Sign-in didn't complete: ${e.message}`, e.status);
+    if (e instanceof OAuthErrorException) throw new McpException(t('Sign-in didn’t complete: {reason}', { reason: e.message }), e.status);
     throw e;
   }
   return applyTokens(o, res, null);
@@ -140,7 +141,7 @@ async function refresh(state: McpOAuthState): Promise<McpOAuthState> {
 
 function applyTokens(state: McpOAuthState, res: Json, keepRefresh: string | null): McpOAuthState {
   const access = jstr(res, 'access_token');
-  if (access == null) throw new McpException("The sign-in server didn't return an access token.");
+  if (access == null) throw new McpException(t('The sign-in server didn’t return an access token.'));
   const raw = res.expires_in;
   const expiresIn = typeof raw === 'number' ? Math.trunc(raw) : typeof raw === 'string' && /^-?\d+$/.test(raw.trim()) ? parseInt(raw, 10) : null;
   return {
@@ -156,7 +157,7 @@ function applyTokens(state: McpOAuthState, res: Json, keepRefresh: string | null
 
 async function discover(serverUrl: string, wwwAuthenticate: string | null): Promise<OAuthDiscovery> {
   const server = httpUrl(serverUrl.trim());
-  if (!server) throw new McpException("That server address isn't a valid URL.");
+  if (!server) throw new McpException(t('That server address isn’t a valid URL.'));
   const challenge = parseBearerChallenge(wwwAuthenticate);
 
   let prm: Json | null = challenge.resource_metadata ? await getJson(challenge.resource_metadata) : null;
@@ -201,8 +202,7 @@ async function register(d: OAuthDiscovery, redirectUri: string, clientName: stri
   const endpoint = d.registrationEndpoint;
   if (endpoint == null) {
     throw new McpException(
-      "This server requires an app that was registered in advance, and it doesn't allow automatic registration. " +
-        "Facet can't sign in to it yet; use a server that supports dynamic client registration, or connect with an access token in headers.",
+      t('This server requires an app that was registered in advance, and it doesn’t allow automatic registration. Facet can’t sign in to it yet; use a server that supports dynamic client registration, or connect with an access token in headers.'),
     );
   }
   const body: Json = {
@@ -221,15 +221,15 @@ async function register(d: OAuthDiscovery, redirectUri: string, clientName: stri
       body: JSON.stringify(body),
     });
   } catch (e) {
-    throw new McpException("Couldn't reach the server's sign-in service.", null, e);
+    throw new McpException(t("Couldn't reach the server's sign-in service."), null, e);
   }
   const json = parseObject(await response.text().catch(() => ''));
   if (!response.ok) {
     const reason = jstr(json, 'error_description') ?? jstr(json, 'error') ?? `HTTP ${response.status}`;
-    throw new McpException(`The server didn't accept Facet's sign-in registration: ${reason}`, response.status);
+    throw new McpException(t('The server didn’t accept Facet’s sign-in registration: {reason}', { reason }), response.status);
   }
   const clientId = jstr(json, 'client_id');
-  if (clientId == null) throw new McpException("The server's sign-in registration didn't return a client id.");
+  if (clientId == null) throw new McpException(t('The server’s sign-in registration didn’t return a client ID.'));
   return [clientId, jstr(json, 'client_secret')];
 }
 
@@ -265,7 +265,7 @@ async function tokenRequest(state: McpOAuthState, form: [string, string][]): Pro
   try {
     response = await fetchFn(state.tokenEndpoint, { method: 'POST', headers, body: new URLSearchParams(form) });
   } catch (e) {
-    throw new McpException("Couldn't reach the server's sign-in service.", null, e);
+    throw new McpException(t("Couldn't reach the server's sign-in service."), null, e);
   }
   const json = parseObject(await response.text().catch(() => ''));
   if (!response.ok || json == null || jstr(json, 'error') != null) {

@@ -4,6 +4,7 @@
  * (via llm/errors, plus the few cases that read differently for media).
  */
 import { isObject } from '../../core/json';
+import { t } from '../../i18n';
 import { platform } from '../../platform';
 import { fromHttp, fromNetwork, HttpStatusError, providerName, TransportError, unexpected } from '../errors';
 import { ProviderKinds } from '../providers';
@@ -179,7 +180,7 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
 export function browserBlocked(config: ProviderConfig): LlmException {
   return new LlmException({
     kind: 'BROWSER_BLOCKED',
-    message: `${providerName(config)} doesn't accept requests from web browsers. Use it in the Facet app for Windows or Android.`,
+    message: t('{provider} doesn\'t accept requests from web browsers. Use it in the Facet app for Windows or Android.', { provider: providerName(config) }),
   });
 }
 
@@ -194,7 +195,7 @@ export function toLlmException(config: ProviderConfig, model: string | null, e: 
     if (e.status === 413) {
       return new LlmException({
         kind: 'BAD_REQUEST',
-        message: `${providerName(config)} says the request is too large. Try a shorter text or recording.`,
+        message: t('{provider} says the request is too large. Try a shorter text or recording.', { provider: providerName(config) }),
         httpStatus: 413,
       });
     }
@@ -214,7 +215,7 @@ export async function guard<T>(config: ProviderConfig, model: string | null, wor
   }
 }
 
-/** "<Provider label> <what>." as an UNKNOWN error (the provider answered, but not with media). */
-export function failure(config: ProviderConfig, what: string): LlmException {
-  return new LlmException({ kind: 'UNKNOWN', message: `${config.label} ${what}.` });
+/** A whole, translated sentence as an UNKNOWN error (the provider answered, but not with media). */
+export function failure(message: string): LlmException {
+  return new LlmException({ kind: 'UNKNOWN', message });
 }

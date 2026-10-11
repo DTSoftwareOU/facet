@@ -11,6 +11,7 @@ import type { ModelRef } from '../../data/prefs';
 import { ChatError } from '../../domain/chat';
 import { AGENT_NAMES, importAgentSession } from '../../domain/resume';
 import { defaultParams, parseParams, type GenParams } from '../../llm/types';
+import { t } from '../../i18n';
 import { platform } from '../../platform';
 import type { AgentKind } from '../../platform/platform';
 import type { ChatComputer } from '../../remote/computers';
@@ -40,9 +41,9 @@ function useNewChatDefaults(route: Route, assistants: Assistant[] | undefined) {
 }
 
 function exportMarkdown(conv: ConversationEntity, path: MessageEntity[]): string {
-  const lines = [`# ${conv.title || 'Chat'}`, ''];
+  const lines = [`# ${conv.title || t('Chat')}`, ''];
   for (const m of path) {
-    lines.push(m.role === 'user' ? '## You' : `## ${m.modelName ?? 'Assistant'}`, '', m.content, '');
+    lines.push(m.role === 'user' ? `## ${t('You')}` : `## ${m.modelName ?? t('Assistant')}`, '', m.content, '');
   }
   return lines.join('\n');
 }
@@ -90,8 +91,8 @@ export function ChatScreen({ route }: { route: Route }) {
   useEffect(() => {
     // The chat was deleted (here or on another device): go back to a new chat.
     if (missing) {
-      const t = setTimeout(() => navigate({ name: 'home' }, true), 400);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => navigate({ name: 'home' }, true), 400);
+      return () => clearTimeout(timer);
     }
   }, [missing]);
 
@@ -138,15 +139,15 @@ export function ChatScreen({ route }: { route: Route }) {
   const startResume = (agent: AgentKind) => {
     if (readyComputer) setResume({ agent, computer: readyComputer });
     else {
-      toast(`Choose a folder on a PC first, then type /resume-from-${agent} again.`);
+      toast(t('Choose a folder on a PC first, then type {command} again.', { command: '/resume-from-' + agent }));
       setComputerDialog(true);
     }
   };
 
   const resumeSession = async (agent: AgentKind, computer: ChatComputer, sessionId: string) => {
     const session = await computer.readAgentSession(agent, sessionId);
-    if (!session) throw new Error('That session isn’t in this folder anymore.');
-    if (session.messages.length === 0) throw new Error(`That ${AGENT_NAMES[agent]} session has no messages to continue.`);
+    if (!session) throw new Error(t('That session isn’t in this folder anymore.'));
+    if (session.messages.length === 0) throw new Error(t('That {agent} session has no messages to continue.', { agent: AGENT_NAMES[agent] }));
     const id = await importAgentSession(app.conversations, agent, session, {
       computer: { host: computer.hostId, folder: computer.folder },
       assistantId: conv ? conv.assistantId ?? null : assistant.id === DEFAULT_ASSISTANT_ID ? null : assistant.id,
@@ -194,7 +195,7 @@ export function ChatScreen({ route }: { route: Route }) {
     try {
       await fn();
     } catch (e) {
-      toast(e instanceof ChatError ? e.message : (e as Error).message || 'Something went wrong.');
+      toast(e instanceof ChatError ? e.message : (e as Error).message || t('Something went wrong.'));
     }
   };
 
@@ -202,7 +203,7 @@ export function ChatScreen({ route }: { route: Route }) {
     if (!modelRef) {
       if (!catalog?.length) ui.openSettings('providers');
       else setPicker({});
-      toast('Choose a model to start chatting.');
+      toast(t('Choose a model to start chatting.'));
       return false;
     }
     try {
@@ -218,26 +219,26 @@ export function ChatScreen({ route }: { route: Route }) {
       if (!conversationId) navigate({ name: 'chat', id }, true);
       return true;
     } catch (e) {
-      toast(e instanceof ChatError ? e.message : (e as Error).message || 'Couldn’t send this message.');
+      toast(e instanceof ChatError ? e.message : (e as Error).message || t('Couldn’t send this message.'));
       return false;
     }
   };
 
   const commands: SlashCommand[] = useMemo(() => {
     const list: SlashCommand[] = [
-      { name: 'new', description: 'Start a new chat', icon: <SquarePen size={16} />, run: () => navigate({ name: 'home' }) },
-      { name: 'model', description: 'Choose the model', icon: <Cpu size={16} />, run: () => setPicker({}) },
+      { name: 'new', description: t('Start a new chat'), icon: <SquarePen size={16} />, run: () => navigate({ name: 'home' }) },
+      { name: 'model', description: t('Choose the model'), icon: <Cpu size={16} />, run: () => setPicker({}) },
     ];
     if (canChooseComputer) {
-      list.push({ name: 'folder', description: readyComputer ? `Change the working folder (${folderName(readyComputer.folder)})` : 'Choose a folder to work in', icon: <FolderOpen size={16} />, run: () => void chooseComputer() });
+      list.push({ name: 'folder', description: readyComputer ? t('Change the working folder ({folder})', { folder: folderName(readyComputer.folder) }) : t('Choose a folder to work in'), icon: <FolderOpen size={16} />, run: () => void chooseComputer() });
     }
     if (otherPcs.length > 0) {
-      list.push({ name: 'pc', description: 'Choose which PC this chat works on', icon: <Monitor size={16} />, run: () => setComputerDialog(true) });
+      list.push({ name: 'pc', description: t('Choose which PC this chat works on'), icon: <Monitor size={16} />, run: () => setComputerDialog(true) });
     }
     if (canChooseComputer) {
       list.push(
-        { name: 'resume-from-claude', description: 'Continue a Claude Code session from this folder', icon: <History size={16} />, run: () => startResume('claude') },
-        { name: 'resume-from-codex', description: 'Continue a Codex session from this folder', icon: <History size={16} />, run: () => startResume('codex') },
+        { name: 'resume-from-claude', description: t('Continue a {agent} session from this folder', { agent: AGENT_NAMES.claude }), icon: <History size={16} />, run: () => startResume('claude') },
+        { name: 'resume-from-codex', description: t('Continue a {agent} session from this folder', { agent: AGENT_NAMES.codex }), icon: <History size={16} />, run: () => startResume('codex') },
       );
     }
     return list;
@@ -288,28 +289,28 @@ export function ChatScreen({ route }: { route: Route }) {
     <div className="main">
       <header className="topbar">
         {sidebarHidden && (
-          <IconButton label="Show chats" onClick={() => (narrow ? ui.set({ drawer: true }) : app.settings.updateLocal((l) => ({ ...l, sidebarOpen: true })))}>
-            {narrow ? <MenuIcon size={21} /> : <PanelLeftOpen size={20} />}
+          <IconButton label={t('Show chats')} onClick={() => (narrow ? ui.set({ drawer: true }) : app.settings.updateLocal((l) => ({ ...l, sidebarOpen: true })))}>
+            {narrow ? <MenuIcon size={21} /> : <PanelLeftOpen size={20} className="flip-rtl" />}
           </IconButton>
         )}
         <button type="button" className="model-title" onClick={() => setPicker({})} aria-haspopup="dialog">
           <span className="col" style={{ minWidth: 0 }}>
-            <span className="name ellipsis">{model?.model.displayName ?? (catalog?.length ? 'Choose a model' : 'Add a provider')}</span>
+            <span className="name ellipsis">{model?.model.displayName ?? (catalog?.length ? t('Choose a model') : t('Add a provider'))}</span>
             {model && <span className="provider ellipsis">{model.providerLabel}</span>}
           </span>
           <ChevronDown size={18} className="c-2" />
         </button>
         <span className="topbar-spacer" />
         {sidebarHidden && (
-          <IconButton label="New chat" onClick={() => navigate({ name: 'home' })}>
+          <IconButton label={t('New chat')} onClick={() => navigate({ name: 'home' })}>
             <SquarePen size={20} />
           </IconButton>
         )}
-        <IconButton label="Chat settings" onClick={() => setSettingsOpen(true)}>
+        <IconButton label={t('Chat settings')} onClick={() => setSettingsOpen(true)}>
           <SlidersHorizontal size={20} />
         </IconButton>
         {conv && (
-          <IconButton label="More" onClick={more.open}>
+          <IconButton label={t('More')} onClick={more.open}>
             <MoreVertical size={20} />
           </IconButton>
         )}
@@ -343,7 +344,7 @@ export function ChatScreen({ route }: { route: Route }) {
         </div>
       )}
       {showDown && !empty && (
-        <button type="button" className="scroll-down" style={{ bottom: 120 }} aria-label="Scroll to the latest message" onClick={() => { pinned.current = true; thread.current?.scrollTo({ top: thread.current.scrollHeight, behavior: 'smooth' }); }}>
+        <button type="button" className="scroll-down" style={{ bottom: 120 }} aria-label={t('Scroll to the latest message')} onClick={() => { pinned.current = true; thread.current?.scrollTo({ top: thread.current.scrollHeight, behavior: 'smooth' }); }}>
           <ArrowDown size={18} />
         </button>
       )}
@@ -362,7 +363,7 @@ export function ChatScreen({ route }: { route: Route }) {
         commands={commands}
       />
       <div className="composer-hint" style={{ marginTop: -10, marginBottom: 8 }}>
-        {platform().kind === 'web' ? 'AI can make mistakes. Chats are end-to-end encrypted, and replies come straight from the provider you choose.' : 'AI can make mistakes. Check important answers.'}
+        {platform().kind === 'web' ? t('AI can make mistakes. Chats are end-to-end encrypted, and replies come straight from the provider you choose.') : t('AI can make mistakes. Check important answers.')}
       </div>
 
       {computerDialog && <ComputerDialog binding={binding} onPick={setComputer} onClose={() => setComputerDialog(false)} />}
@@ -374,7 +375,7 @@ export function ChatScreen({ route }: { route: Route }) {
           onClose={() => setResume(null)}
         />
       )}
-      {picker && <ModelPicker current={picker.regenerate ? null : modelRef} onPick={pickModel} onClose={() => setPicker(null)} title={picker.regenerate ? 'Regenerate with' : 'Choose a model'} />}
+      {picker && <ModelPicker current={picker.regenerate ? null : modelRef} onPick={pickModel} onClose={() => setPicker(null)} title={picker.regenerate ? t('Regenerate with') : t('Choose a model')} />}
       {settingsOpen && (
         <ChatSettings
           model={model}
@@ -395,18 +396,18 @@ export function ChatScreen({ route }: { route: Route }) {
           onClose={more.close}
           items={[
             {
-              label: 'Rename',
+              label: t('Rename'),
               icon: <Pencil size={17} />,
               onSelect: () => setRenaming(true),
             },
-            { label: conv.pinned ? 'Unpin' : 'Pin', icon: conv.pinned ? <PinOff size={17} /> : <Pin size={17} />, onSelect: () => app.conversations.setPinned(conv.id, !conv.pinned) },
+            { label: conv.pinned ? t('Unpin') : t('Pin'), icon: conv.pinned ? <PinOff size={17} /> : <Pin size={17} />, onSelect: () => app.conversations.setPinned(conv.id, !conv.pinned) },
             {
-              label: 'Export as Markdown',
+              label: t('Export as Markdown'),
               icon: <Download size={17} />,
               onSelect: () => void platform().saveFile(`${(conv.title || 'chat').replace(/[\\/:*?"<>|]+/g, '_')}.md`, new Blob([exportMarkdown(conv, items.map((i) => i.message))], { type: 'text/markdown' })),
             },
             {
-              label: 'Export as JSON',
+              label: t('Export as JSON'),
               icon: <ArrowUp size={17} style={{ transform: 'rotate(180deg)' }} />,
               onSelect: () =>
                 void platform().saveFile(
@@ -414,18 +415,18 @@ export function ChatScreen({ route }: { route: Route }) {
                   new Blob([JSON.stringify({ conversation: { ...conv, params: parseJson(conv.paramsJson, {}) }, messages: (messages ?? []).map((m) => JSON.parse(toJson(m))) }, null, 2)], { type: 'application/json' }),
                 ),
             },
-            { label: 'Delete chat', icon: <Trash2 size={17} />, danger: true, separatorBefore: true, onSelect: () => setConfirmDelete(true) },
+            { label: t('Delete chat'), icon: <Trash2 size={17} />, danger: true, separatorBefore: true, onSelect: () => setConfirmDelete(true) },
           ]}
         />
       )}
       {renaming && conv && (
-        <TextPrompt title="Rename chat" initial={conv.title} confirm="Rename" onSubmit={(t) => app.conversations.rename(conv.id, t)} onClose={() => setRenaming(false)} />
+        <TextPrompt title={t('Rename chat')} initial={conv.title} confirm={t('Rename')} onSubmit={(title) => app.conversations.rename(conv.id, title)} onClose={() => setRenaming(false)} />
       )}
       {confirmDelete && conv && (
         <Confirm
-          title="Delete this chat?"
-          body="It's removed from all your devices."
-          confirm="Delete"
+          title={t('Delete this chat?')}
+          body={t("It's removed from all your devices.")}
+          confirm={t('Delete')}
           danger
           onConfirm={async () => {
             await app.conversations.delete(conv.id);
@@ -450,20 +451,20 @@ function Welcome({ assistant, assistants, onAssistant, onStarter, modelName, noP
     <div className="welcome">
       <div className="welcome-inner">
         {assistant.id === DEFAULT_ASSISTANT_ID ? <Gem size={64} /> : <AssistantAvatar assistant={assistant} size={64} />}
-        <h1 className="t-display">{assistant.id === DEFAULT_ASSISTANT_ID ? 'What can I help with?' : assistant.name}</h1>
+        <h1 className="t-display">{assistant.id === DEFAULT_ASSISTANT_ID ? t('What can I help with?') : <bdi>{assistant.name}</bdi>}</h1>
         {noProviders ? (
           <div className="col gap-12" style={{ alignItems: 'center', textAlign: 'center', maxWidth: 440 }}>
             <p className="t-body c-2" style={{ margin: 0 }}>
-              Add an API key from OpenAI, Anthropic, Google or any other provider. It's encrypted on this device before it syncs.
+              {t("Add an API key from OpenAI, Anthropic, Google or any other provider. It's encrypted on this device before it syncs.")}
             </p>
-            <button type="button" className="btn btn-primary" onClick={() => ui.openSettings('providers')}>Add a provider</button>
+            <button type="button" className="btn btn-primary" onClick={() => ui.openSettings('providers')}>{t('Add a provider')}</button>
           </div>
         ) : (
           assistant.starters.length > 0 && (
             <div className="starters">
               {assistant.starters.slice(0, 4).map((s) => (
                 <button key={s} type="button" className="starter" onClick={() => onStarter(s)}>
-                  <span>{s}</span>
+                  <span dir="auto">{s}</span>
                   <ArrowUp size={17} />
                 </button>
               ))}
@@ -474,7 +475,7 @@ function Welcome({ assistant, assistants, onAssistant, onStarter, modelName, noP
           {assistants.slice(0, 8).map((a) => (
             <button key={a.id} type="button" className={'assistant-chip' + (a.id === assistant.id ? ' sel' : '')} onClick={() => onAssistant(a)}>
               <AssistantAvatar assistant={a} size={28} />
-              {a.name}
+              <bdi>{a.name}</bdi>
             </button>
           ))}
         </div>

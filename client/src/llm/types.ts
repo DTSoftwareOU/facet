@@ -3,6 +3,7 @@
  * LlmTypes.kt). Enum-like string unions use the Android enum NAMES, because they are stored in
  * synced JSON (GenParams, ModelInfo, ProviderBlocks) that both apps read and write.
  */
+import { msg, type Msg } from '../i18n';
 import type { ProviderKind } from './providers';
 
 /** Wire protocol a provider speaks. MEDIA providers make images, video, speech, music or transcripts, but no chat. */
@@ -21,21 +22,23 @@ export interface ProviderConfig {
 /** Reasoning effort levels across providers. Not every model supports every level. */
 export type Effort = 'NONE' | 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'XHIGH' | 'MAX';
 export const EFFORTS: readonly Effort[] = ['NONE', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH', 'XHIGH', 'MAX'];
-export const EFFORT_INFO: Record<Effort, { wire: string; label: string }> = {
-  NONE: { wire: 'none', label: 'Off' },
-  MINIMAL: { wire: 'minimal', label: 'Minimal' },
-  LOW: { wire: 'low', label: 'Low' },
-  MEDIUM: { wire: 'medium', label: 'Medium' },
-  HIGH: { wire: 'high', label: 'High' },
-  XHIGH: { wire: 'xhigh', label: 'Extra high' },
-  MAX: { wire: 'max', label: 'Max' },
+/** `label` is shown with tm(). */
+export const EFFORT_INFO: Record<Effort, { wire: string; label: Msg }> = {
+  NONE: { wire: 'none', label: msg('Off') },
+  MINIMAL: { wire: 'minimal', label: msg('Minimal') },
+  LOW: { wire: 'low', label: msg('Low') },
+  MEDIUM: { wire: 'medium', label: msg('Medium') },
+  HIGH: { wire: 'high', label: msg('High') },
+  XHIGH: { wire: 'xhigh', label: msg('Extra high') },
+  MAX: { wire: 'max', label: msg('Max') },
 };
 
 export type Verbosity = 'LOW' | 'MEDIUM' | 'HIGH';
-export const VERBOSITY_INFO: Record<Verbosity, { wire: string; label: string }> = {
-  LOW: { wire: 'low', label: 'Concise' },
-  MEDIUM: { wire: 'medium', label: 'Balanced' },
-  HIGH: { wire: 'high', label: 'Detailed' },
+/** `label` is shown with tm(). */
+export const VERBOSITY_INFO: Record<Verbosity, { wire: string; label: Msg }> = {
+  LOW: { wire: 'low', label: msg('Concise') },
+  MEDIUM: { wire: 'medium', label: msg('Balanced') },
+  HIGH: { wire: 'high', label: msg('Detailed') },
 };
 
 /**
@@ -117,13 +120,14 @@ export interface ModelPricing {
 
 /** What a model produces. Chat pickers list TEXT models; the others are media models chosen in Settings. */
 export type ModelOutput = 'TEXT' | 'IMAGE' | 'VIDEO' | 'SPEECH' | 'MUSIC' | 'TRANSCRIPTION';
-export const MODEL_OUTPUT_INFO: Record<ModelOutput, { label: string; noun: string; what: string }> = {
-  TEXT: { label: 'Chat', noun: 'chat', what: 'chat' },
-  IMAGE: { label: 'Images', noun: 'image', what: 'images' },
-  VIDEO: { label: 'Video', noun: 'video', what: 'video' },
-  SPEECH: { label: 'Speech', noun: 'speech', what: 'speech' },
-  MUSIC: { label: 'Music & sound', noun: 'music', what: 'music' },
-  TRANSCRIPTION: { label: 'Transcription', noun: 'transcription', what: 'transcripts' },
+/** `label` is shown with tm(); `noun` and `what` are English, for file names and model-facing text. */
+export const MODEL_OUTPUT_INFO: Record<ModelOutput, { label: Msg; noun: string; what: string }> = {
+  TEXT: { label: msg('Chat'), noun: 'chat', what: 'chat' },
+  IMAGE: { label: msg('Images'), noun: 'image', what: 'images' },
+  VIDEO: { label: msg('Video'), noun: 'video', what: 'video' },
+  SPEECH: { label: msg('Speech'), noun: 'speech', what: 'speech' },
+  MUSIC: { label: msg('Music & sound'), noun: 'music', what: 'music' },
+  TRANSCRIPTION: { label: msg('Transcription'), noun: 'transcription', what: 'transcripts' },
 };
 
 export interface ModelInfo {

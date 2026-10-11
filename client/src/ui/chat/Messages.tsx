@@ -31,6 +31,7 @@ import { messageAttachments, messageCitations, messageError, messageUsage } from
 import type { MessageEntity } from '../../data/entities';
 import type { ModelRef } from '../../data/prefs';
 import type { LiveTurn, ToolActivity } from '../../domain/chat';
+import { formatNumber, t } from '../../i18n';
 import type { Citation } from '../../llm/types';
 import type { ToolTrace } from '../../tools/types';
 import { Gem } from '../components/Gem';
@@ -61,12 +62,12 @@ function BranchSwitcher({ item, actions }: { item: ThreadItem; actions: MessageA
   const i = item.siblingIndex;
   return (
     <span className="branch">
-      <IconButton label="Previous version" small disabled={i === 0} onClick={() => actions.switchBranch(item.siblingIds[i - 1])}>
-        <ChevronLeft size={16} />
+      <IconButton label={t('Previous version')} small disabled={i === 0} onClick={() => actions.switchBranch(item.siblingIds[i - 1])}>
+        <ChevronLeft size={16} className="flip-rtl" />
       </IconButton>
-      {i + 1}/{item.siblingIds.length}
-      <IconButton label="Next version" small disabled={i === item.siblingIds.length - 1} onClick={() => actions.switchBranch(item.siblingIds[i + 1])}>
-        <ChevronRight size={16} />
+      {t('{current}/{total}', { current: i + 1, total: item.siblingIds.length })}
+      <IconButton label={t('Next version')} small disabled={i === item.siblingIds.length - 1} onClick={() => actions.switchBranch(item.siblingIds[i + 1])}>
+        <ChevronRight size={16} className="flip-rtl" />
       </IconButton>
     </span>
   );
@@ -99,11 +100,12 @@ export const UserMessage = memo(function UserMessage({ item, actions, busy }: { 
                 }
               }
             }}
-            aria-label="Edit message"
+            aria-label={t('Edit message')}
+            dir="auto"
           />
           <div className="row gap-8" style={{ justifyContent: 'flex-end' }}>
-            <Button variant="text" small onClick={() => setEditing(false)}>Cancel</Button>
-            <Button small disabled={!text.trim() || busy} onClick={() => { setEditing(false); actions.editAndResend(m.id, text); }}>Send</Button>
+            <Button variant="text" small onClick={() => setEditing(false)}>{t('Cancel')}</Button>
+            <Button small disabled={!text.trim() || busy} onClick={() => { setEditing(false); actions.editAndResend(m.id, text); }}>{t('Send')}</Button>
           </div>
         </div>
       </div>
@@ -112,14 +114,14 @@ export const UserMessage = memo(function UserMessage({ item, actions, busy }: { 
   return (
     <div className="user-msg turn">
       {atts.length > 0 && <AttachmentStrip atts={atts} />}
-      {m.content.trim() && <div className="user-bubble">{m.content}</div>}
+      {m.content.trim() && <div className="user-bubble" dir="auto">{m.content}</div>}
       <div className="row gap-4">
         <BranchSwitcher item={item} actions={actions} />
         <div className="user-actions">
-          <IconButton label="Copy" small onClick={() => { void navigator.clipboard.writeText(m.content); toast('Copied.'); }}>
+          <IconButton label={t('Copy')} small onClick={() => { void navigator.clipboard.writeText(m.content); toast(t('Copied.')); }}>
             <Copy size={15} />
           </IconButton>
-          <IconButton label="Edit and resend" small disabled={busy} onClick={() => { setText(m.content); setEditing(true); }}>
+          <IconButton label={t('Edit and resend')} small disabled={busy} onClick={() => { setText(m.content); setEditing(true); }}>
             <Pencil size={15} />
           </IconButton>
         </div>
@@ -132,8 +134,8 @@ function useElapsed(since: number | null, active: boolean): number {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!active) return;
-    const t = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(timer);
   }, [active]);
   return since ? Math.max(0, now - since) : 0;
 }
@@ -143,18 +145,20 @@ function ThinkingPanel({ text, active, startedAt, ms, showText }: { text: string
   const [open, setOpen] = useState(local.expandThinking);
   const elapsed = useElapsed(startedAt, active);
   if (!active && !text && !ms) return null;
-  const label = active ? 'Thinking' : ms ? `Thought for ${Format.seconds(ms)}` : 'Thought';
+  const label = active
+    ? elapsed > 1500 ? t('Thinking · {duration}', { duration: Format.seconds(elapsed) }) : t('Thinking')
+    : ms ? t('Thought for {duration}', { duration: Format.seconds(ms) }) : t('Thought');
   const canOpen = showText && !!text.trim();
   return (
     <div className="thinking">
       <button type="button" className="thinking-toggle" onClick={() => canOpen && setOpen(!open)} aria-expanded={canOpen ? open : undefined}>
         {active ? <Gem size={18} thinking /> : <Brain size={18} />}
-        <span>{label}{active && elapsed > 1500 ? ` · ${Format.seconds(elapsed)}` : ''}</span>
+        <span>{label}</span>
         {canOpen && (open ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
       </button>
-      {canOpen && (open || (active && local.expandThinking)) && <div className={'thinking-body' + (active ? '' : ' done')}>{text}</div>}
+      {canOpen && (open || (active && local.expandThinking)) && <div className={'thinking-body' + (active ? '' : ' done')} dir="auto">{text}</div>}
       {canOpen && active && !open && !local.expandThinking && (
-        <div className="thinking-body" style={{ maxHeight: 66, overflow: 'hidden', maskImage: 'linear-gradient(transparent, black 60%)' }}>
+        <div className="thinking-body" dir="auto" style={{ maxHeight: 66, overflow: 'hidden', maskImage: 'linear-gradient(transparent, black 60%)' }}>
           {text.slice(-400)}
         </div>
       )}
@@ -162,8 +166,8 @@ function ThinkingPanel({ text, active, startedAt, ms, showText }: { text: string
   );
 }
 
-function toolIcon(t: ToolActivity) {
-  switch (t.kind) {
+function toolIcon(tool: ToolActivity) {
+  switch (tool.kind) {
     case 'SEARCH':
       return <Globe size={16} />;
     case 'FETCH':
@@ -179,8 +183,8 @@ function toolIcon(t: ToolActivity) {
   }
 }
 
-function statusIcon(t: ToolActivity) {
-  switch (t.status) {
+function statusIcon(tool: ToolActivity) {
+  switch (tool.status) {
     case 'PREPARING':
     case 'RUNNING':
       return <Spinner size={14} />;
@@ -202,26 +206,26 @@ function prettyArgs(json: string): string {
 }
 
 /** What the model wants to do, in words, for the approval card. */
-function approvalSummary(t: ToolActivity): { title: string; detail: string | null } {
-  const args = parseJson<Record<string, any>>(t.argumentsJson, {});
-  if (t.kind === 'COMPUTER') {
-    switch (t.name) {
+function approvalSummary(tool: ToolActivity): { title: string; detail: string | null; prose?: boolean } {
+  const args = parseJson<Record<string, any>>(tool.argumentsJson, {});
+  if (tool.kind === 'COMPUTER') {
+    switch (tool.name) {
       case 'run_command':
-        return { title: 'Run this command?', detail: String(args.command ?? '') };
+        return { title: t('Run this command?'), detail: String(args.command ?? '') };
       case 'write_file':
-        return { title: `Write ${args.path}?`, detail: String(args.content ?? '').slice(0, 2000) };
+        return { title: t('Write {path}?', { path: String(args.path) }), detail: String(args.content ?? '').slice(0, 2000) };
       case 'edit_file':
-        return { title: `Edit ${args.path}?`, detail: `- ${String(args.old_string ?? '').split('\n').join('\n- ')}\n+ ${String(args.new_string ?? '').split('\n').join('\n+ ')}`.slice(0, 3000) };
+        return { title: t('Edit {path}?', { path: String(args.path) }), detail: `- ${String(args.old_string ?? '').split('\n').join('\n- ')}\n+ ${String(args.new_string ?? '').split('\n').join('\n+ ')}`.slice(0, 3000) };
       case 'stop_process':
-        return { title: 'Stop this background process?', detail: String(args.id ?? '') };
+        return { title: t('Stop this background process?'), detail: String(args.id ?? '') };
       case 'open_path':
-        return { title: `Open ${args.path}?`, detail: null };
+        return { title: t('Open {path}?', { path: String(args.path) }), detail: null };
       default:
-        return { title: `Allow ${t.name.replace(/_/g, ' ')}?`, detail: prettyArgs(t.argumentsJson) };
+        return { title: t('Allow {tool}?', { tool: tool.name.replace(/_/g, ' ') }), detail: prettyArgs(tool.argumentsJson) };
     }
   }
-  if (t.kind === 'MEDIA') return { title: 'Create this video?', detail: String(args.prompt ?? '') };
-  return { title: `Allow ${t.label}?`, detail: t.argumentsJson && t.argumentsJson !== '{}' ? prettyArgs(t.argumentsJson) : null };
+  if (tool.kind === 'MEDIA') return { title: t('Create this video?'), detail: String(args.prompt ?? ''), prose: true };
+  return { title: t('Allow {tool}?', { tool: tool.label }), detail: tool.argumentsJson && tool.argumentsJson !== '{}' ? prettyArgs(tool.argumentsJson) : null };
 }
 
 /** Tool labels mark commands and names with backticks ("Ran `npm test`"): show those parts as code. */
@@ -231,48 +235,48 @@ function labelParts(label: string): ReactNode {
   return parts.map((part, i) => (i % 2 ? <code key={i} className="tool-code">{part}</code> : part));
 }
 
-function ToolItem({ t, live }: { t: ToolActivity; live: boolean }) {
+function ToolItem({ tool, live }: { tool: ToolActivity; live: boolean }) {
   const [open, setOpen] = useState(false);
   const app = getApp();
-  const waiting = live && t.status === 'AWAITING_APPROVAL';
-  const summary = waiting ? approvalSummary(t) : null;
+  const waiting = live && tool.status === 'AWAITING_APPROVAL';
+  const summary = waiting ? approvalSummary(tool) : null;
   return (
     <div className="tool-item">
       <button type="button" className="tool-line" onClick={() => setOpen(!open)} aria-expanded={open}>
-        {toolIcon(t)}
-        <span className="label">{labelParts(t.label)}</span>
-        {statusIcon(t)}
+        {toolIcon(tool)}
+        <span className="label">{labelParts(tool.label)}</span>
+        {statusIcon(tool)}
         {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
       </button>
       {waiting && summary && (
         <div className="approval">
           <span className="t-label-l">{summary.title}</span>
-          {summary.detail && <div className="tool-detail" style={{ borderRadius: 10, border: 0 }}>{summary.detail}</div>}
+          {summary.detail && <div className="tool-detail" dir={summary.prose ? 'auto' : 'ltr'} style={{ borderRadius: 10, border: 0 }}>{summary.detail}</div>}
           <div className="approval-actions">
-            <Button small onClick={() => app.chat.respondToApproval(t.id, 'ALLOW')}>Allow</Button>
-            {(t.kind === 'MCP' || t.kind === 'COMPUTER') && (
-              <Button small variant="tonal" onClick={() => app.chat.respondToApproval(t.id, 'ALWAYS')}>
-                {t.kind === 'MCP' ? 'Always allow this tool' : 'Allow for this chat'}
+            <Button small onClick={() => app.chat.respondToApproval(tool.id, 'ALLOW')}>{t('Allow')}</Button>
+            {(tool.kind === 'MCP' || tool.kind === 'COMPUTER') && (
+              <Button small variant="tonal" onClick={() => app.chat.respondToApproval(tool.id, 'ALWAYS')}>
+                {tool.kind === 'MCP' ? t('Always allow this tool') : t('Allow for this chat')}
               </Button>
             )}
-            <Button small variant="outline" onClick={() => app.chat.respondToApproval(t.id, 'DENY')}>Deny</Button>
+            <Button small variant="outline" onClick={() => app.chat.respondToApproval(tool.id, 'DENY')}>{t('Deny')}</Button>
           </div>
         </div>
       )}
       {open && (
         <div className="tool-detail">
-          {t.serverName && <div className="k">{t.serverName} · {t.name}</div>}
-          {t.argumentsJson && t.argumentsJson !== '{}' && (
+          {tool.serverName && <div className="k">{tool.serverName} · {tool.name}</div>}
+          {tool.argumentsJson && tool.argumentsJson !== '{}' && (
             <>
-              <div className="k">Input</div>
-              {prettyArgs(t.argumentsJson)}
+              <div className="k">{t('Input')}</div>
+              <bdi dir="ltr">{prettyArgs(tool.argumentsJson)}</bdi>
               {'\n\n'}
             </>
           )}
-          {t.result != null && (
+          {tool.result != null && (
             <>
-              <div className="k">Result</div>
-              {t.result}
+              <div className="k">{t('Result')}</div>
+              <bdi>{tool.result}</bdi>
             </>
           )}
         </div>
@@ -309,7 +313,7 @@ function Citations({ list }: { list: Citation[] }) {
         <a key={c.url} className="citation" href={c.url} target="_blank" rel="noopener noreferrer" title={c.snippet ?? c.url}>
           <span className="num">{i + 1}</span>
           <span className="col" style={{ minWidth: 0 }}>
-            <span className="t ellipsis">{c.title || hostOf(c.url)}</span>
+            <span className="t ellipsis"><bdi>{c.title || hostOf(c.url)}</bdi></span>
             <span className="h ellipsis">{hostOf(c.url)}</span>
           </span>
         </a>
@@ -321,25 +325,26 @@ function Citations({ list }: { list: Citation[] }) {
 function UsageDialog({ m, onClose }: { m: MessageEntity; onClose: () => void }) {
   const u = messageUsage(m);
   if (!u) return null;
-  const rows: [string, string][] = [
-    ['Input tokens', u.inputTokens.toLocaleString()],
-    ['  of which cached', u.cacheReadTokens.toLocaleString()],
-    ['  of which written to cache', u.cacheWriteTokens.toLocaleString()],
-    ['Output tokens', u.outputTokens.toLocaleString()],
-    ['  of which reasoning', u.reasoningTokens.toLocaleString()],
-    ['Estimated cost', m.costUsd != null ? Format.cost(m.costUsd) : 'Unknown (no price for this model)'],
-    ['Model', m.modelName ?? m.modelId ?? ''],
+  // [label, value, indented under the row above]
+  const rows: [string, string, boolean][] = [
+    [t('Input tokens'), formatNumber(u.inputTokens), false],
+    [t('of which cached'), formatNumber(u.cacheReadTokens), true],
+    [t('of which written to cache'), formatNumber(u.cacheWriteTokens), true],
+    [t('Output tokens'), formatNumber(u.outputTokens), false],
+    [t('of which reasoning'), formatNumber(u.reasoningTokens), true],
+    [t('Estimated cost'), m.costUsd != null ? Format.cost(m.costUsd) : t('Unknown (no price for this model)'), false],
+    [t('Model'), m.modelName ?? m.modelId ?? '', false],
   ];
   return (
-    <Dialog title="Usage" onClose={onClose} size="narrow">
+    <Dialog title={t('Usage')} onClose={onClose} size="narrow">
       <div className="col gap-8">
-        {rows.map(([k, v]) => (
+        {rows.map(([k, v, sub]) => (
           <div key={k} className="row" style={{ justifyContent: 'space-between', gap: 16 }}>
-            <span className={k.startsWith('  ') ? 'c-3' : 'c-2'} style={{ paddingLeft: k.startsWith('  ') ? 14 : 0 }}>{k.trim()}</span>
+            <span className={sub ? 'c-3' : 'c-2'} style={{ paddingInlineStart: sub ? 14 : 0 }}>{k}</span>
             <span>{v}</span>
           </div>
         ))}
-        <p className="field-hint">Estimates from the provider's token counts and published prices.</p>
+        <p className="field-hint">{t("Estimates from the provider's token counts and published prices.")}</p>
       </div>
     </Dialog>
   );
@@ -372,25 +377,29 @@ export const AssistantMessage = memo(function AssistantMessage({ item, live, act
 
   const copy = () => {
     void navigator.clipboard.writeText(m.content);
-    toast('Copied.');
+    toast(t('Copied.'));
   };
 
   return (
     <div className="turn">
       <div className="assistant-head">
         <Gem size={20} thinking={streaming && (live!.thinkingActive || waitingForFirst || live!.searching)} />
-        <span>{m.modelName || m.modelId || 'Assistant'}</span>
-        {live?.searching && <span className="served">Searching{live.searchQuery ? ` “${live.searchQuery}”` : ' the web'}…</span>}
+        <span>{m.modelName || m.modelId || t('Assistant')}</span>
+        {live?.searching && <span className="served">{live.searchQuery ? t('Searching “{query}”…', { query: live.searchQuery }) : t('Searching the web…')}</span>}
       </div>
       {(thinking || live?.thinkingActive || m.thinkingMs) && (
         <ThinkingPanel text={thinking} active={!!live?.thinkingActive} startedAt={live?.thinkingStartedAt ?? null} ms={live ? live.thinkingMs || null : m.thinkingMs ?? null} showText={showThinking} />
       )}
       {tools.length > 0 && (
         <div className="tool-list">
-          {tools.map((t) => <ToolItem key={t.id} t={t} live={streaming} />)}
+          {tools.map((tool) => <ToolItem key={tool.id} tool={tool} live={streaming} />)}
         </div>
       )}
-      {text ? <Markdown text={text} streaming={streaming} /> : waitingForFirst ? <div className="c-3 t-body">Waiting for {m.modelName ?? 'the model'}…</div> : null}
+      {text ? (
+        <Markdown text={text} streaming={streaming} />
+      ) : waitingForFirst ? (
+        <div className="c-3 t-body">{m.modelName ? t('Waiting for {model}…', { model: m.modelName }) : t('Waiting for the model…')}</div>
+      ) : null}
       {atts.length > 0 && <AttachmentStrip atts={atts} align="start" />}
       <Citations list={citations} />
       {live?.notice && <div className="notice"><Sparkles size={16} /><span className="grow">{live.notice}</span></div>}
@@ -399,29 +408,29 @@ export const AssistantMessage = memo(function AssistantMessage({ item, live, act
           <AlertCircle size={18} style={{ flex: 'none', marginTop: 2 }} />
           <div className="grow col gap-4">
             <span>{err.message}</span>
-            {err.detail && <span className="t-label-s" style={{ opacity: 0.8, fontWeight: 400 }}>{err.detail}</span>}
+            {err.detail && <span className="t-label-s" dir="auto" style={{ opacity: 0.8, fontWeight: 400 }}>{err.detail}</span>}
           </div>
-          {last && <Button small variant="outline" onClick={() => actions.regenerate(m.id)}>Try again</Button>}
+          {last && <Button small variant="outline" onClick={() => actions.regenerate(m.id)}>{t('Try again')}</Button>}
         </div>
       )}
-      {!streaming && status === 'REFUSED' && <div className="notice">The model declined to answer this request.</div>}
-      {!streaming && status === 'STOPPED' && !m.content && <div className="notice">Stopped.</div>}
+      {!streaming && status === 'REFUSED' && <div className="notice">{t('The model declined to answer this request.')}</div>}
+      {!streaming && status === 'STOPPED' && !m.content && <div className="notice">{t('Stopped.')}</div>}
       {!streaming && status === 'TRUNCATED' && last && (
         <div className="notice">
-          <span className="grow">The reply reached the output limit.</span>
-          <Button small variant="tonal" onClick={actions.continueReply}>Continue</Button>
+          <span className="grow">{t('The reply reached the output limit.')}</span>
+          <Button small variant="tonal" onClick={actions.continueReply}>{t('Continue')}</Button>
         </div>
       )}
       {!streaming && (
         <div className="msg-actions">
-          <IconButton label="Copy" small onClick={copy} disabled={!m.content}>
+          <IconButton label={t('Copy')} small onClick={copy} disabled={!m.content}>
             <Copy size={16} />
           </IconButton>
-          <IconButton label="Regenerate" small onClick={() => actions.regenerate(m.id)}>
+          <IconButton label={t('Regenerate')} small onClick={() => actions.regenerate(m.id)}>
             <RefreshCw size={16} />
           </IconButton>
           <IconButton
-            label={read.speaking === m.id ? 'Stop reading' : 'Read aloud'}
+            label={read.speaking === m.id ? t('Stop reading') : t('Read aloud')}
             small
             active={read.speaking === m.id}
             disabled={!m.content}
@@ -429,13 +438,13 @@ export const AssistantMessage = memo(function AssistantMessage({ item, live, act
           >
             {read.loading === m.id ? <Spinner size={14} /> : read.speaking === m.id ? <Square size={14} /> : <Volume2 size={16} />}
           </IconButton>
-          <IconButton label="More" small onClick={more.open}>
+          <IconButton label={t('More')} small onClick={more.open}>
             <MoreHorizontal size={16} />
           </IconButton>
           <BranchSwitcher item={item} actions={actions} />
           {local.showUsage && usage && (
-            <button type="button" className="msg-meta" onClick={() => setUsageOpen(true)} title="Usage details">
-              {Format.tokens(usage.inputTokens)} in · {Format.tokens(usage.outputTokens)} out
+            <button type="button" className="msg-meta" onClick={() => setUsageOpen(true)} title={t('Usage details')}>
+              {t('{input} in · {output} out', { input: Format.tokens(usage.inputTokens), output: Format.tokens(usage.outputTokens) })}
               {local.showCost && m.costUsd != null ? ` · ${Format.cost(m.costUsd)}` : ''}
             </button>
           )}
@@ -446,9 +455,9 @@ export const AssistantMessage = memo(function AssistantMessage({ item, live, act
           anchor={more.anchor}
           onClose={more.close}
           items={[
-            { label: 'Regenerate with another model', icon: <RefreshCw size={17} />, onSelect: () => actions.regenerateWith(m.id) },
-            { label: 'Copy as plain text', icon: <Copy size={17} />, onSelect: () => { void navigator.clipboard.writeText(markdownToPlain(m.content)); toast('Copied.'); } },
-            { label: 'Delete', icon: <Trash2 size={17} />, danger: true, separatorBefore: true, onSelect: () => actions.deleteMessage(m) },
+            { label: t('Regenerate with another model'), icon: <RefreshCw size={17} />, onSelect: () => actions.regenerateWith(m.id) },
+            { label: t('Copy as plain text'), icon: <Copy size={17} />, onSelect: () => { void navigator.clipboard.writeText(markdownToPlain(m.content)); toast(t('Copied.')); } },
+            { label: t('Delete'), icon: <Trash2 size={17} />, danger: true, separatorBefore: true, onSelect: () => actions.deleteMessage(m) },
           ]}
         />
       )}

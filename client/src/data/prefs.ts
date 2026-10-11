@@ -2,6 +2,7 @@
  * Preferences (port of Settings.kt). LocalPrefs stay on this device; SyncedPrefs follow the account
  * as the end-to-end encrypted "settings" record. Both notify other open tabs of changes.
  */
+import type { LanguagePref } from '../i18n';
 import { defaultParams, type GenParams, type ModelOutput } from '../llm/types';
 import { db } from './db';
 
@@ -31,6 +32,8 @@ export interface LocalPrefs {
   computerApproval: ToolApprovalName;
   /** Windows app: the folder new chats work in (empty = the default). */
   defaultWorkspace: string;
+  /** Interface language: a locale code (src/i18n), or 'auto' to follow the system. */
+  language: LanguagePref;
 }
 
 export const DEFAULT_LOCAL: LocalPrefs = {
@@ -50,6 +53,7 @@ export const DEFAULT_LOCAL: LocalPrefs = {
   computerTools: true,
   computerApproval: 'WRITES',
   defaultWorkspace: '',
+  language: 'auto',
 };
 
 /** A model reference: a configured provider plus a model id. */
@@ -274,7 +278,8 @@ export class SettingsStore {
   }
 }
 
-function readLocal(): LocalPrefs {
+/** This device's preferences as stored (main.tsx reads the language from them before the app starts). */
+export function readLocal(): LocalPrefs {
   try {
     const raw = localStorage.getItem(LOCAL_KEY);
     if (raw) return { ...DEFAULT_LOCAL, ...JSON.parse(raw) };

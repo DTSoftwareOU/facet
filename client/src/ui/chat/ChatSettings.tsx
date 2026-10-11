@@ -5,6 +5,7 @@ import { getApp } from '../../app';
 import { Format } from '../../core/format';
 import { parseJson } from '../../core/json';
 import { db } from '../../data/db';
+import { formatList, formatNumber, t, tm, tn } from '../../i18n';
 import { EFFORT_INFO, VERBOSITY_INFO, type Effort, type GenParams, type Verbosity } from '../../llm/types';
 import { platform } from '../../platform';
 import { isSearchKind } from '../../tools/types';
@@ -13,7 +14,7 @@ import { Button, Dialog, Divider, Field, Group, Row, SwitchRow, useToast } from 
 import { useLocalPrefs, useSyncedPrefs } from '../hooks';
 import type { ResolvedModel } from './ModelPicker';
 
-export function Segmented<T>({ options, selected, label, onSelect }: { options: T[]; selected: T; label: (t: T) => string; onSelect: (t: T) => void }) {
+export function Segmented<T>({ options, selected, label, onSelect }: { options: T[]; selected: T; label: (option: T) => string; onSelect: (option: T) => void }) {
   return (
     <div className="segmented" role="radiogroup">
       {options.map((o, i) => (
@@ -29,18 +30,18 @@ export function effortHint(e: Effort | null | undefined): string {
   switch (e) {
     case null:
     case undefined:
-      return 'The model decides how long to think.';
+      return t('The model decides how long to think.');
     case 'NONE':
-      return 'Answers immediately without extended reasoning.';
+      return t('Answers immediately without extended reasoning.');
     case 'MINIMAL':
     case 'LOW':
-      return 'Quick answers for simple questions. Cheapest.';
+      return t('Quick answers for simple questions. Cheapest.');
     case 'MEDIUM':
-      return 'Balanced depth, speed and cost.';
+      return t('Balanced depth, speed and cost.');
     case 'HIGH':
-      return 'Thinks longer for harder problems.';
+      return t('Thinks longer for harder problems.');
     default:
-      return 'Maximum depth for the hardest problems. Slowest and most expensive.';
+      return t('Maximum depth for the hardest problems. Slowest and most expensive.');
   }
 }
 
@@ -79,12 +80,12 @@ export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPr
   const set = (patch: Partial<GenParams>) => onParams({ ...params, ...patch });
 
   return (
-    <Dialog title="Chat settings" onClose={close}>
+    <Dialog title={t('Chat settings')} onClose={close}>
       <div className="col" style={{ gap: 18 }}>
         <div className="group">
           <Row
             icon={model ? <ProviderBadge name={model.kindName} size={28} /> : undefined}
-            title={model?.model.displayName ?? 'No model selected'}
+            title={model?.model.displayName ?? t('No model selected')}
             subtitle={model?.providerLabel}
             onClick={() => {
               close();
@@ -95,20 +96,20 @@ export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPr
 
         {caps && caps.reasoning.kind !== 'NONE' && (
           <section className="col gap-8">
-            <span className="field-label" style={{ marginLeft: 4 }}>Reasoning</span>
+            <span className="field-label" style={{ marginInlineStart: 4 }}>{t('Reasoning')}</span>
             <Segmented
               options={[null, ...caps.reasoning.efforts] as (Effort | null)[]}
               selected={params.effort ?? null}
-              label={(e) => (e ? EFFORT_INFO[e].label : 'Auto')}
+              label={(e) => (e ? tm(EFFORT_INFO[e].label) : t('Auto'))}
               onSelect={(e) => set({ effort: e })}
             />
-            <span className="field-hint" style={{ marginLeft: 4 }}>{effortHint(params.effort)}</span>
+            <span className="field-hint" style={{ marginInlineStart: 4 }}>{effortHint(params.effort)}</span>
             <div className="group">
-              <SwitchRow icon={<Brain size={20} />} title="Show reasoning" subtitle="Stream the model's reasoning summary while it thinks." checked={params.showThinking} onChange={(v) => set({ showThinking: v })} />
+              <SwitchRow icon={<Brain size={20} />} title={t('Show reasoning')} subtitle={t("Stream the model's reasoning summary while it thinks.")} checked={params.showThinking} onChange={(v) => set({ showThinking: v })} />
               {caps.proMode && (
                 <>
                   <Divider />
-                  <SwitchRow icon={<GemIcon size={20} />} title="Pro mode" subtitle="Does more work per answer. Slower and costs more." checked={params.proMode} onChange={(v) => set({ proMode: v })} />
+                  <SwitchRow icon={<GemIcon size={20} />} title={t('Pro mode')} subtitle={t('Does more work per answer. Slower and costs more.')} checked={params.proMode} onChange={(v) => set({ proMode: v })} />
                 </>
               )}
             </div>
@@ -117,26 +118,26 @@ export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPr
 
         {caps?.verbosity && (
           <section className="col gap-8">
-            <span className="field-label" style={{ marginLeft: 4 }}>Length</span>
+            <span className="field-label" style={{ marginInlineStart: 4 }}>{t('Length')}</span>
             <Segmented
               options={[null, 'LOW', 'MEDIUM', 'HIGH'] as (Verbosity | null)[]}
               selected={params.verbosity ?? null}
-              label={(v) => (v ? VERBOSITY_INFO[v].label : 'Auto')}
+              label={(v) => (v ? tm(VERBOSITY_INFO[v].label) : t('Auto'))}
               onSelect={(v) => set({ verbosity: v })}
             />
           </section>
         )}
 
-        <Group title="Tools and speed">
+        <Group title={t('Tools and speed')}>
           <SwitchRow
             icon={<Globe size={20} />}
-            title="Web search"
+            title={t('Web search')}
             subtitle={
-              !caps ? 'Choose a model first.'
-                : caps.webSearch ? 'Let the model search the web and cite sources.'
-                  : canSearch ? 'Uses your search key, then reads pages as needed.'
-                    : caps.tools ? 'Add a search key in Settings → Tools to let this model search.'
-                      : 'This model can’t use tools or search the web.'
+              !caps ? t('Choose a model first.')
+                : caps.webSearch ? t('Let the model search the web and cite sources.')
+                  : canSearch ? t('Uses your search key, then reads pages as needed.')
+                    : caps.tools ? t('Add a search key in Settings → Tools to let this model search.')
+                      : t('This model can’t use tools or search the web.')
             }
             checked={params.webSearch && canSearch}
             onChange={(v) => set({ webSearch: v })}
@@ -147,8 +148,13 @@ export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPr
               <Divider />
               <SwitchRow
                 icon={<Wand2 size={20} />}
-                title="MCP tools and skills"
-                subtitle={[servers.length ? `${servers.length} server${servers.length === 1 ? '' : 's'}` : '', skillCount ? `${skillCount} skill${skillCount === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ') + ' available in this chat.'}
+                title={t('MCP tools and skills')}
+                subtitle={t('{things} available in this chat.', {
+                  things: formatList([
+                    servers.length ? tn('{count} server', '{count} servers', servers.length) : '',
+                    skillCount ? tn('{count} skill', '{count} skills', skillCount) : '',
+                  ].filter(Boolean)),
+                })}
                 checked={params.tools}
                 onChange={(v) => set({ tools: v })}
               />
@@ -159,7 +165,7 @@ export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPr
                     <SwitchRow
                       icon={<Server size={20} />}
                       title={s.name}
-                      subtitle={s.status ?? `${parseJson<unknown[]>(s.toolsJson, []).length} tools`}
+                      subtitle={s.status ?? tn('{count} tool', '{count} tools', parseJson<unknown[]>(s.toolsJson, []).length)}
                       checked={!params.disabledMcpServers.includes(s.id)}
                       onChange={(v) => set({ disabledMcpServers: v ? params.disabledMcpServers.filter((x) => x !== s.id) : [...params.disabledMcpServers, s.id] })}
                     />
@@ -172,8 +178,8 @@ export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPr
               <Divider />
               <SwitchRow
                 icon={<Monitor size={20} />}
-                title={computer ? 'Use this computer' : 'Use your PC'}
-                subtitle={local.computerTools ? 'The model can run commands and read and edit files in the working folder.' : 'Off for every chat. Turn it on to let models run commands and edit files.'}
+                title={computer ? t('Use this computer') : t('Use your PC')}
+                subtitle={local.computerTools ? t('The model can run commands and read and edit files in the working folder.') : t('Off for every chat. Turn it on to let models run commands and edit files.')}
                 checked={local.computerTools && params.tools}
                 onChange={(v) => {
                   if (v && !local.computerTools) app.settings.updateLocal((l) => ({ ...l, computerTools: true }));
@@ -186,8 +192,8 @@ export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPr
                   <Divider />
                   <Row
                     icon={<FolderOpen size={20} />}
-                    title="Working folder"
-                    subtitle={<span className="mono" style={{ fontSize: 12.5 }}>{computerLabel || 'Not set'}</span>}
+                    title={t('Working folder')}
+                    subtitle={<span className="mono" style={{ fontSize: 12.5 }}>{computerLabel ? <bdi dir="ltr">{computerLabel}</bdi> : t('Not set')}</span>}
                     onClick={onComputer}
                   />
                 </>
@@ -197,23 +203,23 @@ export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPr
           {caps?.tools && (
             <>
               <Divider />
-              <SwitchRow icon={<Rocket size={20} />} title="YOLO mode" subtitle="Run tools without asking, in every chat." checked={synced.yoloMode} onChange={(v) => app.settings.updateSynced((s) => ({ ...s, yoloMode: v }))} />
+              <SwitchRow icon={<Rocket size={20} />} title={t('YOLO mode')} subtitle={t('Run tools without asking, in every chat.')} checked={synced.yoloMode} onChange={(v) => app.settings.updateSynced((s) => ({ ...s, yoloMode: v }))} />
             </>
           )}
           {caps?.fastMode && (
             <>
               <Divider />
-              <SwitchRow icon={<Zap size={20} />} title="Fast mode" subtitle="Up to 2.5× faster output at premium pricing." checked={params.fastMode} onChange={(v) => set({ fastMode: v })} />
+              <SwitchRow icon={<Zap size={20} />} title={t('Fast mode')} subtitle={t('Up to 2.5× faster output at premium pricing.')} checked={params.fastMode} onChange={(v) => set({ fastMode: v })} />
             </>
           )}
         </Group>
 
         {caps?.sampling && (
           <section className="col gap-8">
-            <span className="field-label row" style={{ marginLeft: 4 }}>
-              <span className="grow">Temperature</span>
-              <button type="button" className="c-2 t-label-m" onClick={() => set({ temperature: null })} title="Use the model's default">
-                {params.temperature != null ? params.temperature.toFixed(2) : 'Auto'}
+            <span className="field-label row" style={{ marginInlineStart: 4 }}>
+              <span className="grow">{t('Temperature')}</span>
+              <button type="button" className="c-2 t-label-m" onClick={() => set({ temperature: null })} title={t("Use the model's default")}>
+                {params.temperature != null ? formatNumber(params.temperature, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : t('Auto')}
               </button>
             </span>
             <input
@@ -224,24 +230,24 @@ export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPr
               value={params.temperature ?? 1}
               onChange={(e) => set({ temperature: Number(e.target.value) })}
               className="range"
-              aria-label="Temperature"
+              aria-label={t('Temperature')}
             />
           </section>
         )}
 
         <section className="col gap-8">
-          <span className="field-label" style={{ marginLeft: 4 }}>Maximum reply length</span>
+          <span className="field-label" style={{ marginInlineStart: 4 }}>{t('Maximum reply length')}</span>
           <Segmented
             options={[null, 2_000, 8_000, 16_000, 32_000, 64_000] as (number | null)[]}
             selected={params.maxOutputTokens ?? null}
-            label={(n) => (n ? Format.tokens(n) : 'Auto')}
+            label={(n) => (n ? Format.tokens(n) : t('Auto'))}
             onSelect={(n) => set({ maxOutputTokens: n })}
           />
         </section>
 
         {onSystemPrompt && (
-          <Field label="Instructions for this chat" hint="Added to the assistant's instructions for this chat only.">
-            <textarea className="textarea" rows={3} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. Answer in Spanish. Keep replies under 150 words." />
+          <Field label={t('Instructions for this chat')} hint={t("Added to the assistant's instructions for this chat only.")}>
+            <textarea className="textarea" rows={3} dir="auto" value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder={t('e.g. Answer in Spanish. Keep replies under 150 words.')} />
           </Field>
         )}
 
@@ -250,10 +256,10 @@ export function ChatSettings({ model, params, onParams, systemPrompt, onSystemPr
           block
           onClick={async () => {
             await app.settings.updateSynced((s) => ({ ...s, defaultParams: params, defaultModel: model?.ref ?? s.defaultModel }));
-            toast('New chats will use these settings.');
+            toast(t('New chats will use these settings.'));
           }}
         >
-          Use these settings for new chats
+          {t('Use these settings for new chats')}
         </Button>
       </div>
     </Dialog>

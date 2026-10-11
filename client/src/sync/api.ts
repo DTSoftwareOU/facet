@@ -1,5 +1,6 @@
 /** Thin, stateless client for the Facet sync server (docs/API.md). Authentication lives in AuthManager. */
 import { buf } from '../core/bytes';
+import { t } from '../i18n';
 
 export interface Kdf {
   algorithm: string;
@@ -99,7 +100,7 @@ export class ApiError extends Error {
 
 /** The server couldn't be reached (offline, DNS, TLS, blocked). */
 export class NetworkError extends Error {
-  constructor(message = 'Couldn’t reach the sync server.') {
+  constructor(message = t('Couldn’t reach the sync server.')) {
     super(message);
     this.name = 'NetworkError';
   }
@@ -120,9 +121,9 @@ export function normalizeUser(u: any): UserDto {
 }
 
 function defaultMessage(status: number): string {
-  if (status >= 500) return 'The sync server had a problem. Try again in a moment.';
-  if (status === 404) return 'The sync server doesn’t recognize this request. Check the server address.';
-  return `The sync server returned an error (${status}).`;
+  if (status >= 500) return t('The sync server had a problem. Try again in a moment.');
+  if (status === 404) return t('The sync server doesn’t recognize this request. Check the server address.');
+  return t('The sync server returned an error ({status}).', { status: String(status) });
 }
 
 export class SyncApi {

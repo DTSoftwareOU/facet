@@ -6,6 +6,7 @@ import { unzipSync } from 'fflate';
 import { newId } from '../core/ids';
 import { isObject, parseJson } from '../core/json';
 import { db } from '../data/db';
+import { t } from '../i18n';
 import type { SkillEntity } from '../data/entities';
 import { platform } from '../platform';
 import type { SkillResource } from './types';
@@ -40,7 +41,7 @@ export const SkillParser = {
     const name = SkillParser.slug(fields.name ?? heading ?? fallbackName);
     const firstLine = body.split(/\r\n|\r|\n/).find((l) => l.trim() !== '' && !l.startsWith('#')) ?? '';
     const description = (fields.description ?? firstLine).trim().slice(0, 1024);
-    if (!body.trim()) throw new SkillImportException('The skill has no instructions.');
+    if (!body.trim()) throw new SkillImportException(t('The skill has no instructions.'));
     return { name, description: description.trim() ? description : `Use when the task matches ${name}.`, body: body.trim() };
   },
 
@@ -247,7 +248,7 @@ Plan by neighborhood to minimize transit. For each day give morning, afternoon a
       // Skips large entries before inflating them, so a zip bomb can't exhaust memory.
       entries = unzipSync(bytes, { filter: (f) => accept(f.name) && f.originalSize <= SkillRepository.MAX_FILE });
     } catch {
-      throw new SkillImportException("That file isn't a valid .zip archive.");
+      throw new SkillImportException(t('That file isn’t a valid .zip archive.'));
     }
     const files = new Map<string, string>();
     const decoder = new TextDecoder();
@@ -256,7 +257,7 @@ Plan by neighborhood to minimize transit. For each day give morning, afternoon a
       const path = name.replace(/\\/g, '/').replace(/^\/+/, '');
       if (data.length > SkillRepository.MAX_FILE || !isText(path, data)) continue;
       total += data.length;
-      if (total > SkillRepository.MAX_TOTAL) throw new SkillImportException(`The skill is larger than ${SkillRepository.MAX_TOTAL / 1024} KB of text.`);
+      if (total > SkillRepository.MAX_TOTAL) throw new SkillImportException(t('The skill is larger than {size} KB of text.', { size: SkillRepository.MAX_TOTAL / 1024 }));
       files.set(path, decoder.decode(data));
     }
     let skillPath: string | null = null;
@@ -264,7 +265,7 @@ Plan by neighborhood to minimize transit. For each day give morning, afternoon a
       if (afterLast(k, '/').toLowerCase() !== 'skill.md') continue;
       if (skillPath == null || depth(k) < depth(skillPath)) skillPath = k;
     }
-    if (skillPath == null) throw new SkillImportException('No SKILL.md found in that archive.');
+    if (skillPath == null) throw new SkillImportException(t('No SKILL.md found in that archive.'));
     const root = beforeLast(skillPath, '/', '');
     const prefix = root ? `${root}/` : '';
     const p = SkillParser.parse(files.get(skillPath)!, afterLast(root, '/').trim() || 'skill');
@@ -289,16 +290,16 @@ Plan by neighborhood to minimize transit. For each day give morning, afternoon a
     } catch {
       throw new SkillImportException(
         platform().corsLimited
-          ? "Couldn't download the skill. The site may not allow downloads from web browsers; download the file and import it from your computer instead."
-          : "Couldn't download the skill. Check the link and your connection.",
+          ? t('Couldn’t download the skill. The site may not allow downloads from web browsers; download the file and import it from your computer instead.')
+          : t('Couldn’t download the skill. Check the link and your connection.'),
       );
     }
     if (!response.ok) {
       response.body?.cancel().catch(() => {});
-      throw new SkillImportException(`Couldn't download the skill (HTTP ${response.status}).`);
+      throw new SkillImportException(t("Couldn't download the skill (HTTP {status}).", { status: String(response.status) }));
     }
     const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.length > SkillRepository.MAX_TOTAL * 4) throw new SkillImportException('That file is too large to be a skill.');
+    if (bytes.length > SkillRepository.MAX_TOTAL * 4) throw new SkillImportException(t('That file is too large to be a skill.'));
     if (raw.toLowerCase().endsWith('.zip') || isZip(bytes)) return this.importZip(bytes, url);
     const fileBase = beforeLast(afterLast(raw, '/'), '.');
     const name = fileBase.toLowerCase() !== 'skill' ? fileBase : afterLast(beforeLast(raw, '/'), '/');

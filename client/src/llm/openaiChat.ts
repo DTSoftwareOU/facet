@@ -6,6 +6,7 @@
  */
 import { fromUtf8 } from '../core/bytes';
 import { isObject } from '../core/json';
+import { t } from '../i18n';
 import { canRun, chatByMetadata, compatCaps, displayName, GEMINI_MEDIA_DEFAULTS, isCompatChatModel, looksVision, mediaOutput, metadataCaps, perplexityModels } from './catalog';
 import { extractMessage, fromHttp, fromNetwork, fromStream, HttpStatusError, TransportError, truncatedStream, unexpected } from './errors';
 import {
@@ -505,7 +506,7 @@ export class OpenAiChatClient implements LlmClient {
     else if (s.finishReason === 'content_filter') stop = 'REFUSAL';
     else if (calls.length > 0) stop = 'TOOL_USE';
     else stop = 'END';
-    if (stop === 'REFUSAL') yield { type: 'notice', text: `${s.model} stopped because of a content filter.` };
+    if (stop === 'REFUSAL') yield { type: 'notice', text: t('{model} stopped because of a content filter.', { model: s.model }) };
     let blocks = null;
     if (calls.length > 0) {
       // Kept so a provider that requires it (DeepSeek thinking + tools) can get reasoning_content back.

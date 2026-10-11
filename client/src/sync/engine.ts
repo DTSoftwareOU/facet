@@ -11,6 +11,7 @@ import type { AttachmentStore } from '../data/attachments';
 import { db } from '../data/db';
 import type { AttachmentEntity, MessageEntity } from '../data/entities';
 import type { SettingsStore, SyncedPrefs } from '../data/prefs';
+import { t } from '../i18n';
 import { platform } from '../platform';
 import { ApiError, NetworkError, SyncApi, type RecordDto } from './api';
 import { AuthError, type AuthManager, type SignedIn } from './auth';
@@ -43,8 +44,8 @@ const RECORD_OVERHEAD = 64;
 const EAGER_DOWNLOAD_MAX = 6 * 1024 * 1024;
 /** The sync server rejects encrypted blobs over 32 MiB; leave headroom for encryption overhead. */
 export const MAX_SYNC_BLOB_BYTES = 31 * 1024 * 1024;
-const STORAGE_FULL =
-  'Your sync storage is full. New changes and files are kept on this device until you free up space in Settings → Data and storage.';
+const storageFullMessage = () =>
+  t('Your sync storage is full. New changes and files are kept on this device until you free up space in Settings → Data and storage.');
 
 const K_CURSOR = 'sync_cursor';
 const K_LAST = 'sync_last';
@@ -121,7 +122,7 @@ export class SyncEngine {
       } else {
         this.stopStream();
         if (s.kind === 'guest') this.setState({ phase: 'OFF', message: null, storageFull: false });
-        else this.setState({ phase: 'PAUSED', message: 'Sign in again to resume sync.' });
+        else this.setState({ phase: 'PAUSED', message: t('Sign in again to resume sync.') });
       }
     };
     this.auth.subscribe(onAccount);
@@ -191,7 +192,7 @@ export class SyncEngine {
       }
       const now = Date.now();
       await db().setKv(K_LAST, now);
-      this.setState({ phase: 'IDLE', lastSyncAt: now, message: this.storageFull ? STORAGE_FULL : null, storageFull: this.storageFull });
+      this.setState({ phase: 'IDLE', lastSyncAt: now, message: this.storageFull ? storageFullMessage() : null, storageFull: this.storageFull });
       return true;
     } catch (e) {
       if (e instanceof AuthError) {
@@ -199,10 +200,10 @@ export class SyncEngine {
       } else if (e instanceof ApiError) {
         this.setState({ phase: 'ERROR', message: e.message });
       } else if (isOffline(e)) {
-        this.setState({ phase: 'OFFLINE', message: 'Offline. Changes will sync when you’re back online.' });
+        this.setState({ phase: 'OFFLINE', message: t('Offline. Changes will sync when you’re back online.') });
       } else {
         console.warn('sync failed', e);
-        this.setState({ phase: 'ERROR', message: 'Sync failed. It will retry automatically.' });
+        this.setState({ phase: 'ERROR', message: t('Sync failed. It will retry automatically.') });
       }
       return false;
     }
@@ -751,7 +752,7 @@ export class SyncEngine {
     let backoff = 1_000;
     while (!signal.aborted && this.auth.isSignedIn) {
       try {
-        const token = await this.auth.authed(async (_base, t) => t);
+        const token = await this.auth.authed(async (_base, tok) => tok);
         const res = await this.api.stream(this.auth.serverUrl, token, signal);
         if (res.status === 401) {
           // Refreshes the access token for the next attempt.

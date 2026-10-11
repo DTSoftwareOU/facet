@@ -4,18 +4,19 @@ import { createPortal } from 'react-dom';
 import { getApp } from '../../app';
 import { Format } from '../../core/format';
 import type { AttachmentRef } from '../../data/entities';
+import { t } from '../../i18n';
 import { platform } from '../../platform';
 import { IconButton, useToast } from '../components/primitives';
 import { useAttachmentUrl } from '../hooks';
 
 /** Opens or saves an attachment, downloading it from sync storage first if needed. */
-export async function saveAttachment(ref: AttachmentRef, toast: (t: string) => void): Promise<void> {
+export async function saveAttachment(ref: AttachmentRef, toast: (text: string) => void): Promise<void> {
   const app = getApp();
   const ok = await app.sync.ensureLocal(ref.id);
   const blob = ok ? await app.attachments.blob(ref.id) : null;
   if (!blob) {
     const a = await app.attachments.get(ref.id);
-    toast(a?.uploaded === false ? 'This file is only on another of your devices.' : 'This file isn’t on this device yet.');
+    toast(a?.uploaded === false ? t('This file is only on another of your devices.') : t('This file isn’t on this device yet.'));
     return;
   }
   await platform().saveFile(ref.name, blob);
@@ -23,13 +24,13 @@ export async function saveAttachment(ref: AttachmentRef, toast: (t: string) => v
 
 export function FileChip({ att, onClick, trailing }: { att: AttachmentRef; onClick?: () => void; trailing?: React.ReactNode }) {
   const isPdf = att.kind === 'pdf';
-  const ext = att.name.includes('.') ? att.name.slice(att.name.lastIndexOf('.') + 1).toUpperCase() : 'File';
+  const ext = att.name.includes('.') ? att.name.slice(att.name.lastIndexOf('.') + 1).toUpperCase() : t('File');
   return (
     <button type="button" className="file-chip" onClick={onClick} title={att.name}>
       <span className={'ic' + (isPdf ? ' pdf' : '')}>{isPdf ? <FileText size={17} /> : att.kind === 'audio' ? <Music size={17} /> : <FileIcon size={17} />}</span>
       <span className="col" style={{ minWidth: 0 }}>
-        <span className="t-label-m ellipsis">{att.name}</span>
-        <span className="t-label-s c-3" style={{ fontWeight: 400 }}>{(isPdf ? 'PDF' : ext) + ' · ' + Format.bytes(att.sizeBytes)}</span>
+        <span className="t-label-m ellipsis"><bdi>{att.name}</bdi></span>
+        <span className="t-label-s c-3" style={{ fontWeight: 400 }}>{t('{type} · {size}', { type: isPdf ? 'PDF' : ext, size: Format.bytes(att.sizeBytes) })}</span>
       </span>
       {trailing}
     </button>
@@ -40,8 +41,8 @@ export function ImageThumb({ att, width, onOpen }: { att: AttachmentRef; width: 
   const { url, missing } = useAttachmentUrl(att.id);
   const ratio = att.width && att.height ? Math.min(2, Math.max(0.5, att.width / att.height)) : 1;
   return (
-    <button type="button" className="attach-img" style={{ width, height: Math.round(width / ratio) }} onClick={() => url && onOpen(url)} aria-label={`Open ${att.name}`}>
-      {url ? <img src={url} alt={att.name} loading="lazy" /> : missing ? <span className="t-label-s c-3" style={{ padding: 10, display: 'block' }}>Not on this device</span> : null}
+    <button type="button" className="attach-img" style={{ width, height: Math.round(width / ratio) }} onClick={() => url && onOpen(url)} aria-label={t('Open {name}', { name: att.name })}>
+      {url ? <img src={url} alt={att.name} loading="lazy" /> : missing ? <span className="t-label-s c-3" style={{ padding: 10, display: 'block' }}>{t('Not on this device')}</span> : null}
     </button>
   );
 }
@@ -60,7 +61,7 @@ function AudioView({ att }: { att: AttachmentRef }) {
     <div className="media-audio">
       <Music size={18} className="c-2" />
       {url && <audio src={url} controls preload="metadata" />}
-      <IconButton label="Save" small onClick={() => saveAttachment(att, toast)}>
+      <IconButton label={t('Save')} small onClick={() => saveAttachment(att, toast)}>
         <Download size={16} />
       </IconButton>
     </div>
@@ -98,10 +99,10 @@ export function Lightbox({ url, att, onClose }: { url: string; att: AttachmentRe
     <div className="lightbox" onClick={onClose}>
       <img src={url} alt={att.name} onClick={(e) => e.stopPropagation()} />
       <div className="lightbox-bar" onClick={(e) => e.stopPropagation()}>
-        <IconButton label="Save image" onClick={() => saveAttachment(att, toast)}>
+        <IconButton label={t('Save image')} onClick={() => saveAttachment(att, toast)}>
           <Download size={20} />
         </IconButton>
-        <IconButton label="Close" onClick={onClose}>
+        <IconButton label={t('Close')} onClick={onClose}>
           <X size={20} />
         </IconButton>
       </div>

@@ -1,10 +1,17 @@
-/* Rendered replies: unboxed, full-width, set for reading. */
+/*
+ * Rendered replies: unboxed, full-width, set for reading.
+ * Each block carries dir="auto" (render.ts), so a paragraph, heading, list or quote reads in its
+ * own text's direction whatever the interface language is; code and math always read left to right.
+ */
 
 .md {
   font-size: calc(16.5px * var(--chat-scale));
   line-height: calc(26px * var(--chat-scale));
   overflow-wrap: anywhere;
   color: var(--text);
+}
+.md :is(p, h1, h2, h3, h4, h5, h6, li, blockquote, th, td) {
+  text-align: start;
 }
 .md > :first-child {
   margin-top: 0;
@@ -42,7 +49,7 @@
 .md ul,
 .md ol {
   margin: 0 0 12px;
-  padding-left: 1.5em;
+  padding-inline-start: 1.5em;
 }
 .md li {
   margin: 4px 0;
@@ -55,13 +62,13 @@
 }
 .md .md-task-item {
   list-style: none;
-  margin-left: -1.4em;
+  margin-inline-start: -1.4em;
 }
 .md-task {
   display: inline-block;
   width: 16px;
   height: 16px;
-  margin-right: 8px;
+  margin-inline-end: 8px;
   vertical-align: -2px;
   border-radius: 5px;
   border: 1.5px solid var(--text-3);
@@ -76,8 +83,9 @@
 }
 .md blockquote {
   margin: 0 0 12px;
-  padding: 2px 0 2px 16px;
-  border-left: 3px solid var(--outline);
+  padding-block: 2px;
+  padding-inline: 16px 0;
+  border-inline-start: 3px solid var(--outline);
   color: var(--text-2);
 }
 .md hr {
@@ -91,6 +99,8 @@
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, var(--primary) 40%, transparent);
   text-underline-offset: 3px;
+  /* A URL or a Latin link title keeps its own order inside right-to-left text, and vice versa. */
+  unicode-bidi: plaintext;
 }
 .md strong {
   font-weight: 600;
@@ -105,6 +115,7 @@
   background: var(--inline-code-bg);
   border-radius: 6px;
   padding: 2px 6px;
+  unicode-bidi: plaintext;
 }
 
 .md-code {
@@ -113,12 +124,15 @@
   border: 1px solid var(--outline-variant);
   background: var(--code-bg);
   overflow: hidden;
+  direction: ltr;
+  text-align: left;
 }
 .md-code-head {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 4px 6px 4px 14px;
+  padding-block: 4px;
+  padding-inline: 14px 6px;
   background: var(--code-header);
   border-bottom: 1px solid var(--outline-variant);
 }
@@ -174,7 +188,6 @@
 .md th,
 .md td {
   padding: 9px 14px;
-  text-align: left;
   vertical-align: top;
   border-bottom: 1px solid var(--outline-variant);
 }
@@ -188,7 +201,7 @@
 }
 .md td + td,
 .md th + th {
-  border-left: 1px solid var(--outline-variant);
+  border-inline-start: 1px solid var(--outline-variant);
 }
 
 .math-block {
@@ -197,6 +210,13 @@
   overflow-x: auto;
   overflow-y: hidden;
   text-align: center;
+}
+/* Formulas lay out left to right in every language. */
+.math-block,
+.math-inline,
+.md .katex {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 .math-pending {
   font-family: var(--font-mono);
@@ -209,7 +229,7 @@
   display: inline-block;
   width: 0.62em;
   height: 0.62em;
-  margin-left: 4px;
+  margin-inline-start: 4px;
   vertical-align: -0.02em;
   transform: rotate(45deg);
   background: conic-gradient(from 45deg, var(--flash), var(--deep), var(--glint), var(--gold), var(--flash));

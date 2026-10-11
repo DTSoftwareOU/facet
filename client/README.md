@@ -36,6 +36,27 @@ the Android `WebRecordsCompatTest` decodes, so both apps keep one record format.
 | `src/domain/` | Chat engine (requests, tool loop, approvals, streaming, titles) and media service |
 | `src/platform/` | What differs between the website and the Windows app (`window.facetDesktop`) |
 | `src/ui/` | Interface: sidebar, chat, composer, Markdown, settings, account flows |
+| `src/i18n/` | Translations: `t()`, plurals, language matching, one JSON catalog per language in `locales/` |
+
+## Translations
+
+Interface text is written in English and wrapped where it's shown: `t('Delete chat')`,
+`t('Rename {name}', { name })`, `tn('{count} tool', '{count} tools', n)` for counts, and
+`msg('…')` + `tm(…)` for tables defined at module level (those run before the language loads, so
+they can't call `t()`). The English text is the key; `src/i18n/locales/<code>.json` maps it to
+the translation (plural keys map to `{ one, few, many, other, … }` as `Intl.PluralRules` needs).
+Anything missing falls back to English. Text sent to models, tool schemas and logs stay English.
+
+`node scripts/i18n-keys.mjs` lists every key from the source (it fails on a `t()` whose text
+isn't a string literal); `--missing <code>` prints the keys a catalog still needs and
+`--stale <code>` the ones it can drop. `test/i18n/catalogs.test.ts` fails until every catalog has
+exactly the source's keys, the same `{placeholders}` and the plural forms its language uses, so
+a new or changed string means adding its translation to all 19 catalogs.
+
+The choice lives in the local (not synced) preference `language` (`'auto'` follows
+`navigator.languages`). `main.tsx` loads only that catalog before the first render and sets
+`<html lang dir>`; Arabic and Urdu are right to left, so styles use logical properties
+(`margin-inline-start`, `inset-inline-end`, …) and directional icons get `className="flip-rtl"`.
 
 ## Website limits
 

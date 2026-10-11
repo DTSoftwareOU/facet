@@ -3,6 +3,7 @@
  * Deepgram (port of MediaProviderClient.kt). It lists their models and checks keys; generation
  * goes through gen.ts. It has no chat.
  */
+import { t } from '../../i18n';
 import { ProviderKinds } from '../providers';
 import { normalizeModel, type LlmClient, type ModelInfo, type ProviderConfig, type StreamEvent } from '../types';
 import { mediaProviderModels } from './catalog';
@@ -40,7 +41,7 @@ export function createMediaProviderClient(config: ProviderConfig, options: { fet
     },
 
     async *stream(): AsyncIterable<StreamEvent> {
-      yield { type: 'failed', error: { kind: 'BAD_REQUEST', message: `${config.label} makes media only. Pick a chat model for conversations.` } };
+      yield { type: 'failed', error: { kind: 'BAD_REQUEST', message: t('{provider} makes media only. Pick a chat model for conversations.', { provider: config.label }) } };
     },
 
     async verify(): Promise<void> {

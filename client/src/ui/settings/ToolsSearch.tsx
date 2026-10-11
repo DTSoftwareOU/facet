@@ -3,17 +3,22 @@ import { ExternalLink, Globe, Search, Sparkles, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getApp } from '../../app';
 import type { ProviderEntity } from '../../data/entities';
+import { formatList, t, tm, tn } from '../../i18n';
 import { platform } from '../../platform';
 import { SEARCH_KINDS, isSearchKind, searchKind, type SearchKind } from '../../tools/types';
 import { Button, Confirm, Dialog, Divider, Field, Group, Row, SwitchRow, useToast } from '../components/primitives';
 import { useProviders, useSyncedPrefs } from '../hooks';
 import { ui } from '../nav';
-import { ToolsSecretInput, ToolsStatus, ToolsSubhead, errorText, plural, useStableCallback } from './ToolsShared';
+import { ToolsSecretInput, ToolsStatus, ToolsSubhead, errorText, useStableCallback } from './ToolsShared';
 
 /** "Tavily, Jina Search or SearXNG" */
 function nameList(kinds: readonly SearchKind[], conjunction: 'or' | 'and' = 'or'): string {
-  const names = kinds.map((k) => k.displayName);
-  return names.length > 1 ? `${names.slice(0, -1).join(', ')} ${conjunction} ${names[names.length - 1]}` : names.join('');
+  return formatList(kinds.map((k) => k.displayName), conjunction === 'or' ? 'disjunction' : 'conjunction');
+}
+
+/** A search service's one-line description in the interface language. */
+function searchBlurb(k: SearchKind): string {
+  return tm(k.blurb);
 }
 
 const blockedHere = (k: SearchKind) => platform().corsLimited && !k.browserOk;
@@ -44,8 +49,8 @@ function PreferNativeRow() {
   return (
     <SwitchRow
       icon={<Sparkles size={20} />}
-      title="Prefer the model's own search"
-      subtitle="When a model can search on its own, let it. Turn off to always use your search service."
+      title={t("Prefer the model's own search")}
+      subtitle={t('When a model can search on its own, let it. Turn off to always use your search service.')}
       checked={synced.preferNativeSearch}
       onChange={(v) => void getApp().settings.updateSynced((s) => ({ ...s, preferNativeSearch: v }))}
     />
@@ -57,15 +62,15 @@ export function SearchOverviewGroup() {
   const current = useSearchService();
   const subtitle =
     current === undefined ? ' '
-      : !current ? 'Not set up. Models without their own search can’t search the web.'
-        : blockedHere(current.kind) ? `${current.kind.displayName} · Works in the Windows and Android apps only`
-          : `${current.kind.displayName} · ${current.provider.enabled ? 'Ready' : 'Off'}`;
+      : !current ? t('Not set up. Models without their own search can’t search the web.')
+        : blockedHere(current.kind) ? `${current.kind.displayName} · ${t('Works in the Windows and Android apps only')}`
+          : `${current.kind.displayName} · ${current.provider.enabled ? t('Ready') : t('Off')}`;
   return (
     <Group
-      title="Web search"
-      footer="Claude, GPT and Gemini models can search on their own. Every other model searches with the service you set up here."
+      title={t('Web search')}
+      footer={t('Claude, GPT and Gemini models can search on their own. Every other model searches with the service you set up here.')}
     >
-      <Row icon={<Globe size={20} />} title="Search service" subtitle={subtitle} onClick={() => ui.openSettings('tools', 'search')} />
+      <Row icon={<Globe size={20} />} title={t('Search service')} subtitle={subtitle} onClick={() => ui.openSettings('tools', 'search')} />
       <Divider />
       <PreferNativeRow />
     </Group>
@@ -87,37 +92,41 @@ export function WebSearchPage() {
   return (
     <div className="col gap-16 tools-page">
       <ToolsSubhead
-        title="Web search"
+        title={t('Web search')}
         subtitle={
-          'Claude, GPT and Gemini models can search on their own. For every other model, add a search key here and Facet gives the model ' +
-          `a search tool and a page reader. Searches go straight from ${web ? 'your browser' : 'this computer'} to the service you pick.`
+          web
+            ? t('Claude, GPT and Gemini models can search on their own. For every other model, add a search key here and Facet gives the model a search tool and a page reader. Searches go straight from your browser to the service you pick.')
+            : t('Claude, GPT and Gemini models can search on their own. For every other model, add a search key here and Facet gives the model a search tool and a page reader. Searches go straight from this computer to the service you pick.')
         }
       />
 
       {web && blocked.length > 0 && (
         <ToolsStatus tone="info">
-          {blocked.length === 1
-            ? `${nameList(blocked)} doesn’t accept requests from web browsers, so it can’t search on the website. It works in the Windows and Android apps, and a key you save here syncs to them.`
-            : `${nameList(blocked, 'and')} don’t accept requests from web browsers, so they can’t search on the website. They work in the Windows and Android apps, and a key you save here syncs to them.`}
+          {tn(
+            '{names} doesn’t accept requests from web browsers, so it can’t search on the website. It works in the Windows and Android apps, and a key you save here syncs to them.',
+            '{names} don’t accept requests from web browsers, so they can’t search on the website. They work in the Windows and Android apps, and a key you save here syncs to them.',
+            blocked.length,
+            { names: nameList(blocked, 'and') },
+          )}
         </ToolsStatus>
       )}
 
       {current && (
         <section>
-          <Group title="In use">
+          <Group title={t('In use')}>
             <Row
               icon={<Globe size={20} />}
               title={current.kind.displayName}
-              subtitle={blockedHere(current.kind) ? 'Works in the Windows and Android apps only' : current.provider.enabled ? 'Ready' : 'Off'}
+              subtitle={blockedHere(current.kind) ? t('Works in the Windows and Android apps only') : current.provider.enabled ? t('Ready') : t('Off')}
               onClick={() => setEditing(current.kind)}
             />
             <Divider />
-            <Row icon={<Trash2 size={20} />} title="Remove" danger chevron={false} onClick={() => setConfirmRemove(true)} />
+            <Row icon={<Trash2 size={20} />} title={t('Remove')} danger chevron={false} onClick={() => setConfirmRemove(true)} />
           </Group>
           {blockedHere(current.kind) && (
             <div style={{ marginTop: 12 }}>
               <ToolsStatus tone="warning">
-                Models can’t search with {current.kind.displayName} on the website. To search here, switch to {nameList(browserKinds())}.
+                {t('Models can’t search with {name} on the website. To search here, switch to {names}.', { name: current.kind.displayName, names: nameList(browserKinds()) })}
               </ToolsStatus>
             </div>
           )}
@@ -125,16 +134,16 @@ export function WebSearchPage() {
       )}
 
       {current !== undefined && (
-        <Group title={current ? 'Switch service' : 'Choose a search service'}>
+        <Group title={current ? t('Switch service') : t('Choose a search service')}>
           {SEARCH_KINDS.filter((k) => k.id !== current?.kind.id).map((k, i) => (
             <div key={k.id}>
               {i > 0 && <Divider />}
               <Row
                 icon={<Search size={20} />}
                 title={k.displayName}
-                subtitle={k.blurb}
+                subtitle={searchBlurb(k)}
                 onClick={() => setEditing(k)}
-                trailing={blockedHere(k) ? <span className="badge">Windows and Android only</span> : undefined}
+                trailing={blockedHere(k) ? <span className="badge">{t('Windows and Android only')}</span> : undefined}
                 chevron={blockedHere(k) ? true : undefined}
               />
             </div>
@@ -151,13 +160,13 @@ export function WebSearchPage() {
       )}
       {confirmRemove && current && (
         <Confirm
-          title="Remove web search?"
-          body="Models without built-in search won’t be able to search the web."
-          confirm="Remove"
+          title={t('Remove web search?')}
+          body={t('Models without built-in search won’t be able to search the web.')}
+          confirm={t('Remove')}
           danger
           onConfirm={async () => {
             await app.providers.delete(current.provider.id);
-            toast('Web search removed.');
+            toast(t('Web search removed.'));
           }}
           onClose={closeConfirm}
         />
@@ -195,10 +204,11 @@ function SearchSetupDialog({ kind, existing, onClose }: { kind: SearchKind; exis
     setBusy('test');
     setStatus(null);
     try {
+      // The test query goes to the search service, not to the interface: it stays English.
       const results = await app.search.search({ kind, apiKey: key.trim(), baseUrl: url.trim() }, 'weather in Lisbon', 3);
-      setStatus({ ok: true, text: `Working. Found ${plural(results.length, 'result')}.` });
+      setStatus({ ok: true, text: tn('Working. Found {count} result.', 'Working. Found {count} results.', results.length) });
     } catch (e) {
-      setStatus({ ok: false, text: errorText(e, `${kind.displayName} didn’t answer. Check the key and try again.`) });
+      setStatus({ ok: false, text: errorText(e, t('{name} didn’t answer. Check the key and try again.', { name: kind.displayName })) });
     } finally {
       setBusy(null);
     }
@@ -216,10 +226,10 @@ function SearchSetupDialog({ kind, existing, onClose }: { kind: SearchKind; exis
       } else {
         await app.providers.addService(kind.id, kind.displayName, url.trim(), key.trim());
       }
-      toast(`Web search uses ${kind.displayName}.`);
+      toast(t('Web search uses {name}.', { name: kind.displayName }));
       onClose();
     } catch (e) {
-      setStatus({ ok: false, text: errorText(e, 'Couldn’t save. Try again.') });
+      setStatus({ ok: false, text: errorText(e, t('Couldn’t save. Try again.')) });
       setBusy(null);
     }
   };
@@ -230,29 +240,28 @@ function SearchSetupDialog({ kind, existing, onClose }: { kind: SearchKind; exis
       onClose={onClose}
       footer={
         <>
-          <Button variant="text" onClick={onClose}>Cancel</Button>
-          <Button variant="tonal" busy={busy === 'test'} disabled={!valid || busy != null || blockedHere(kind)} onClick={test}>Test</Button>
-          <Button busy={busy === 'save'} disabled={!valid || busy != null} onClick={save}>Save</Button>
+          <Button variant="text" onClick={onClose}>{t('Cancel')}</Button>
+          <Button variant="tonal" busy={busy === 'test'} disabled={!valid || busy != null || blockedHere(kind)} onClick={test}>{t('Test')}</Button>
+          <Button busy={busy === 'save'} disabled={!valid || busy != null} onClick={save}>{t('Save')}</Button>
         </>
       }
     >
       <div className="col gap-16">
-        <p className="t-body c-2" style={{ margin: 0 }}>{kind.blurb}</p>
+        <p className="t-body c-2" style={{ margin: 0 }}>{searchBlurb(kind)}</p>
         {blockedHere(kind) && (
           <ToolsStatus tone="warning">
-            {kind.displayName} doesn’t accept requests from web browsers, so it can’t search on the website. Save it here to use it in the
-            Windows and Android apps.
+            {t('{name} doesn’t accept requests from web browsers, so it can’t search on the website. Save it here to use it in the Windows and Android apps.', { name: kind.displayName })}
           </ToolsStatus>
         )}
         {kind.needsKey && (
           <div className="col gap-6">
-            <Field label="API key">
-              <ToolsSecretInput value={key} onChange={(v) => { setKey(v.trim()); setStatus(null); }} label="API key" onEnter={() => valid && !busy && void save()} />
+            <Field label={t('API key')}>
+              <ToolsSecretInput value={key} onChange={(v) => { setKey(v.trim()); setStatus(null); }} label={t('API key')} onEnter={() => valid && !busy && void save()} />
             </Field>
             {kind.keyUrl && (
               <span>
                 <Button variant="text" small onClick={() => platform().openExternal(kind.keyUrl!)}>
-                  Get a key from {kind.displayName} <ExternalLink size={14} />
+                  {t('Get a key from {name}', { name: kind.displayName })} <ExternalLink size={14} />
                 </Button>
               </span>
             )}
@@ -261,12 +270,13 @@ function SearchSetupDialog({ kind, existing, onClose }: { kind: SearchKind; exis
         {isSearx && (
           <div className="col gap-6">
             <Field
-              label="Instance URL"
-              hint="Your SearXNG instance, with the JSON format enabled in settings.yml."
-              error={url.trim().length > 8 && !validUrl(url) ? 'Enter an address that starts with https://' : undefined}
+              label={t('Instance URL')}
+              hint={t('Your SearXNG instance, with the JSON format enabled in settings.yml.')}
+              error={url.trim().length > 8 && !validUrl(url) ? t('Enter an address that starts with https://') : undefined}
             >
               <input
                 className="input mono"
+                dir="ltr"
                 value={url}
                 inputMode="url"
                 spellCheck={false}
@@ -277,7 +287,7 @@ function SearchSetupDialog({ kind, existing, onClose }: { kind: SearchKind; exis
             {kind.keyUrl && (
               <span>
                 <Button variant="text" small onClick={() => platform().openExternal(kind.keyUrl!)}>
-                  SearXNG documentation <ExternalLink size={14} />
+                  {t('SearXNG documentation')} <ExternalLink size={14} />
                 </Button>
               </span>
             )}
@@ -285,7 +295,7 @@ function SearchSetupDialog({ kind, existing, onClose }: { kind: SearchKind; exis
         )}
         {status && <ToolsStatus tone={status.ok ? 'ok' : 'error'}>{status.text}</ToolsStatus>}
         <p className="field-hint" style={{ margin: 0 }}>
-          The key is encrypted on this device and syncs end-to-end encrypted. Only one search service is used at a time.
+          {t('The key is encrypted on this device and syncs end-to-end encrypted. Only one search service is used at a time.')}
         </p>
       </div>
     </Dialog>

@@ -4,6 +4,7 @@
  * talks to [McpClient] and [McpOAuth].
  */
 import type { McpAuthMode, StdioSpec } from '../data/entities';
+import { t } from '../i18n';
 
 export type { McpAuthMode, StdioSpec };
 
@@ -113,7 +114,7 @@ export class McpAuthRequiredException extends Error {
     /** Value of the WWW-Authenticate header from the 401, used for discovery. */
     readonly wwwAuthenticate: string | null,
   ) {
-    super('This server needs you to sign in.');
+    super(t('This server needs you to sign in.'));
     this.name = 'McpAuthRequiredException';
   }
 }

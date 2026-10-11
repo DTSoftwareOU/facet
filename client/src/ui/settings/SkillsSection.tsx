@@ -4,6 +4,7 @@ import { ClipboardPaste, Download, FileText, Infinity as InfinityIcon, Link, Plu
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { getApp } from '../../app';
 import type { SkillEntity } from '../../data/entities';
+import { sentences, t, tn } from '../../i18n';
 import { platform } from '../../platform';
 import { SkillParser, SkillRepository } from '../../tools/skills';
 import type { SkillResource } from '../../tools/types';
@@ -16,7 +17,25 @@ const openSkill = (id: string) => ui.openSettings('tools', 'skill:' + id);
 /** "Imported meeting-notes." with an Open action. */
 function useImported() {
   const toast = useToast();
-  return (s: SkillEntity, verb = 'Imported') => toast(`${verb} ${s.name}.`, { label: 'Open', run: () => openSkill(s.id) });
+  return (s: SkillEntity, how: 'imported' | 'added' = 'imported') =>
+    toast(how === 'added' ? t('Added {name}.', { name: s.name }) : t('Imported {name}.', { name: s.name }), { label: t('Open'), run: () => openSkill(s.id) });
+}
+
+/**
+ * What an example skill does, in the interface language. The skill itself (name, description,
+ * instructions) is for models and is added in English.
+ */
+function exampleSummary(ex: (typeof SkillRepository.EXAMPLES)[number]): string {
+  switch (ex.name) {
+    case 'meeting-notes':
+      return t('Turn rough notes or a transcript into clear meeting notes with decisions and action items.');
+    case 'code-review':
+      return t('Review code changes for bugs, security issues and maintainability, with concrete fixes.');
+    case 'trip-planner':
+      return t('Plan trips day by day with realistic travel times, budgets and booking tips.');
+    default:
+      return ex.description.split('. Use when')[0].replace(/\.?$/, '.');
+  }
 }
 
 /** The skills group on the Tools overview. */
@@ -39,14 +58,14 @@ export function SkillsOverviewGroup() {
     try {
       imported(await app.skills.importFile(f.name, new Uint8Array(await f.arrayBuffer())));
     } catch (err) {
-      setProblem(errorText(err, 'Couldn’t import that file. Choose a SKILL.md, or a .zip that contains one.'));
+      setProblem(errorText(err, t('Couldn’t import that file. Choose a SKILL.md, or a .zip that contains one.')));
     }
   };
 
   const addExample = async (ex: (typeof SkillRepository.EXAMPLES)[number]) => {
     setAdding(ex.name);
     try {
-      imported(await app.skills.save({ name: ex.name, description: ex.description, instructions: ex.body }), 'Added');
+      imported(await app.skills.save({ name: ex.name, description: ex.description, instructions: ex.body }), 'added');
     } finally {
       setAdding(null);
     }
@@ -55,53 +74,53 @@ export function SkillsOverviewGroup() {
   return (
     <section className="col gap-12">
       <Group
-        title="Skills"
-        footer="Skills are reusable instructions a model loads when a task calls for them, like a checklist for code review or a format for meeting notes. They work with any model that supports tools and sync to all your devices. Compatible with SKILL.md files."
+        title={t('Skills')}
+        footer={t('Skills are reusable instructions a model loads when a task calls for them, like a checklist for code review or a format for meeting notes. They work with any model that supports tools and sync to all your devices. Compatible with SKILL.md files.')}
       >
         {skills?.map((s, i) => (
           <div key={s.id}>
             {i > 0 && <Divider />}
             <ToolsRow
               icon={<WandSparkles size={20} />}
-              title={s.name}
-              subtitle={<span className="tools-clamp">{s.description}</span>}
+              title={<bdi>{s.name}</bdi>}
+              subtitle={<span className="tools-clamp"><bdi>{s.description}</bdi></span>}
               onClick={() => openSkill(s.id)}
               trailing={
                 <>
                   <ToolsToggleChip
                     on={s.alwaysOn}
                     icon={<InfinityIcon size={14} />}
-                    title={s.alwaysOn ? 'Always on: the full instructions are in every chat' : 'Load only when a task calls for it. Click to include it in every chat.'}
+                    title={s.alwaysOn ? t('Always on: the full instructions are in every chat') : t('Load only when a task calls for it. Click to include it in every chat.')}
                     onChange={(v) => void app.skills.setAlwaysOn(s.id, v)}
                   >
-                    Always on
+                    {t('Always on')}
                   </ToolsToggleChip>
-                  <Switch checked={s.enabled} label={`Use ${s.name}`} onChange={(v) => void app.skills.setEnabled(s.id, v)} />
+                  <Switch checked={s.enabled} label={t('Use {name}', { name: s.name })} onChange={(v) => void app.skills.setEnabled(s.id, v)} />
                 </>
               }
             />
           </div>
         ))}
         {skills && skills.length === 0 && (
-          <Row icon={<WandSparkles size={20} />} title="No skills yet" subtitle="Create one, import a SKILL.md or .zip, or start with an example below." />
+          <Row icon={<WandSparkles size={20} />} title={t('No skills yet')} subtitle={t('Create one, import a SKILL.md or .zip, or start with an example below.')} />
         )}
         {skills && <Divider full={skills.length === 0} />}
-        <ToolsRow icon={<Plus size={20} />} title="New skill" tone="primary" onClick={() => ui.openSettings('tools', 'skill:new')} />
+        <ToolsRow icon={<Plus size={20} />} title={t('New skill')} tone="primary" onClick={() => ui.openSettings('tools', 'skill:new')} />
         <Divider />
-        <ToolsRow icon={<Download size={20} />} title="Import a skill" tone="primary" onClick={menu.open} />
+        <ToolsRow icon={<Download size={20} />} title={t('Import a skill')} tone="primary" onClick={menu.open} />
       </Group>
 
       {problem && <ToolsStatus tone="error">{problem}</ToolsStatus>}
 
       {skills && skills.length === 0 && (
-        <Group title="Start with an example">
+        <Group title={t('Start with an example')}>
           {SkillRepository.EXAMPLES.map((ex, i) => (
             <div key={ex.name}>
               {i > 0 && <Divider />}
               <Row
                 icon={adding === ex.name ? <Spinner size={18} /> : <Plus size={20} />}
                 title={ex.name}
-                subtitle={ex.description.split('. Use when')[0].replace(/\.?$/, '.')}
+                subtitle={exampleSummary(ex)}
                 onClick={() => void addExample(ex)}
                 disabled={adding != null}
               />
@@ -116,9 +135,9 @@ export function SkillsOverviewGroup() {
           anchor={menu.anchor}
           onClose={menu.close}
           items={[
-            { label: 'From a file (.md or .zip)', icon: <FileText size={17} />, onSelect: () => file.current?.click() },
-            { label: 'From a link', icon: <Link size={17} />, onSelect: () => setDialog('url') },
-            { label: 'Paste SKILL.md text', icon: <ClipboardPaste size={17} />, onSelect: () => setDialog('paste') },
+            { label: t('From a file (.md or .zip)'), icon: <FileText size={17} />, onSelect: () => file.current?.click() },
+            { label: t('From a link'), icon: <Link size={17} />, onSelect: () => setDialog('url') },
+            { label: t('Paste SKILL.md text'), icon: <ClipboardPaste size={17} />, onSelect: () => setDialog('paste') },
           ]}
         />
       )}
@@ -143,26 +162,27 @@ function SkillUrlDialog({ onClose }: { onClose: () => void }) {
       imported(await app.skills.importUrl(url.trim()));
       onClose();
     } catch (e) {
-      setError(errorText(e, 'Couldn’t import from that link.'));
+      setError(errorText(e, t('Couldn’t import from that link.')));
       setBusy(false);
     }
   };
   return (
     <Dialog
-      title="Import from a link"
+      title={t('Import from a link')}
       onClose={onClose}
       size="narrow"
       footer={
         <>
-          <Button variant="text" onClick={onClose}>Cancel</Button>
-          <Button busy={busy} disabled={!valid} onClick={submit}>Import</Button>
+          <Button variant="text" onClick={onClose}>{t('Cancel')}</Button>
+          <Button busy={busy} disabled={!valid} onClick={submit}>{t('Import')}</Button>
         </>
       }
     >
       <div className="col gap-12">
-        <Field label="Link" hint="A SKILL.md, a Markdown file or a .zip. GitHub file links work too." error={error ?? undefined}>
+        <Field label={t('Link')} hint={t('A SKILL.md, a Markdown file or a .zip. GitHub file links work too.')} error={error ?? undefined}>
           <input
             className="input mono"
+            dir="ltr"
             value={url}
             inputMode="url"
             spellCheck={false}
@@ -172,7 +192,7 @@ function SkillUrlDialog({ onClose }: { onClose: () => void }) {
           />
         </Field>
         {platform().corsLimited && (
-          <span className="field-hint">Some sites don’t allow downloads from web pages. If a link doesn’t work, download the file and import it instead.</span>
+          <span className="field-hint">{t('Some sites don’t allow downloads from web pages. If a link doesn’t work, download the file and import it instead.')}</span>
         )}
       </div>
     </Dialog>
@@ -201,29 +221,30 @@ function SkillPasteDialog({ onClose }: { onClose: () => void }) {
       imported(await app.skills.importMarkdown(text));
       onClose();
     } catch (e) {
-      setError(errorText(e, 'Couldn’t read that as a skill.'));
+      setError(errorText(e, t('Couldn’t read that as a skill.')));
       setBusy(false);
     }
   };
   return (
     <Dialog
-      title="Paste a skill"
+      title={t('Paste a skill')}
       onClose={onClose}
       size="wide"
       footer={
         <>
-          <Button variant="text" onClick={onClose}>Cancel</Button>
-          <Button busy={busy} disabled={!text.trim()} onClick={submit}>Import</Button>
+          <Button variant="text" onClick={onClose}>{t('Cancel')}</Button>
+          <Button busy={busy} disabled={!text.trim()} onClick={submit}>{t('Import')}</Button>
         </>
       }
     >
       <Field
         label="SKILL.md"
-        hint="Frontmatter with name and description, then the instructions in Markdown. Without frontmatter, the first heading becomes the name."
+        hint={t('Frontmatter with name and description, then the instructions in Markdown. Without frontmatter, the first heading becomes the name.')}
         error={error ?? undefined}
       >
         <textarea
           className="textarea tools-code-input"
+          dir="auto"
           rows={14}
           value={text}
           spellCheck={false}
@@ -290,10 +311,10 @@ export function SkillEditPage({ id }: { id: string | null }) {
     setError(null);
     try {
       const s = await app.skills.save({ id, name, description, instructions, resources, enabled, alwaysOn, sourceUrl });
-      toast(`Saved ${s.name}.`);
+      toast(t('Saved {name}.', { name: s.name }));
       back();
     } catch (e) {
-      setError(errorText(e, 'Couldn’t save the skill. Try again.'));
+      setError(errorText(e, t('Couldn’t save the skill. Try again.')));
       setBusy(false);
     }
   };
@@ -309,9 +330,9 @@ export function SkillEditPage({ id }: { id: string | null }) {
   if (missing) {
     return (
       <div className="col gap-16 tools-page">
-        <ToolsStatus tone="info">This skill was deleted.</ToolsStatus>
+        <ToolsStatus tone="info">{t('This skill was deleted.')}</ToolsStatus>
         <span>
-          <Button variant="tonal" onClick={back}>Back to Tools</Button>
+          <Button variant="tonal" onClick={back}>{t('Back to Tools')}</Button>
         </span>
       </div>
     );
@@ -326,35 +347,37 @@ export function SkillEditPage({ id }: { id: string | null }) {
 
   return (
     <div className="col gap-16 tools-page" onKeyDown={onKeyDown}>
-      <ToolsSubhead title={id ? 'Edit skill' : 'New skill'} />
+      <ToolsSubhead title={id ? t('Edit skill') : t('New skill')} />
       <Field
-        label="Name"
-        hint={
-          'Lowercase words joined by hyphens. Models refer to the skill by this name.' +
-          (name.trim() && slug !== name.trim() ? ` Saved as “${slug}”.` : '')
-        }
+        label={t('Name')}
+        hint={sentences(
+          t('Lowercase words joined by hyphens. Models refer to the skill by this name.'),
+          name.trim() && slug !== name.trim() ? t('Saved as “{name}”.', { name: slug }) : null,
+        )}
       >
-        <input className="input mono" value={name} placeholder="e.g. meeting-notes" spellCheck={false} onChange={(e) => setName(e.target.value)} />
+        <input className="input mono" dir="ltr" value={name} placeholder={t('e.g. {name}', { name: 'meeting-notes' })} spellCheck={false} onChange={(e) => setName(e.target.value)} />
       </Field>
       <Field
-        label="When to use it"
-        hint={description.length > 900 ? `${description.length} of 1024 characters.` : 'Models read this to decide when to load the skill. Be specific.'}
+        label={t('When to use it')}
+        hint={description.length > 900 ? t('{count} of {max} characters.', { count: description.length, max: 1024 }) : t('Models read this to decide when to load the skill. Be specific.')}
       >
         <textarea
           className="textarea"
+          dir="auto"
           rows={3}
           value={description}
           maxLength={1024}
-          placeholder="Turn rough notes into structured meeting notes. Use when the user shares notes or a transcript."
+          placeholder={t('Turn rough notes into structured meeting notes. Use when the user shares notes or a transcript.')}
           onChange={(e) => setDescription(e.target.value)}
         />
       </Field>
-      <Field label="Instructions" hint="Markdown: steps, formats, checklists and examples.">
+      <Field label={t('Instructions')} hint={t('Markdown: steps, formats, checklists and examples.')}>
         <textarea
           className="textarea tools-code-input"
+          dir="auto"
           rows={14}
           value={instructions}
-          placeholder="Step-by-step instructions, formats, checklists, examples…"
+          placeholder={t('Step-by-step instructions, formats, checklists, examples…')}
           onChange={(e) => setInstructions(e.target.value)}
         />
       </Field>
@@ -362,30 +385,30 @@ export function SkillEditPage({ id }: { id: string | null }) {
       <div className="group">
         <SwitchRow
           icon={<Power size={20} />}
-          title="Use this skill"
-          subtitle={enabled ? 'Models load it when a task calls for it.' : 'Off: models don’t see it.'}
+          title={t('Use this skill')}
+          subtitle={enabled ? t('Models load it when a task calls for it.') : t('Off: models don’t see it.')}
           checked={enabled}
           onChange={setEnabled}
         />
         <Divider />
         <SwitchRow
           icon={<InfinityIcon size={20} />}
-          title="Always on"
-          subtitle="Include the full instructions in every chat instead of loading them when needed. Uses more tokens."
+          title={t('Always on')}
+          subtitle={t('Include the full instructions in every chat instead of loading them when needed. Uses more tokens.')}
           checked={alwaysOn}
           onChange={setAlwaysOn}
         />
       </div>
 
       {resources.length > 0 && (
-        <Group title={`Bundled files (${resources.length})`} footer="Files that came with the skill. Models can read them while they use it.">
+        <Group title={t('Bundled files ({count})', { count: resources.length })} footer={t('Files that came with the skill. Models can read them while they use it.')}>
           {resources.map((r, i) => (
             <div key={r.path}>
               {i > 0 && <Divider />}
               <Row
                 icon={<FileText size={20} />}
-                title={<span className="mono" style={{ fontSize: 13.5 }}>{r.path}</span>}
-                subtitle={`${r.content.length.toLocaleString()} characters`}
+                title={<span className="mono" dir="ltr" style={{ fontSize: 13.5 }}>{r.path}</span>}
+                subtitle={tn('{count} character', '{count} characters', r.content.length)}
                 onClick={() => setViewing(r)}
               />
             </div>
@@ -393,41 +416,41 @@ export function SkillEditPage({ id }: { id: string | null }) {
         </Group>
       )}
 
-      {sourceUrl && <p className="field-hint ellipsis" style={{ margin: '0 6px' }} title={sourceUrl}>Imported from {sourceUrl}</p>}
+      {sourceUrl && <p className="field-hint ellipsis" style={{ margin: '0 6px' }} title={sourceUrl}>{t('Imported from {url}', { url: sourceUrl })}</p>}
       {error && <ToolsStatus tone="error">{error}</ToolsStatus>}
 
       <div className="tools-form-actions">
-        <Button busy={busy} disabled={!valid} onClick={save}>Save skill</Button>
-        <Button variant="text" onClick={back}>Cancel</Button>
+        <Button busy={busy} disabled={!valid} onClick={save}>{t('Save skill')}</Button>
+        <Button variant="text" onClick={back}>{t('Cancel')}</Button>
         <span className="grow" />
         {id && (
           <Button variant="danger" onClick={() => setConfirm('delete')}>
-            <Trash2 size={16} /> Delete
+            <Trash2 size={16} /> {t('Delete')}
           </Button>
         )}
       </div>
 
       {viewing && (
-        <Dialog title={<span className="mono">{viewing.path}</span>} onClose={closeViewer} size="wide">
-          <div className="code-box" style={{ maxHeight: '60vh' }}>{viewing.content}</div>
+        <Dialog title={<span className="mono" dir="ltr">{viewing.path}</span>} onClose={closeViewer} size="wide">
+          <div className="code-box" dir="auto" style={{ maxHeight: '60vh' }}>{viewing.content}</div>
         </Dialog>
       )}
       {confirm === 'delete' && id && (
         <Confirm
-          title="Delete this skill?"
-          body="It’s removed from all your devices."
-          confirm="Delete"
+          title={t('Delete this skill?')}
+          body={t('It’s removed from all your devices.')}
+          confirm={t('Delete')}
           danger
           onConfirm={async () => {
             await app.skills.delete(id);
-            toast(`Deleted ${name}.`);
+            toast(t('Deleted {name}.', { name }));
             back();
           }}
           onClose={closeConfirm}
         />
       )}
       {confirm === 'leave' && (
-        <Confirm title="Discard changes?" body="Your edits to this skill aren’t saved." confirm="Discard" danger onConfirm={back} onClose={closeConfirm} />
+        <Confirm title={t('Discard changes?')} body={t('Your edits to this skill aren’t saved.')} confirm={t('Discard')} danger onConfirm={back} onClose={closeConfirm} />
       )}
     </div>
   );

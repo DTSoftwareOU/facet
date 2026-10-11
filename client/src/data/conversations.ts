@@ -1,6 +1,7 @@
 /** Conversations and messages (port of ConversationRepository.kt and MessageTree in Models.kt). */
 import { newId } from '../core/ids';
 import { parseJson, toJson } from '../core/json';
+import { t } from '../i18n';
 import type { Citation, GenParams, Usage } from '../llm/types';
 import { db } from './db';
 import type { AttachmentRef, ComputerBinding, ConversationEntity, MessageEntity, MessageError } from './entities';
@@ -114,7 +115,7 @@ export class ConversationRepository {
   async create(assistantId: string | null, providerId: string | null, modelId: string | null, params: GenParams, folderId: string | null = null, computer: ComputerBinding | null = null): Promise<ConversationEntity> {
     const now = Date.now();
     const c: ConversationEntity = {
-      id: newId(now), title: 'New chat', titleSet: false, assistantId, folderId, providerId, modelId,
+      id: newId(now), title: t('New chat'), titleSet: false, assistantId, folderId, providerId, modelId,
       paramsJson: toJson(params), systemPrompt: null, currentLeafId: null, pinned: false, archived: 0,
       createdAt: now, lastActivityAt: now, updatedAt: now, deleted: 0, dirty: 1,
       computerHost: computer?.host ?? null, computerFolder: computer?.folder ?? null,
@@ -216,7 +217,7 @@ export class ConversationRepository {
       const c = byId.get(m.conversationId);
       if (!c || hits.length >= 400) return;
       const text = m.content.toLowerCase();
-      if (!terms.every((t) => text.includes(t))) return;
+      if (!terms.every((term) => text.includes(term))) return;
       hits.push({ messageId: m.id, conversationId: m.conversationId, title: c.title, snippet: snippet(m.content, terms[0]), role: m.role, createdAt: m.createdAt });
     });
     hits.sort((a, b) => b.createdAt - a.createdAt);

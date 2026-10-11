@@ -9,6 +9,7 @@ import { getApp } from '../../app';
 import { db } from '../../data/db';
 import { builtinAssistant, DEFAULT_ASSISTANT_ID, toAssistant, type Assistant } from '../../data/library';
 import type { ModelRef } from '../../data/prefs';
+import { t, tm } from '../../i18n';
 import { EFFORT_INFO, type Effort } from '../../llm/types';
 import { effortHint, Segmented } from '../chat/ChatSettings';
 import { ModelPicker, resolveModel } from '../chat/ModelPicker';
@@ -36,7 +37,7 @@ export function AssistantsPage({ detail }: PageProps) {
 
 function summary(a: Assistant): string {
   const first = a.instructions.split('\n').find((l) => l.trim())?.trim() ?? '';
-  if (!first) return 'General-purpose assistant';
+  if (!first) return t('General-purpose assistant');
   return first.length > 90 ? first.slice(0, 89).trimEnd() + '…' : first;
 }
 
@@ -53,8 +54,8 @@ function AssistantList() {
         {i > 0 && <Sep inset={66} />}
         <ActionRow
           leading={<AssistantAvatar assistant={a} size={36} />}
-          title={a.name}
-          subtitle={summary(a)}
+          title={<bdi>{a.name}</bdi>}
+          subtitle={<bdi>{summary(a)}</bdi>}
           subLines={1}
           chevron
           onClick={() => ui.openSettings('assistants', a.id)}
@@ -64,16 +65,16 @@ function AssistantList() {
   return (
     <div className="col gap-16">
       <p className="settings-intro t-body">
-        Assistants are reusable personas: instructions, a default model and conversation starters. Pick one when you start a chat.
+        {t('Assistants are reusable personas: instructions, a default model and conversation starters. Pick one when you start a chat.')}
       </p>
       <div className="row">
         <Button onClick={() => ui.openSettings('assistants', 'new')}>
           <Plus size={18} />
-          Create an assistant
+          {t('Create an assistant')}
         </Button>
       </div>
-      {custom.length > 0 && <Group title="Yours">{rows(custom)}</Group>}
-      <Group title="Built in">{rows(builtins)}</Group>
+      {custom.length > 0 && <Group title={t('Yours')}>{rows(custom)}</Group>}
+      <Group title={t('Built in')}>{rows(builtins)}</Group>
     </div>
   );
 }
@@ -93,7 +94,8 @@ function BuiltinView({ assistant: a }: { assistant: Assistant }) {
     try {
       const id = await app.assistants.save({
         id: null,
-        name: `${a.name} (copy)`,
+        // Stored as data: no bidi isolation marks in the name.
+        name: t('{name} (copy)', { name: a.name }).replace(/[\u2068\u2069]/g, ''),
         emoji: BUILTIN_EMOJI[a.icon ?? 'gem'] ?? '✨',
         colorIndex: a.colorIndex,
         instructions: a.instructions,
@@ -102,7 +104,7 @@ function BuiltinView({ assistant: a }: { assistant: Assistant }) {
         starters: a.starters,
       });
       ui.openSettings('assistants', id);
-      toast('Copy created. Change anything you like.');
+      toast(t('Copy created. Change anything you like.'));
     } finally {
       setCopying(false);
     }
@@ -112,34 +114,34 @@ function BuiltinView({ assistant: a }: { assistant: Assistant }) {
       <div className="row gap-16 page-hero">
         <AssistantAvatar assistant={a} size={56} />
         <div className="col grow">
-          <span className="t-title-m">{a.name}</span>
-          <span className="t-label-m c-2" style={{ fontWeight: 400 }}>Built in. Make a copy to change it.</span>
+          <span className="t-title-m"><bdi>{a.name}</bdi></span>
+          <span className="t-label-m c-2" style={{ fontWeight: 400 }}>{t('Built in. Make a copy to change it.')}</span>
         </div>
       </div>
       <div className="form-actions" style={{ marginTop: 0 }}>
         <Button onClick={start}>
           <MessageSquarePlus size={18} />
-          Start a chat
+          {t('Start a chat')}
         </Button>
         <Button variant="tonal" onClick={copy} busy={copying}>
           {!copying && <Copy size={17} />}
-          Make a copy
+          {t('Make a copy')}
         </Button>
       </div>
       <section className="col gap-8">
-        <h3 className="group-title" style={{ margin: '14px 4px 0' }}>Instructions</h3>
+        <h3 className="group-title" style={{ margin: '14px 4px 0' }}>{t('Instructions')}</h3>
         {a.instructions ? (
-          <div className="group read-box">{a.instructions}</div>
+          <div className="group read-box" dir="auto">{a.instructions}</div>
         ) : (
-          <p className="t-body c-2" style={{ margin: '0 4px' }}>None. Facet uses only your custom instructions from Settings → Chat.</p>
+          <p className="t-body c-2" style={{ margin: '0 4px' }}>{t('None. Facet uses only your custom instructions from Settings → Chat.')}</p>
         )}
       </section>
       {a.starters.length > 0 && (
-        <Group title="Conversation starters">
+        <Group title={t('Conversation starters')}>
           {a.starters.map((s, i) => (
             <div key={i}>
               {i > 0 && <Divider />}
-              <Row icon={<MessageSquare size={18} />} title={<span style={{ fontWeight: 400 }}>{s}</span>} />
+              <Row icon={<MessageSquare size={18} />} title={<span style={{ fontWeight: 400 }}><bdi>{s}</bdi></span>} />
             </div>
           ))}
         </Group>
@@ -159,8 +161,8 @@ function EditExisting({ id }: { id: string }) {
   if (e === null || (e?.deleted && !initial)) {
     return (
       <div className="empty">
-        <span className="t-body">This assistant was deleted, maybe from another device.</span>
-        <Button variant="tonal" onClick={() => ui.openSettings('assistants', null)}>Back to assistants</Button>
+        <span className="t-body">{t('This assistant was deleted, maybe from another device.')}</span>
+        <Button variant="tonal" onClick={() => ui.openSettings('assistants', null)}>{t('Back to assistants')}</Button>
       </div>
     );
   }
@@ -198,7 +200,7 @@ function AssistantEditor({ initial }: { initial: Assistant | null }) {
   const effectiveEffort = !model ? null : !resolved ? effort : effort && efforts.includes(effort) ? effort : null;
 
   const preview: Assistant = {
-    id: 'preview', name: name || 'Assistant', emoji, icon: null, colorIndex: color, instructions, model, params: null, starters: [], builtin: false,
+    id: 'preview', name: name || t('Assistant'), emoji, icon: null, colorIndex: color, instructions, model, params: null, starters: [], builtin: false,
   };
   const back = () => ui.openSettings('assistants', null);
 
@@ -210,7 +212,7 @@ function AssistantEditor({ initial }: { initial: Assistant | null }) {
       // Assistant params replace the chat defaults, so start from them when there were none.
       const params = effectiveEffort != null || prior ? { ...(prior ?? synced.defaultParams), effort: effectiveEffort } : null;
       await app.assistants.save({ id: initial?.id ?? null, name, emoji, colorIndex: color, instructions, model, params, starters });
-      toast(initial ? 'Assistant saved.' : `${name.trim()} is ready. Pick it when you start a chat.`);
+      toast(initial ? t('Assistant saved.') : t('{name} is ready. Pick it when you start a chat.', { name: name.trim() }));
       back();
     } finally {
       setSaving(false);
@@ -222,18 +224,18 @@ function AssistantEditor({ initial }: { initial: Assistant | null }) {
       <div className="row gap-16 page-hero" style={{ alignItems: 'center' }}>
         <AssistantAvatar assistant={preview} size={64} />
         <div className="col gap-8" style={{ minWidth: 0 }}>
-          <span className="field-label">Color</span>
-          <div className="row gap-8 row-wrap" role="radiogroup" aria-label="Color">
+          <span className="field-label">{t('Color')}</span>
+          <div className="row gap-8 row-wrap" role="radiogroup" aria-label={t('Color')}>
             {ACCENTS.map((c, i) => (
-              <button key={c} type="button" role="radio" aria-checked={color === i} aria-label={`Color ${i + 1}`} className="swatch" style={{ background: c }} onClick={() => setColor(i)} />
+              <button key={c} type="button" role="radio" aria-checked={color === i} aria-label={t('Color {number}', { number: i + 1 })} className="swatch" style={{ background: c }} onClick={() => setColor(i)} />
             ))}
           </div>
         </div>
       </div>
 
       <section className="col gap-8">
-        <SectionLabel>Emoji</SectionLabel>
-        <div className="emoji-grid" role="radiogroup" aria-label="Emoji">
+        <SectionLabel>{t('Emoji')}</SectionLabel>
+        <div className="emoji-grid" role="radiogroup" aria-label={t('Emoji')}>
           {emojiChoices.map((e) => (
             <button key={e} type="button" role="radio" aria-checked={emoji === e} aria-label={e} className="emoji-cell" onClick={() => setEmoji(e)}>
               {e}
@@ -242,29 +244,30 @@ function AssistantEditor({ initial }: { initial: Assistant | null }) {
         </div>
       </section>
 
-      <Field label="Name">
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Travel planner" maxLength={60} />
+      <Field label={t('Name')}>
+        <input className="input" dir="auto" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('e.g. Travel planner')} maxLength={60} />
       </Field>
-      <Field label="Instructions" hint="Sent at the start of every chat with this assistant, before your own custom instructions.">
+      <Field label={t('Instructions')} hint={t('Sent at the start of every chat with this assistant, before your own custom instructions.')}>
         <textarea
           className="textarea"
+          dir="auto"
           rows={8}
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
-          placeholder="Describe the role, tone, and anything it should always or never do."
+          placeholder={t('Describe the role, tone, and anything it should always or never do.')}
         />
       </Field>
 
-      <Group title="Default model">
+      <Group title={t('Default model')}>
         <ActionRow
           icon={<Cpu size={20} />}
-          title={resolved ? resolved.model.displayName : model ? model.modelId : 'Use the chat’s current model'}
-          subtitle={resolved ? resolved.providerLabel : model ? 'This provider is off or was removed.' : 'Or pick one this assistant always starts with.'}
+          title={resolved ? resolved.model.displayName : model ? model.modelId : t('Use the chat’s current model')}
+          subtitle={resolved ? resolved.providerLabel : model ? t('This provider is off or was removed.') : t('Or pick one this assistant always starts with.')}
           chevron={!model}
           onClick={() => setPicker(true)}
           trailing={
             model ? (
-              <IconButton small label="Clear default model" onClick={() => setModel(null)}>
+              <IconButton small label={t('Clear default model')} onClick={() => setModel(null)}>
                 <X size={17} />
               </IconButton>
             ) : undefined
@@ -274,11 +277,11 @@ function AssistantEditor({ initial }: { initial: Assistant | null }) {
 
       {model && efforts.length > 0 && (
         <section className="col gap-8">
-          <SectionLabel>Reasoning</SectionLabel>
+          <SectionLabel>{t('Reasoning')}</SectionLabel>
           <Segmented
             options={[null, ...efforts] as (Effort | null)[]}
             selected={effectiveEffort}
-            label={(e) => (e ? EFFORT_INFO[e].label : 'Auto')}
+            label={(e) => (e ? tm(EFFORT_INFO[e].label) : t('Auto'))}
             onSelect={setEffort}
           />
           <span className="field-hint section-label">{effortHint(effectiveEffort)}</span>
@@ -286,22 +289,23 @@ function AssistantEditor({ initial }: { initial: Assistant | null }) {
       )}
 
       <section className="col gap-8">
-        <SectionLabel>Conversation starters</SectionLabel>
+        <SectionLabel>{t('Conversation starters')}</SectionLabel>
         {starters.map((s, i) => (
           <input
             key={i}
             className="input"
+            dir="auto"
             value={s}
             onChange={(e) => setStarters((list) => list.map((x, j) => (j === i ? e.target.value : x)))}
-            placeholder={`Starter ${i + 1}`}
-            aria-label={`Conversation starter ${i + 1}`}
+            placeholder={t('Starter {number}', { number: i + 1 })}
+            aria-label={t('Conversation starter {number}', { number: i + 1 })}
           />
         ))}
-        <span className="field-hint section-label">Shown as suggestions when a chat with this assistant is empty.</span>
+        <span className="field-hint section-label">{t('Shown as suggestions when a chat with this assistant is empty.')}</span>
         {starters.length < MAX_STARTERS && (
           <button type="button" className="link-btn" style={{ marginTop: 0 }} onClick={() => setStarters((list) => [...list, ''])}>
             <Plus size={15} aria-hidden />
-            Add another
+            {t('Add another')}
           </button>
         )}
       </section>
@@ -310,27 +314,27 @@ function AssistantEditor({ initial }: { initial: Assistant | null }) {
         {initial && (
           <Button variant="danger" onClick={() => setConfirmDelete(true)}>
             <Trash2 size={17} />
-            Delete
+            {t('Delete')}
           </Button>
         )}
         <span className="grow" />
-        <Button variant="text" onClick={back}>Cancel</Button>
+        <Button variant="text" onClick={back}>{t('Cancel')}</Button>
         <Button onClick={save} busy={saving} disabled={!name.trim()}>
-          {initial ? 'Save changes' : 'Create assistant'}
+          {initial ? t('Save changes') : t('Create assistant')}
         </Button>
       </div>
 
-      {picker && <ModelPicker title="Default model" current={model} onPick={setModel} onClose={closePicker} />}
+      {picker && <ModelPicker title={t('Default model')} current={model} onPick={setModel} onClose={closePicker} />}
       {confirmDelete && initial && (
         <Confirm
-          title="Delete this assistant?"
-          body="Existing chats keep working with their instructions removed."
-          confirm="Delete"
+          title={t('Delete this assistant?')}
+          body={t('Existing chats keep working with their instructions removed.')}
+          confirm={t('Delete')}
           danger
           onConfirm={async () => {
             await app.assistants.delete(initial.id);
             back();
-            toast(`Deleted ${initial.name}.`);
+            toast(t('Deleted {name}.', { name: initial.name }));
           }}
           onClose={closeConfirm}
         />

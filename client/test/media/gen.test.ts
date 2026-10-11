@@ -171,7 +171,7 @@ describe('video', () => {
     server.json({ name: 'operations/op1' });
     server.json({ done: true, error: { message: 'The prompt was blocked.' } });
     const e = await settle(generateMedia(config(ProviderKinds.GOOGLE, 'https://api.test/v1beta/openai'), model('veo-3', 'VIDEO'), { output: 'VIDEO', prompt: 'x' }, { fetch: server.fetch })).catch((x) => x);
-    expect(e.message).toBe('Google Gemini The prompt was blocked..');
+    expect(e.message).toBe("Google Gemini couldn't make that video: The prompt was blocked.");
   });
 
   it('other Gemini video models go through Interactions', async () => {

@@ -19,6 +19,7 @@ import {
 } from '../core/crypto';
 import { randomBytes } from '../core/bytes';
 import { db } from '../data/db';
+import { t } from '../i18n';
 import { platform } from '../platform';
 import { ApiError, NetworkError, SyncApi, type DeviceDto, type Kdf, type MetaDto, type RecoveryDto, type SessionDto, type TokensDto, type UserDto } from './api';
 
@@ -211,7 +212,7 @@ export class AuthManager {
     try {
       vaultKey = await unwrapVaultKey(keys.wrapKey, unb64(res.wrappedVaultKey));
     } catch {
-      throw new AuthError('Your encryption key couldn’t be unlocked with this password.');
+      throw new AuthError(t('Your encryption key couldn’t be unlocked with this password.'));
     }
     const previous = (await db().getKv<StoredAccount | null>(K_ACCOUNT, null))?.userId ?? null;
     await this.saveSession(res.user, res.tokens, vaultKey);
@@ -224,14 +225,14 @@ export class AuthManager {
   async recoverWithCode(email: string, code: string, newPassword: string): Promise<string> {
     const cleanEmail = email.trim().toLowerCase();
     const codeBytes = parseRecoveryCode(code);
-    if (!codeBytes) throw new AuthError('That recovery code isn’t valid. It has 32 letters and digits.');
+    if (!codeBytes) throw new AuthError(t('That recovery code isn’t valid. It has 32 letters and digits.'));
     const recKeys = await deriveFromRecovery(codeBytes);
     const start = await this.mapErrors(() => this.api.recoverStart(this.serverUrl, cleanEmail, b64(recKeys.authHash)));
     let vaultKey: Uint8Array;
     try {
       vaultKey = await unwrapVaultKey(recKeys.wrapKey, unb64(start.recoveryWrappedVaultKey), true);
     } catch {
-      throw new AuthError('That recovery code doesn’t match this account.');
+      throw new AuthError(t('That recovery code doesn’t match this account.'));
     }
     const pm = await this.passwordMaterial(newPassword, vaultKey);
     const rm = await this.recoveryMaterial(vaultKey);
@@ -273,7 +274,7 @@ export class AuthManager {
 
   async changePassword(current: string, newPassword: string): Promise<void> {
     const vault = await this.vault();
-    if (!vault) throw new AuthError('Sign in again to change your password.');
+    if (!vault) throw new AuthError(t('Sign in again to change your password.'));
     const currentHash = await this.currentAuthHash(current);
     const pm = await this.passwordMaterial(newPassword, vault.raw);
     const tokens = await this.authed((base, token) =>
@@ -285,7 +286,7 @@ export class AuthManager {
   /** Creates a new recovery code (the old one stops working). */
   async regenerateRecoveryCode(password: string): Promise<string> {
     const vault = await this.vault();
-    if (!vault) throw new AuthError('Sign in again to create a recovery code.');
+    if (!vault) throw new AuthError(t('Sign in again to create a recovery code.'));
     const currentHash = await this.currentAuthHash(password);
     const rm = await this.recoveryMaterial(vault.raw);
     await this.authed((base, token) => this.api.setRecovery(base, token, currentHash, rm.recovery));
@@ -363,7 +364,7 @@ export class AuthManager {
 
   private accessToken(forceRefresh: boolean, rejected?: string): Promise<string> {
     return withLock('facet-auth-refresh', async () => {
-      if (this.stateValue.kind !== 'signedIn') throw new AuthError('You’re not signed in.');
+      if (this.stateValue.kind !== 'signedIn') throw new AuthError(t('You’re not signed in.'));
       const current = await this.readSecret(K_ACCESS);
       const expiresAt = await db().getKv<number>(K_ACCESS_EXP, 0);
       // Another tab may have refreshed while we waited for the lock: use its token.
@@ -372,7 +373,7 @@ export class AuthManager {
       const refresh = await this.readSecret(K_REFRESH);
       if (!refresh) {
         await this.markExpired();
-        throw new AuthError('Your session ended. Sign in again to keep syncing.');
+        throw new AuthError(t('Your session ended. Sign in again to keep syncing.'));
       }
       try {
         const tokens = await this.api.refresh(this.serverUrl, refresh);
@@ -381,7 +382,7 @@ export class AuthManager {
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
           await this.markExpired();
-          throw new AuthError('Your session ended. Sign in again to keep syncing.');
+          throw new AuthError(t('Your session ended. Sign in again to keep syncing.'));
         }
         throw e;
       }
@@ -392,7 +393,7 @@ export class AuthManager {
 
   private async currentAuthHash(password: string): Promise<string> {
     const acct = await db().getKv<StoredAccount | null>(K_ACCOUNT, null);
-    if (!acct) throw new AuthError('You’re not signed in.');
+    if (!acct) throw new AuthError(t('You’re not signed in.'));
     const kdf = await this.mapErrors(() => this.api.prelogin(this.serverUrl, acct.email));
     const keys = await deriveFromPassword(password, unb64(kdf.salt), kdf.iterations);
     return b64(keys.authHash);
@@ -479,19 +480,19 @@ export class AuthManager {
     } catch (e) {
       if (e instanceof ApiError) {
         const messages: Record<string, string> = {
-          invalid_credentials: 'That email and password don’t match an account.',
-          email_taken: 'An account with this email already exists. Sign in instead.',
-          registration_closed: 'This server isn’t accepting new accounts.',
-          rate_limited: 'Too many attempts. Wait a few minutes and try again.',
-          email_disabled: 'This server can’t send email. Use your recovery code instead.',
+          invalid_credentials: t('That email and password don’t match an account.'),
+          email_taken: t('An account with this email already exists. Sign in instead.'),
+          registration_closed: t('This server isn’t accepting new accounts.'),
+          rate_limited: t('Too many attempts. Wait a few minutes and try again.'),
+          email_disabled: t('This server can’t send email. Use your recovery code instead.'),
         };
-        throw new AuthError(messages[e.code] ?? e.message ?? 'The sync server returned an error.');
+        throw new AuthError(messages[e.code] ?? e.message ?? t('The sync server returned an error.'));
       }
       if (e instanceof AuthError) throw e;
       if (e instanceof NetworkError || e instanceof TypeError) {
-        throw new AuthError('Couldn’t reach the sync server. Check your connection and the server address.');
+        throw new AuthError(t('Couldn’t reach the sync server. Check your connection and the server address.'));
       }
-      if (e instanceof DecryptionError) throw new AuthError('Your encryption key couldn’t be unlocked.');
+      if (e instanceof DecryptionError) throw new AuthError(t('Your encryption key couldn’t be unlocked.'));
       throw e;
     }
   }

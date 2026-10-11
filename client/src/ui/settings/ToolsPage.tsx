@@ -5,6 +5,7 @@
 import { Monitor, Rocket } from 'lucide-react';
 import { useEffect, useLayoutEffect } from 'react';
 import { getApp } from '../../app';
+import { t } from '../../i18n';
 import { platform } from '../../platform';
 import { YOLO_TOOL_ROUNDS } from '../../tools/registry';
 import { Divider, Group, Row, SwitchRow } from '../components/primitives';
@@ -59,19 +60,18 @@ function ToolsOverview() {
   return (
     <div className="col gap-16 tools-page">
       <p className="settings-intro t-body" style={{ margin: '0 4px' }}>
-        Tools let models search the web, use your apps through MCP servers and follow your skills. They work with any model that supports
-        tools, and tools that change things ask before they run.
+        {t('Tools let models search the web, use your apps through MCP servers and follow your skills. They work with any model that supports tools, and tools that change things ask before they run.')}
       </p>
 
       <SearchOverviewGroup />
       <McpOverviewGroup />
       <SkillsOverviewGroup />
 
-      <Group title="Approvals">
+      <Group title={t('Approvals')}>
         <SwitchRow
           icon={<Rocket size={20} />}
-          title="YOLO mode"
-          subtitle={`Run every tool call without asking, in every chat on all your devices, and allow up to ${YOLO_TOOL_ROUNDS} tool rounds per reply.`}
+          title={t('YOLO mode')}
+          subtitle={t('Run every tool call without asking, in every chat on all your devices, and allow up to {rounds} tool rounds per reply.', { rounds: YOLO_TOOL_ROUNDS })}
           checked={synced.yoloMode}
           onChange={(v) => void app.settings.updateSynced((s) => ({ ...s, yoloMode: v }))}
         />
@@ -79,16 +79,15 @@ function ToolsOverview() {
         {computer && (
           <Row
             icon={<Monitor size={20} />}
-            title="Computer access"
-            subtitle={local.computerTools ? 'Commands and files in a chat’s working folder' : 'Off'}
+            title={t('Computer access')}
+            subtitle={local.computerTools ? t('Commands and files in a chat’s working folder') : t('Off')}
             onClick={() => ui.openSettings('computer')}
           />
         )}
       </Group>
       {synced.yoloMode && (
         <ToolsStatus tone="warning">
-          YOLO mode is on: every tool runs without asking, including tools that change files or data. Turn it off when you aren’t
-          watching.
+          {t('YOLO mode is on: every tool runs without asking, including tools that change files or data. Turn it off when you aren’t watching.')}
         </ToolsStatus>
       )}
     </div>

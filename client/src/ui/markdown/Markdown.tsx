@@ -42,7 +42,8 @@ export const Markdown = memo(function Markdown({ text, streaming = false, classN
     }
   };
 
-  return <div ref={ref} className={'md' + (className ? ' ' + className : '')} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />;
+  // dir="auto": a reply follows its own language's direction (an English reply in an Arabic interface reads left to right).
+  return <div ref={ref} dir="auto" className={'md' + (className ? ' ' + className : '')} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />;
 });
 
 /**

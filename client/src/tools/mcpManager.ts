@@ -28,14 +28,15 @@ import {
   type McpTokenStore,
   type McpTool,
 } from '../mcp/types';
+import { t } from '../i18n';
 import { platform } from '../platform';
 import { TOOL_APPROVAL_INFO, type ToolApproval } from './types';
 
+/** Stored as a server's status (and compared), so it stays English; the UI shows its own translated text. */
 export const MCP_STATUS_SIGN_IN = 'Sign in required';
-/** Status on the website when a remote server answers but doesn't allow requests from web pages (no CORS). */
+/** Status on the website when a remote server answers but doesn't allow requests from web pages (no CORS). Stored and compared, so English; the UI translates it. */
 export const MCP_BROWSER_BLOCKED =
   "This server doesn't accept connections from web browsers. Use it in the Facet app for Windows or Android.";
-const STDIO_ONLY_DESKTOP = 'Local servers run only in the Facet app for Windows.';
 
 /** A local server as entered in Settings (Windows app). */
 export interface StdioServerInput {
@@ -87,12 +88,12 @@ export function stdioName(spec: { command: string; args: string[] }): string {
     const name = target ? base(target.replace(/(.)@[^@/]+$/, '$1')) : '';
     if (name) return name;
   }
-  return program || 'Local server';
+  return program || t('Local server');
 }
 
 function stdioSpec(input: StdioServerInput): StdioSpec {
   const command = input.command.trim();
-  if (!command) throw new McpException('Enter the command that starts the server.');
+  if (!command) throw new McpException(t('Enter the command that starts the server.'));
   return { command, args: input.args.map((a) => a), cwd: input.cwd?.trim() || null };
 }
 
@@ -159,7 +160,7 @@ export class McpManager implements McpTokenStore {
 
   tools(e: McpServerEntity): McpTool[] {
     const raw = parseJson<unknown>(e.toolsJson, []);
-    return Array.isArray(raw) ? raw.map(normalizeTool).filter((t): t is McpTool => t != null) : [];
+    return Array.isArray(raw) ? raw.map(normalizeTool).filter((x): x is McpTool => x != null) : [];
   }
 
   disabledTools(e: McpServerEntity): Set<string> {
@@ -210,7 +211,7 @@ export class McpManager implements McpTokenStore {
 
   /** Adds a local server (Windows app). */
   async addStdio(input: StdioServerInput): Promise<McpServerEntity> {
-    if (!platform().stdio) throw new McpException(STDIO_ONLY_DESKTOP);
+    if (!platform().stdio) throw new McpException(t('Local servers run only in the Facet app for Windows.'));
     const spec = stdioSpec(input);
     const now = Date.now();
     const e: McpServerEntity = {
@@ -380,7 +381,7 @@ export class McpManager implements McpTokenStore {
   /** Connects, lists tools and caches them. Marks the server "Sign in required" when OAuth is needed. Throws with the status shown. */
   async refreshTools(id: string): Promise<McpTool[]> {
     const e = await this.get(id);
-    if (!e) throw new McpException('Server not found.');
+    if (!e) throw new McpException(t('Server not found.'));
     try {
       const c = await this.client(e);
       const info = await c.connect();
@@ -420,13 +421,13 @@ export class McpManager implements McpTokenStore {
   /** Calls a tool on a server, reusing its session. Aborting [signal] cancels the call. */
   async call(serverId: string, tool: string, argumentsJson: string, signal?: AbortSignal): Promise<McpCallResult> {
     const e = await this.get(serverId);
-    if (!e || e.deleted) throw new McpException('That MCP server was removed.');
+    if (!e || e.deleted) throw new McpException(t('That MCP server was removed.'));
     try {
       return await (await this.client(e)).callTool(tool, argumentsJson, signal);
     } catch (ex) {
       if (ex instanceof McpAuthRequiredException) {
         await this.setStatus(serverId, MCP_STATUS_SIGN_IN);
-        throw new McpException(`${e.name} needs you to sign in again. Open Settings → MCP servers.`);
+        throw new McpException(t('{server} needs you to sign in again. Open Settings → MCP servers.', { server: e.name }));
       }
       if (!e.stdio && (await this.browserBlocked(ex, e.url))) throw new McpException(MCP_BROWSER_BLOCKED, null, ex);
       throw ex;
@@ -443,7 +444,7 @@ export class McpManager implements McpTokenStore {
 
   private async explain(ex: unknown, e: McpServerEntity): Promise<Error> {
     if (!e.stdio && (await this.browserBlocked(ex, e.url))) return new McpException(MCP_BROWSER_BLOCKED, null, ex);
-    return ex instanceof Error ? ex : new McpException("Couldn't connect.", null, ex);
+    return ex instanceof Error ? ex : new McpException(t('Couldn’t connect.'), null, ex);
   }
 
   /**
@@ -481,7 +482,7 @@ export class McpManager implements McpTokenStore {
    */
   async prepareSignIn(id: string): Promise<McpPendingAuth> {
     const e = await this.get(id);
-    if (!e || e.deleted) throw new McpException('Server not found.');
+    if (!e || e.deleted) throw new McpException(t('Server not found.'));
     const redirectUri = await platform().oauth.redirectUri();
     const previous = await this.load(id);
     const wwwAuth = await this.probeWwwAuthenticate(e);
@@ -498,13 +499,13 @@ export class McpManager implements McpTokenStore {
     // Called before any await, so the website's popup opens within the user's click.
     const redirected = platform().oauth.authorize(pending.authorizationUrl, pending.oauth.redirectUri, signal);
     const params = new URL(await redirected).searchParams;
-    if (params.get('state') !== pending.state) throw new McpException('This sign-in link expired. Start again from Settings.');
+    if (params.get('state') !== pending.state) throw new McpException(t('This sign-in link expired. Start again from Settings.'));
     const error = params.get('error');
     if (error) {
-      throw new McpException(error === 'access_denied' ? 'Sign-in was cancelled.' : `Sign-in didn't complete: ${params.get('error_description') || error}`);
+      throw new McpException(error === 'access_denied' ? t('Sign-in was cancelled.') : t('Sign-in didn’t complete: {reason}', { reason: params.get('error_description') || error }));
     }
     const code = params.get('code');
-    if (!code) throw new McpException("Sign-in didn't complete: the server sent no code.");
+    if (!code) throw new McpException(t('Sign-in didn’t complete: the server sent no code.'));
     let oauth: McpOAuthState;
     try {
       oauth = await McpOAuth.complete(pending, code);
@@ -530,7 +531,7 @@ export class McpManager implements McpTokenStore {
   private signInProblem(ex: unknown): unknown {
     if (platform().corsLimited && ex instanceof McpException && ex.cause instanceof TypeError) {
       return new McpException(
-        "Couldn't reach the server's sign-in service. It may not accept connections from web browsers; sign in from the Facet app for Windows or Android instead, and the sign-in syncs here.",
+        t('Couldn’t reach the server’s sign-in service. It may not accept connections from web browsers; sign in from the Facet app for Windows or Android instead, and the sign-in syncs here.'),
         null,
         ex,
       );

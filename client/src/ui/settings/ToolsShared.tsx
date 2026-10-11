@@ -1,6 +1,7 @@
 /** Small building blocks shared by the Tools and Computer access pages. Styles: screens.css ("Tools and Computer access"). */
 import { ChevronRight, CircleCheck, Eye, EyeOff, Info, Plus, TriangleAlert, X } from 'lucide-react';
 import { useCallback, useLayoutEffect, useRef, useState, type ClipboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { t } from '../../i18n';
 import { Button, IconButton } from '../components/primitives';
 
 /** The message of an error, or [fallback] when it has none. */
@@ -9,24 +10,22 @@ export function errorText(e: unknown, fallback: string): string {
   return m.trim() || fallback;
 }
 
-/** [text] ending in a full stop, so another sentence can follow. */
+/** [text] ending in a full stop (any script's), so another sentence can follow. */
 export function sentence(text: string): string {
-  const t = text.trim();
-  return !t || /[.!?…]["”’)]?$/.test(t) ? t : t + '.';
+  const s = text.trim();
+  return !s || /[.!?…。！？।؟۔]["”’)」』]?$/.test(s) ? s : s + '.';
 }
 
 export const isAbort = (e: unknown): boolean => e instanceof DOMException && e.name === 'AbortError';
 
 /** The first sentence of a description, without Markdown backticks. */
 export function firstSentence(text: string | null | undefined, max = 160): string {
-  const t = (text ?? '').replace(/`/g, '').replace(/\s+/g, ' ').trim();
-  if (!t) return '';
-  const m = /^(.+?[.!?])(?=\s+[A-Z(]|$)/.exec(t);
-  const s = m ? m[1] : t;
+  const all = (text ?? '').replace(/`/g, '').replace(/\s+/g, ' ').trim();
+  if (!all) return '';
+  const m = /^(.+?[.!?])(?=\s+[A-Z(]|$)/.exec(all);
+  const s = m ? m[1] : all;
   return s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s;
 }
-
-export const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
 /**
  * A callback whose identity never changes but always calls the latest [fn]. Dialog re-runs its
@@ -149,6 +148,7 @@ export function ToolsSecretInput({ value, onChange, placeholder, label, autoFocu
     <span className="tools-secret">
       <input
         className="input mono"
+        dir="ltr"
         type={shown ? 'text' : 'password'}
         value={value}
         placeholder={placeholder}
@@ -159,7 +159,7 @@ export function ToolsSecretInput({ value, onChange, placeholder, label, autoFocu
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
       />
-      <IconButton small label={shown ? 'Hide' : 'Show'} onClick={() => setShown(!shown)}>
+      <IconButton small label={shown ? t('Hide') : t('Show')} onClick={() => setShown(!shown)}>
         {shown ? <EyeOff size={17} /> : <Eye size={17} />}
       </IconButton>
     </span>
@@ -215,9 +215,10 @@ export function ToolsKeyValues({ rows, onChange, separator, keyPlaceholder, valu
         <div className="tools-kv-row" key={i}>
           <input
             className="input mono"
+            dir="ltr"
             value={r.key}
             placeholder={keyPlaceholder}
-            aria-label={`${keyLabel} ${i + 1}`}
+            aria-label={t('{label} {number}', { label: keyLabel, number: i + 1 })}
             spellCheck={false}
             autoComplete="off"
             onChange={(e) => set(i, { key: e.target.value })}
@@ -225,15 +226,16 @@ export function ToolsKeyValues({ rows, onChange, separator, keyPlaceholder, valu
           />
           <input
             className="input mono"
+            dir="ltr"
             type={shown ? 'text' : 'password'}
             value={r.value}
             placeholder={valuePlaceholder}
-            aria-label={`${valueLabel} ${i + 1}`}
+            aria-label={t('{label} {number}', { label: valueLabel, number: i + 1 })}
             spellCheck={false}
             autoComplete="off"
             onChange={(e) => set(i, { value: e.target.value })}
           />
-          <IconButton small label={`Remove ${r.key.trim() || 'row'}`} onClick={() => onChange(rows.filter((_, j) => j !== i))}>
+          <IconButton small label={r.key.trim() ? t('Remove {name}', { name: r.key.trim() }) : t('Remove row')} onClick={() => onChange(rows.filter((_, j) => j !== i))}>
             <X size={16} />
           </IconButton>
         </div>
@@ -244,7 +246,7 @@ export function ToolsKeyValues({ rows, onChange, separator, keyPlaceholder, valu
         </Button>
         {rows.some((r) => r.value) && (
           <Button variant="text" small onClick={() => setShown(!shown)}>
-            {shown ? <EyeOff size={15} /> : <Eye size={15} />} {shown ? 'Hide values' : 'Show values'}
+            {shown ? <EyeOff size={15} /> : <Eye size={15} />} {shown ? t('Hide values') : t('Show values')}
           </Button>
         )}
       </div>

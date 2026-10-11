@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { isRtl, t } from '../../i18n';
 
 type BtnStyle = 'primary' | 'tonal' | 'outline' | 'text' | 'danger';
 
@@ -70,7 +71,7 @@ export function Switch({ checked, onChange, disabled, label }: { checked: boolea
 }
 
 export function Spinner({ size = 18 }: { size?: number }) {
-  return <span className="spinner" style={{ width: size, height: size }} aria-label="Loading" />;
+  return <span className="spinner" style={{ width: size, height: size }} aria-label={t('Loading')} />;
 }
 
 export function Group({ title, children, footer }: { title?: ReactNode; children: ReactNode; footer?: ReactNode }) {
@@ -106,7 +107,7 @@ export function Row({ icon, title, subtitle, onClick, trailing, chevron, danger,
         {subtitle && <span className="srow-sub">{subtitle}</span>}
       </span>
       {trailing}
-      {(chevron ?? (onClick && !trailing)) && <ChevronRight size={18} className="srow-chevron" />}
+      {(chevron ?? (onClick && !trailing)) && <ChevronRight size={18} className="srow-chevron flip-rtl" />}
     </>
   );
   if (onClick && trailing) {
@@ -207,7 +208,7 @@ export function Dialog({ title, onClose, children, footer, size, labelledBy, clo
         {title !== undefined && (
           <div className="dialog-head">
             <div className="dialog-title">{title}</div>
-            <IconButton label="Close" onClick={onClose}>
+            <IconButton label={t('Close')} onClick={onClose}>
               <X size={20} />
             </IconButton>
           </div>
@@ -237,7 +238,7 @@ export function Confirm({ title, body, confirm, danger, onConfirm, onClose }: {
       size="narrow"
       footer={
         <>
-          <Button variant="text" onClick={onClose}>Cancel</Button>
+          <Button variant="text" onClick={onClose}>{t('Cancel')}</Button>
           <Button
             variant={danger ? 'danger' : 'primary'}
             busy={busy}
@@ -283,13 +284,13 @@ export function TextPrompt({ title, label, initial = '', confirm, onSubmit, onCl
       size="narrow"
       footer={
         <>
-          <Button variant="text" onClick={onClose}>Cancel</Button>
+          <Button variant="text" onClick={onClose}>{t('Cancel')}</Button>
           <Button onClick={submit} disabled={!value.trim()}>{confirm}</Button>
         </>
       }
     >
       <Field label={label}>
-        <input className="input" value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
+        <input className="input" dir="auto" value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
       </Field>
     </Dialog>
   );
@@ -323,11 +324,13 @@ export function Menu({ anchor, items, onClose, align = 'start' }: {
     let top: number;
     if (anchor instanceof HTMLElement) {
       const r = anchor.getBoundingClientRect();
-      left = align === 'end' ? r.right - w : r.left;
+      // In right-to-left layouts the menu's start edge is its right edge.
+      const atRight = (align === 'end') !== isRtl();
+      left = atRight ? r.right - w : r.left;
       top = r.bottom + 6;
       if (top + h > window.innerHeight - 8) top = r.top - h - 6;
     } else {
-      left = anchor.x;
+      left = isRtl() ? anchor.x - w : anchor.x;
       top = anchor.y;
       if (top + h > window.innerHeight - 8) top = anchor.y - h;
     }
@@ -405,26 +408,26 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const show = useCallback((text: string, action?: Toast['action']) => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t.slice(-2), { id, text, action }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 6000 : 3800);
+    setToasts((list) => [...list.slice(-2), { id, text, action }]);
+    setTimeout(() => setToasts((list) => list.filter((x) => x.id !== id)), action ? 6000 : 3800);
   }, []);
   return (
     <ToastContext.Provider value={show}>
       {children}
       {createPortal(
         <div className="toast-host" role="status" aria-live="polite">
-          {toasts.map((t) => (
-            <div key={t.id} className="toast">
-              <span>{t.text}</span>
-              {t.action && (
+          {toasts.map((toast) => (
+            <div key={toast.id} className="toast">
+              <span>{toast.text}</span>
+              {toast.action && (
                 <button
                   type="button"
                   onClick={() => {
-                    t.action!.run();
-                    setToasts((all) => all.filter((x) => x.id !== t.id));
+                    toast.action!.run();
+                    setToasts((all) => all.filter((x) => x.id !== toast.id));
                   }}
                 >
-                  {t.action.label}
+                  {toast.action.label}
                 </button>
               )}
             </div>

@@ -4,6 +4,7 @@
  * Never leaks API keys.
  */
 import { isObject } from '../core/json';
+import { sentences, t } from '../i18n';
 import { platform } from '../platform';
 import { ProviderKinds } from './providers';
 import { isContextLength } from './quirks';
@@ -56,7 +57,7 @@ export function parseRetryAfter(value: string | null | undefined): number | null
 
 export function providerName(config: ProviderConfig): string {
   if (config.kind.id !== ProviderKinds.CUSTOM.id) return config.kind.displayName;
-  return config.label.trim() === '' ? 'The endpoint' : config.label;
+  return config.label.trim() === '' ? t('The endpoint') : config.label;
 }
 
 /** Removes anything that looks like a credential, including the configured key itself. */
@@ -94,14 +95,28 @@ function errorCode(body: string): string | null {
   return s(err, 'code') ?? s(err, 'type') ?? s(json, 'code');
 }
 
-const quoted = (model: string | null | undefined): string => (model ? `“${model}”` : 'this model');
+/** "{provider} rejected this API key. Check it in Providers." (the Providers page drops the second sentence). */
+export function authMessage(provider: string): string {
+  return sentences(t('{provider} rejected this API key.', { provider }), t('Check it in Providers.'));
+}
+
+function quotaMessage(provider: string): string {
+  return t('{provider} says this account is out of credits or over its spending limit. Add credits with {provider}, then retry.', { provider });
+}
+
+function overloadedMessage(provider: string): string {
+  return t('{provider} is overloaded right now. Try again shortly, or switch models.', { provider });
+}
+
+function timeoutMessage(provider: string): string {
+  return t('{provider} took too long to respond. Try again.', { provider });
+}
 
 export function fromHttp(config: ProviderConfig, model: string | null | undefined, e: HttpStatusError): LlmError {
   const provider = providerName(config);
   const raw = redact(extractMessage(e.body), config.apiKey);
   const m = raw.toLowerCase();
   const code = (errorCode(e.body) ?? '').toLowerCase();
-  const modelName = quoted(model);
   const status = e.status;
   const err = (kind: LlmError['kind'], message: string): LlmError => ({
     kind,
@@ -113,33 +128,50 @@ export function fromHttp(config: ProviderConfig, model: string | null | undefine
 
   const creditProblem = m.includes('credit balance') || code.includes('insufficient_quota') || m.includes('insufficient credits') ||
     m.includes('billing') || m.includes('exceeded your current quota') || m.includes('payment required') || m.includes('out of credits');
-  if (status === 401) return err('AUTH', `${provider} rejected this API key. Check it in Providers.`);
-  if (status === 402 || creditProblem) {
-    return err('QUOTA', `${provider} says this account is out of credits or over its spending limit. Add credits with ${provider}, then retry.`);
-  }
+  if (status === 401) return err('AUTH', authMessage(provider));
+  if (status === 402 || creditProblem) return err('QUOTA', quotaMessage(provider));
   if (status === 403 && m.includes('verif')) {
-    return err('PERMISSION', `${provider} requires organization verification for ${modelName}. Verify your organization in the ${provider} dashboard, or pick another model.`);
+    return err('PERMISSION', model
+      ? t('{provider} requires organization verification for “{model}”. Verify your organization in the {provider} dashboard, or pick another model.', { provider, model })
+      : t('{provider} requires organization verification for this model. Verify your organization in the {provider} dashboard, or pick another model.', { provider }));
   }
-  if (status === 403) return err('PERMISSION', `${provider} denied access to ${modelName} with this key. Check the key's permissions or pick another model.`);
-  if (status === 404) return err('NOT_FOUND', `${provider} couldn't find ${modelName}. It may be retired, or this key can't use it.`);
+  if (status === 403) {
+    return err('PERMISSION', model
+      ? t('{provider} denied access to “{model}” with this key. Check the key\'s permissions or pick another model.', { provider, model })
+      : t('{provider} denied access to this model with this key. Check the key\'s permissions or pick another model.', { provider }));
+  }
+  if (status === 404) {
+    return err('NOT_FOUND', model
+      ? t('{provider} couldn\'t find “{model}”. It may be retired, or this key can\'t use it.', { provider, model })
+      : t('{provider} couldn\'t find this model. It may be retired, or this key can\'t use it.', { provider }));
+  }
   if (status === 413 || isContextLength(raw)) {
-    return err('CONTEXT_LENGTH', `This conversation is too long for ${modelName}. Start a new chat, remove attachments, or pick a model with a larger context window.`);
+    return err('CONTEXT_LENGTH', model
+      ? t('This conversation is too long for “{model}”. Start a new chat, remove attachments, or pick a model with a larger context window.', { model })
+      : t('This conversation is too long for this model. Start a new chat, remove attachments, or pick a model with a larger context window.'));
   }
   if (status === 429) {
     const it = e.retryAfterSeconds;
-    const wait = it == null ? ' Try again in a moment.' : it <= 90 ? ` Try again in ${it}s.` : ` Try again in ${Math.floor((it + 59) / 60)} min.`;
-    return err('RATE_LIMIT', `${provider} is rate-limiting this key.${wait}`);
+    return err('RATE_LIMIT', it == null
+      ? t('{provider} is rate-limiting this key. Try again in a moment.', { provider })
+      : it <= 90
+        ? t('{provider} is rate-limiting this key. Try again in {seconds}s.', { provider, seconds: it })
+        : t('{provider} is rate-limiting this key. Try again in {minutes} min.', { provider, minutes: Math.floor((it + 59) / 60) }));
   }
-  if (status === 408) return err('TIMEOUT', `${provider} took too long to respond. Try again.`);
+  if (status === 408) return err('TIMEOUT', timeoutMessage(provider));
   if (status === 529 || ((status === 503 || status === 502) && m.includes('overload')) || code.includes('overloaded')) {
-    return err('OVERLOADED', `${provider} is overloaded right now. Try again shortly, or switch models.`);
+    return err('OVERLOADED', overloadedMessage(provider));
   }
-  if (status >= 500 && status <= 599) return err('SERVER', `${provider} had a server error (HTTP ${status}). Try again.`);
+  if (status >= 500 && status <= 599) return err('SERVER', t('{provider} had a server error (HTTP {status}). Try again.', { provider, status: String(status) }));
   if (status === 400 || status === 422) {
-    const shown = raw.slice(0, 220).trim() === '' ? 'invalid request' : raw.slice(0, 220);
-    return err('BAD_REQUEST', `${provider} rejected the request: ${shown}`);
+    const shown = raw.slice(0, 220).trim();
+    return err('BAD_REQUEST', shown === ''
+      ? t('{provider} rejected the request as invalid.', { provider })
+      : t('{provider} rejected the request: {reason}', { provider, reason: raw.slice(0, 220) }));
   }
-  return err('UNKNOWN', `${provider} returned HTTP ${status}${raw.trim() !== '' ? `: ${raw.slice(0, 200)}` : '.'}`);
+  return err('UNKNOWN', raw.trim() !== ''
+    ? t('{provider} returned HTTP {status}: {reason}', { provider, status: String(status), reason: raw.slice(0, 200) })
+    : t('{provider} returned HTTP {status}.', { provider, status: String(status) }));
 }
 
 function corsLimited(): boolean {
@@ -173,39 +205,39 @@ export function fromNetwork(config: ProviderConfig, error: unknown, phase: 'conn
   const name = (cause as { name?: string } | null)?.name;
 
   if (name === 'TimeoutError' || name === 'AbortError') {
-    return { kind: 'TIMEOUT', message: `${provider} took too long to respond. Try again.`, detail };
+    return { kind: 'TIMEOUT', message: timeoutMessage(provider), detail };
   }
   if (p === 'read') {
-    return { kind: 'NETWORK', message: `Lost the connection to ${provider} before the response finished. Try again.`, detail };
+    return { kind: 'NETWORK', message: t('Lost the connection to {provider} before the response finished. Try again.', { provider }), detail };
   }
   const local = isLocal(config);
   if (corsLimited()) {
     if (config.kind.browserOk === false) {
       return {
         kind: 'BROWSER_BLOCKED',
-        message: `${provider} doesn't accept requests from web browsers. Use it in the Facet app for Windows or Android, or pick another provider.`,
+        message: t('{provider} doesn\'t accept requests from web browsers. Use it in the Facet app for Windows or Android, or pick another provider.', { provider }),
         detail,
       };
     }
-    if (offline()) return { kind: 'NETWORK', message: `Can't reach ${provider}. Check your connection.`, detail };
+    if (offline()) return { kind: 'NETWORK', message: t('Can\'t reach {provider}. Check your connection.', { provider }), detail };
     if (local) {
       return {
         kind: 'NETWORK',
-        message: `Can't reach ${provider} at ${config.baseUrl}. Make sure it's running and accepts requests from web pages (Ollama: set OLLAMA_ORIGINS; LM Studio: enable CORS), or use the Facet app for Windows.`,
+        message: t('Can\'t reach {provider} at {url}. Make sure it\'s running and accepts requests from web pages (Ollama: set OLLAMA_ORIGINS; LM Studio: enable CORS), or use the Facet app for Windows.', { provider, url: config.baseUrl }),
         detail,
       };
     }
     return {
       kind: 'NETWORK',
-      message: `${provider} couldn't be reached, or the browser blocked the request. Some endpoints don't accept requests from web browsers; if this is one of them, use the Facet app for Windows or Android.`,
+      message: t('{provider} couldn\'t be reached, or the browser blocked the request. Some endpoints don\'t accept requests from web browsers; if this is one of them, use the Facet app for Windows or Android.', { provider }),
       detail,
     };
   }
   return {
     kind: 'NETWORK',
     message: local
-      ? `Can't reach ${provider} at ${config.baseUrl}. Make sure it's running and reachable from this computer.`
-      : `Can't reach ${provider}. Check your connection.`,
+      ? t('Can\'t reach {provider} at {url}. Make sure it\'s running and reachable from this computer.', { provider, url: config.baseUrl })
+      : t('Can\'t reach {provider}. Check your connection.', { provider }),
     detail,
   };
 }
@@ -214,42 +246,50 @@ export function fromNetwork(config: ProviderConfig, error: unknown, phase: 'conn
 export function fromStream(config: ProviderConfig, model: string | null | undefined, type: string | null | undefined, message: string | null | undefined): LlmError {
   const provider = providerName(config);
   const raw = redact(message ?? '', config.apiKey).slice(0, MAX_DETAIL);
-  const t = (type ?? '').toLowerCase();
+  const ty = (type ?? '').toLowerCase();
   const m = raw.toLowerCase();
-  if (t.includes('overloaded') || m.includes('overloaded')) {
-    return { kind: 'OVERLOADED', message: `${provider} is overloaded right now. Try again shortly, or switch models.`, detail: raw };
+  if (ty.includes('overloaded') || m.includes('overloaded')) {
+    return { kind: 'OVERLOADED', message: overloadedMessage(provider), detail: raw };
   }
-  if (t.includes('rate_limit') || m.includes('rate limit')) {
-    return { kind: 'RATE_LIMIT', message: `${provider} is rate-limiting this key. Try again in a moment.`, detail: raw };
+  if (ty.includes('rate_limit') || m.includes('rate limit')) {
+    return { kind: 'RATE_LIMIT', message: t('{provider} is rate-limiting this key. Try again in a moment.', { provider }), detail: raw };
   }
-  if (t.includes('quota') || t.includes('insufficient') || m.includes('credit')) {
-    return { kind: 'QUOTA', message: `${provider} says this account is out of credits or over its spending limit. Add credits with ${provider}, then retry.`, detail: raw };
+  if (ty.includes('quota') || ty.includes('insufficient') || m.includes('credit')) {
+    return { kind: 'QUOTA', message: quotaMessage(provider), detail: raw };
   }
-  if (t.includes('authentication') || t.includes('invalid_api_key')) {
-    return { kind: 'AUTH', message: `${provider} rejected this API key. Check it in Providers.`, detail: raw };
+  if (ty.includes('authentication') || ty.includes('invalid_api_key')) {
+    return { kind: 'AUTH', message: authMessage(provider), detail: raw };
   }
   if (isContextLength(raw)) {
-    return { kind: 'CONTEXT_LENGTH', message: `This conversation is too long for ${quoted(model)}. Start a new chat or remove attachments.`, detail: raw };
+    return {
+      kind: 'CONTEXT_LENGTH',
+      message: model
+        ? t('This conversation is too long for “{model}”. Start a new chat or remove attachments.', { model })
+        : t('This conversation is too long for this model. Start a new chat or remove attachments.'),
+      detail: raw,
+    };
   }
-  if (t.includes('server') || t.includes('api_error')) {
-    return { kind: 'SERVER', message: `${provider} had a server error mid-response. Try again.`, detail: raw };
+  if (ty.includes('server') || ty.includes('api_error')) {
+    return { kind: 'SERVER', message: t('{provider} had a server error mid-response. Try again.', { provider }), detail: raw };
   }
   return {
     kind: 'UNKNOWN',
-    message: `${provider} stopped with an error${raw.trim() !== '' ? `: ${raw.slice(0, 200)}` : '.'}`,
+    message: raw.trim() !== ''
+      ? t('{provider} stopped with an error: {reason}', { provider, reason: raw.slice(0, 200) })
+      : t('{provider} stopped with an error.', { provider }),
     detail: raw.trim() === '' ? null : raw,
   };
 }
 
 export function truncatedStream(config: ProviderConfig): LlmError {
-  return { kind: 'NETWORK', message: `The connection to ${providerName(config)} closed before the response finished. Try again.` };
+  return { kind: 'NETWORK', message: t('The connection to {provider} closed before the response finished. Try again.', { provider: providerName(config) }) };
 }
 
 /** Something unexpected went wrong while handling a response (a bug, or a response we can't parse). */
 export function unexpected(config: ProviderConfig, error: unknown): LlmError {
   return {
     kind: 'UNKNOWN',
-    message: `Something went wrong reading the response from ${providerName(config)}.`,
+    message: t('Something went wrong reading the response from {provider}.', { provider: providerName(config) }),
     detail: error instanceof Error ? error.message : String(error),
   };
 }

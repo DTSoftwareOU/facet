@@ -5,6 +5,7 @@ import { getApp } from '../../app';
 import { Format } from '../../core/format';
 import type { ProviderEntity } from '../../data/entities';
 import type { ModelPrefs } from '../../data/providers';
+import { msg, t, tm, type Msg } from '../../i18n';
 import { canRun, modelInfo } from '../../llm/catalog';
 import type { ProviderKind } from '../../llm/providers';
 import {
@@ -23,15 +24,15 @@ import { ChipChoice, OutlinedGroup, SectionLabel, useStableCallback } from './co
 
 const ALL_OUTPUTS = Object.keys(MODEL_OUTPUT_INFO) as ModelOutput[];
 const REASONING_KINDS: ReasoningKind[] = ['NONE', 'EFFORT', 'BUDGET'];
-const REASONING_LABEL: Record<ReasoningKind, string> = { NONE: 'None', EFFORT: 'Effort levels', BUDGET: 'Thinking budget' };
+const REASONING_LABEL: Record<ReasoningKind, Msg> = { NONE: msg('None'), EFFORT: msg('Effort levels'), BUDGET: msg('Thinking budget') };
 
 /** "128000", "128k", "1.5m" → tokens; null when not a positive number. */
 function parseTokens(s: string): number | null {
-  const t = s.trim().toLowerCase().replace(/[,_\s]/g, '');
-  if (!t) return null;
-  const last = t[t.length - 1];
+  const text = s.trim().toLowerCase().replace(/[,_\s]/g, '');
+  if (!text) return null;
+  const last = text[text.length - 1];
   const mult = last === 'k' ? 1_000 : last === 'm' ? 1_000_000 : 1;
-  const num = mult === 1 ? t : t.slice(0, -1);
+  const num = mult === 1 ? text : text.slice(0, -1);
   if (!/^(\d+\.?\d*|\.\d+)$/.test(num)) return null;
   const v = Number(num) * mult;
   return v >= 1 && v <= 2_147_483_647 ? Math.floor(v) : null;
@@ -39,9 +40,9 @@ function parseTokens(s: string): number | null {
 
 /** "2.5", "2,5", "$2.50" → 2.5; null when not a non-negative number. */
 function parsePrice(s: string): number | null {
-  const t = s.trim().replace(/^\$/, '').replace(',', '.');
-  if (!/^(\d+\.?\d*|\.\d+)$/.test(t)) return null;
-  const v = Number(t);
+  const text = s.trim().replace(/^\$/, '').replace(',', '.');
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(text)) return null;
+  const v = Number(text);
   return Number.isFinite(v) && v >= 0 ? v : null;
 }
 
@@ -168,9 +169,9 @@ export function ModelEditDialog({ provider: p, kind, modelId, onClose }: {
   if (confirmRemove) {
     return (
       <Confirm
-        title={`Remove ${current.displayName}?`}
-        body="It disappears from the model list on all your devices. Chats that used it stay."
-        confirm="Remove"
+        title={t('Remove {model}?', { model: current.displayName })}
+        body={t('It disappears from the model list on all your devices. Chats that used it stay.')}
+        confirm={t('Remove')}
         danger
         onConfirm={async () => {
           await app.providers.removeCustomModel(p.id, modelId);
@@ -199,97 +200,97 @@ export function ModelEditDialog({ provider: p, kind, modelId, onClose }: {
 
   return (
     <Dialog
-      title={<span className="ellipsis" style={{ display: 'block' }}>{name.trim() || base.displayName}</span>}
+      title={<span className="ellipsis" style={{ display: 'block' }}><bdi>{name.trim() || base.displayName}</bdi></span>}
       onClose={close}
       closeOnScrim={false}
       footer={
         <>
-          <Button variant="text" style={{ marginRight: 'auto' }} onClick={restore}>Restore defaults</Button>
-          <Button variant="text" onClick={close}>Cancel</Button>
-          <Button onClick={save} busy={busy} disabled={invalid}>Save</Button>
+          <Button variant="text" style={{ marginInlineEnd: 'auto' }} onClick={restore}>{t('Restore defaults')}</Button>
+          <Button variant="text" onClick={close}>{t('Cancel')}</Button>
+          <Button onClick={save} busy={busy} disabled={invalid}>{t('Save')}</Button>
         </>
       }
     >
       <div className="col gap-16">
         <span className="t-label-m c-3 ellipsis" style={{ fontWeight: 400, marginTop: -6 }}>
-          <span className="mono" style={{ fontSize: 12.5 }}>{modelId}</span> · {p.label}
+          <span className="mono" style={{ fontSize: 12.5 }}>{modelId}</span> · <bdi>{p.label}</bdi>
         </span>
 
-        <Field label="Name">
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={base.displayName} />
+        <Field label={t('Name')}>
+          <input className="input" dir="auto" value={name} onChange={(e) => setName(e.target.value)} placeholder={base.displayName} />
         </Field>
 
         <div className="group outlined">
           <SwitchRow
             icon={hidden ? <EyeOff size={20} /> : <Eye size={20} />}
-            title="Show in model picker"
-            subtitle={hidden ? 'Hidden. Chats that already use it keep working.' : 'Listed when you choose a model.'}
+            title={t('Show in model picker')}
+            subtitle={hidden ? t('Hidden. Chats that already use it keep working.') : t('Listed when you choose a model.')}
             checked={!hidden}
             onChange={(v) => setHidden(!v)}
           />
         </div>
 
         <section className="col gap-8">
-          <SectionLabel>Makes</SectionLabel>
+          <SectionLabel>{t('Makes')}</SectionLabel>
           <ChipChoice
-            ariaLabel="What this model makes"
+            ariaLabel={t('What this model makes')}
             options={ALL_OUTPUTS.filter((o) => o === output || canRun(kind, o))}
             selected={output}
-            label={(o) => MODEL_OUTPUT_INFO[o].label}
+            label={(o) => tm(MODEL_OUTPUT_INFO[o].label)}
             onSelect={setOutput}
           />
           {output !== base.output && (
             <span className="field-hint section-label">
-              Sorted as {MODEL_OUTPUT_INFO[base.output].label.toLowerCase()} automatically. Your choice moves it to the {MODEL_OUTPUT_INFO[output].label.toLowerCase()} list.
+              {t('Sorted as “{from}” automatically. Your choice moves it to the “{to}” list.', { from: tm(MODEL_OUTPUT_INFO[base.output].label), to: tm(MODEL_OUTPUT_INFO[output].label) })}
             </span>
           )}
         </section>
 
         {isText && (
           <>
-            <OutlinedGroup title="Capabilities">
-              {capRow(<ImageIcon size={20} />, 'Images', 'Accepts photos and screenshots.', 'vision')}
+            <OutlinedGroup title={t('Capabilities')}>
+              {capRow(<ImageIcon size={20} />, t('Images'), t('Accepts photos and screenshots.'), 'vision')}
               <Divider />
-              {capRow(<FileText size={20} />, 'PDFs', 'Reads PDF files directly.', 'pdf')}
+              {capRow(<FileText size={20} />, t('PDFs'), t('Reads PDF files directly.'), 'pdf')}
               <Divider />
-              {capRow(<Wand2 size={20} />, 'Tools', 'Facet search, MCP servers and skills.', 'tools')}
+              {capRow(<Wand2 size={20} />, t('Tools'), t('Facet search, MCP servers and skills.'), 'tools')}
               <Divider />
-              {capRow(<Globe size={20} />, 'Built-in web search', 'The provider searches the web itself.', 'webSearch')}
+              {capRow(<Globe size={20} />, t('Built-in web search'), t('The provider searches the web itself.'), 'webSearch')}
               <Divider />
-              {capRow(<Gauge size={20} />, 'Temperature', 'Accepts temperature and top-p.', 'sampling')}
+              {capRow(<Gauge size={20} />, t('Temperature'), t('Accepts temperature and top-p.'), 'sampling')}
               {kind.style === 'OPENAI_RESPONSES' && (
                 <>
                   <Divider />
-                  {capRow(<Type size={20} />, 'Verbosity', 'Concise, balanced or detailed answers.', 'verbosity')}
+                  {capRow(<Type size={20} />, t('Verbosity'), t('Concise, balanced or detailed answers.'), 'verbosity')}
                   <Divider />
-                  {capRow(<Gem size={20} />, 'Pro mode', 'More work per answer.', 'proMode')}
+                  {capRow(<Gem size={20} />, t('Pro mode'), t('More work per answer.'), 'proMode')}
                 </>
               )}
               {kind.style === 'ANTHROPIC' && (
                 <>
                   <Divider />
-                  {capRow(<Zap size={20} />, 'Fast mode', 'Faster output at premium pricing.', 'fastMode')}
+                  {capRow(<Zap size={20} />, t('Fast mode'), t('Faster output at premium pricing.'), 'fastMode')}
                 </>
               )}
             </OutlinedGroup>
 
             <section className="col gap-8">
-              <SectionLabel>Reasoning</SectionLabel>
-              <Segmented options={REASONING_KINDS} selected={r.kind} label={(k) => REASONING_LABEL[k]} onSelect={setReasoningKind} />
+              <SectionLabel>{t('Reasoning')}</SectionLabel>
+              <Segmented options={REASONING_KINDS} selected={r.kind} label={(k) => tm(REASONING_LABEL[k])} onSelect={setReasoningKind} />
               {r.kind !== 'NONE' && (
                 <>
-                  <span className="field-hint section-label" style={{ marginTop: 4 }}>Levels it accepts</span>
-                  <div className="pill-list" role="group" aria-label="Levels it accepts">
+                  <span className="field-hint section-label" style={{ marginTop: 4 }}>{t('Levels it accepts')}</span>
+                  <div className="pill-list" role="group" aria-label={t('Levels it accepts')}>
                     {EFFORTS.map((e) => (
                       <button key={e} type="button" role="checkbox" aria-checked={r.efforts.includes(e)} className={'chip' + (r.efforts.includes(e) ? ' on' : '')} onClick={() => toggleEffort(e)}>
-                        {EFFORT_INFO[e].label}
+                        {tm(EFFORT_INFO[e].label)}
                       </button>
                     ))}
                   </div>
                   {r.efforts.length > 0 && (
                     <>
-                      <span className="field-hint section-label" style={{ marginTop: 4 }}>Default level</span>
-                      <div className="pill-list" role="radiogroup" aria-label="Default level">
+                      <span className="field-hint section-label" style={{ marginTop: 4 }}>{t('Default level')}</span>
+                      <div className="pill-list" role="radiogroup" aria-label={t('Default level')}>
                         {r.efforts.map((e) => (
                           <button
                             key={e}
@@ -299,7 +300,7 @@ export function ModelEditDialog({ provider: p, kind, modelId, onClose }: {
                             className={'chip' + (r.defaultEffort === e ? ' on' : '')}
                             onClick={() => setCaps({ ...caps, reasoning: { ...r, defaultEffort: r.defaultEffort === e ? null : e } })}
                           >
-                            {EFFORT_INFO[e].label}
+                            {tm(EFFORT_INFO[e].label)}
                           </button>
                         ))}
                       </div>
@@ -308,8 +309,8 @@ export function ModelEditDialog({ provider: p, kind, modelId, onClose }: {
                   <div className="group outlined" style={{ marginTop: 4 }}>
                     <SwitchRow
                       icon={<Brain size={20} />}
-                      title="Shows its thinking"
-                      subtitle="Streams readable reasoning you can expand."
+                      title={t('Shows its thinking')}
+                      subtitle={t('Streams readable reasoning you can expand.')}
                       checked={r.summaries}
                       onChange={(v) => setCaps({ ...caps, reasoning: { ...r, summaries: v } })}
                     />
@@ -318,48 +319,48 @@ export function ModelEditDialog({ provider: p, kind, modelId, onClose }: {
               )}
             </section>
 
-            <OutlinedGroup title="Limits">
+            <OutlinedGroup title={t('Limits')}>
               <div className="fields-2 group-pad">
-                <Field label="Context window (tokens)" error={ctxBad ? 'Type a number, like 200000 or 200k.' : undefined}>
+                <Field label={t('Context window (tokens)')} error={ctxBad ? t('Type a number, like 200000 or 200k.') : undefined}>
                   <input
                     className="input"
                     inputMode="numeric"
                     value={context}
                     onChange={(e) => setContext(e.target.value)}
-                    placeholder={base.contextWindow ? Format.contextWindow(base.contextWindow) : 'Unknown'}
+                    placeholder={base.contextWindow ? Format.contextWindow(base.contextWindow) : t('Unknown')}
                   />
                 </Field>
-                <Field label="Max output (tokens)" error={maxBad ? 'Type a number, like 64000 or 64k.' : undefined}>
+                <Field label={t('Max output (tokens)')} error={maxBad ? t('Type a number, like 64000 or 64k.') : undefined}>
                   <input
                     className="input"
                     inputMode="numeric"
                     value={maxOut}
                     onChange={(e) => setMaxOut(e.target.value)}
-                    placeholder={base.maxOutput ? Format.tokens(base.maxOutput) : 'Provider default'}
+                    placeholder={base.maxOutput ? Format.tokens(base.maxOutput) : t('Provider default')}
                   />
                 </Field>
               </div>
-              <p className="field-hint" style={{ margin: '-6px 16px 14px' }}>Empty uses the provider’s value. You can type 128k or 1m.</p>
+              <p className="field-hint" style={{ margin: '-6px 16px 14px' }}>{t('Empty uses the provider’s value. You can type 128k or 1m.')}</p>
             </OutlinedGroup>
 
-            <OutlinedGroup title="Price, USD per 1M tokens">
+            <OutlinedGroup title={t('Price, USD per 1M tokens')}>
               <div className="fields-2 group-pad">
-                <Field label="Input" error={inBad ? 'Type a price, like 2.5.' : undefined}>
+                <Field label={t('Input')} error={inBad ? t('Type a price, like 2.5.') : undefined}>
                   <input
                     className="input"
                     inputMode="decimal"
                     value={priceIn}
                     onChange={(e) => setPriceIn(e.target.value)}
-                    placeholder={base.pricing ? String(base.pricing.input) : 'Unknown'}
+                    placeholder={base.pricing ? String(base.pricing.input) : t('Unknown')}
                   />
                 </Field>
-                <Field label="Output" error={outBad ? 'Type a price, like 10.' : undefined}>
+                <Field label={t('Output')} error={outBad ? t('Type a price, like 10.') : undefined}>
                   <input
                     className="input"
                     inputMode="decimal"
                     value={priceOut}
                     onChange={(e) => setPriceOut(e.target.value)}
-                    placeholder={base.pricing ? String(base.pricing.output) : 'Unknown'}
+                    placeholder={base.pricing ? String(base.pricing.output) : t('Unknown')}
                   />
                 </Field>
               </div>
@@ -369,7 +370,7 @@ export function ModelEditDialog({ provider: p, kind, modelId, onClose }: {
 
         {isCustom && (
           <div className="group outlined">
-            <Row icon={<Trash2 size={20} />} title="Remove model" subtitle="You added this model ID by hand." danger onClick={() => setConfirmRemove(true)} />
+            <Row icon={<Trash2 size={20} />} title={t('Remove model')} subtitle={t('You added this model ID by hand.')} danger onClick={() => setConfirmRemove(true)} />
           </div>
         )}
       </div>

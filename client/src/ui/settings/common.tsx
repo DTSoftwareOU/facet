@@ -1,6 +1,7 @@
 /** Small pieces shared by the Providers, Assistants, Prompt library and Media models pages. */
 import { Check, ChevronRight, CircleAlert, CircleCheck, Eye, EyeOff, Info, Search, TriangleAlert, X } from 'lucide-react';
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { msg, t, tm } from '../../i18n';
 import type { ProviderKind } from '../../llm/providers';
 import { platform } from '../../platform';
 import { IconButton } from '../components/primitives';
@@ -22,24 +23,26 @@ export function browserBlocked(kind: ProviderKind): boolean {
   return platform().corsLimited && !kind.browserOk;
 }
 
-export const BLOCKED_HINT = 'This provider doesn’t accept requests from web browsers. It works in the Facet app for Windows and Android.';
+export const BLOCKED_HINT = msg('This provider doesn’t accept requests from web browsers. It works in the Facet app for Windows and Android.');
+
+/** BLOCKED_HINT in the interface language. */
+export function blockedHint(): string {
+  return tm(BLOCKED_HINT);
+}
 
 export function BlockedBadge() {
   return (
-    <span className="badge warning" title={BLOCKED_HINT} style={{ flex: 'none' }}>
-      Windows and Android only
+    <span className="badge warning" title={blockedHint()} style={{ flex: 'none' }}>
+      {t('Windows and Android only')}
     </span>
   );
 }
 
-export function plural(n: number, one: string, many = one + 's'): string {
-  return `${n} ${n === 1 ? one : many}`;
-}
-
 /** A user-facing message from a thrown value. Inside Providers, "Check it in Providers." is noise. */
 export function errorText(e: unknown, fallback: string): string {
-  const msg = e instanceof Error ? e.message : typeof e === 'string' ? e : '';
-  return (msg.trim() || fallback).replace(/\s*Check it in Providers\.$/, '');
+  const text = (e instanceof Error ? e.message : typeof e === 'string' ? e : '').trim() || fallback;
+  const hint = t('Check it in Providers.');
+  return text.endsWith(hint) ? text.slice(0, -hint.length).trim() : text;
 }
 
 export function Notice({ tone = 'info', children }: { tone?: 'ok' | 'error' | 'warn' | 'info'; children: ReactNode }) {
@@ -63,7 +66,7 @@ export function SectionLabel({ children }: { children: ReactNode }) {
 
 /** A divider indented to line up with row text after a leading element of [inset] px. */
 export function Sep({ inset = 56 }: { inset?: number }) {
-  return <div className="group-divider" style={{ marginLeft: inset }} />;
+  return <div className="group-divider" style={{ marginInlineStart: inset }} />;
 }
 
 /** A group drawn as an outline, for use inside dialogs (whose background is already the surface color). */
@@ -104,7 +107,7 @@ export function ActionRow({ leading, icon, title, subtitle, subLines = 'wrap', o
         {subtitle ? <span className={subCls}>{subtitle}</span> : null}
       </span>
       {aside}
-      {chevron && <ChevronRight size={18} className="srow-chevron" />}
+      {chevron && <ChevronRight size={18} className="srow-chevron flip-rtl" />}
     </>
   );
   if (!onClick) {
@@ -161,7 +164,7 @@ export function ChoiceRow({ leading, title, subtitle, checked, disabled, hint, o
       {checked && (
         <>
           <Check size={20} className="c-primary" aria-hidden style={{ flex: 'none' }} />
-          <span className="sr-only">Selected</span>
+          <span className="sr-only">{t('Selected')}</span>
         </>
       )}
     </button>
@@ -208,7 +211,7 @@ export function FilterBox({ value, onChange, placeholder, autoFocus }: { value: 
         }}
       />
       {value && (
-        <IconButton small label="Clear" onClick={() => onChange('')}>
+        <IconButton small label={t('Clear')} onClick={() => onChange('')}>
           <X size={16} />
         </IconButton>
       )}
@@ -223,6 +226,7 @@ export function SecretInput({ value, onChange, placeholder, label }: { value: st
     <div className="input-wrap">
       <input
         className="input mono"
+        dir="ltr"
         type={shown ? 'text' : 'password'}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -234,7 +238,7 @@ export function SecretInput({ value, onChange, placeholder, label }: { value: st
         data-1p-ignore=""
         data-lpignore="true"
       />
-      <IconButton small label={shown ? 'Hide key' : 'Show key'} onClick={() => setShown((s) => !s)}>
+      <IconButton small label={shown ? t('Hide key') : t('Show key')} onClick={() => setShown((s) => !s)}>
         {shown ? <EyeOff size={17} /> : <Eye size={17} />}
       </IconButton>
     </div>

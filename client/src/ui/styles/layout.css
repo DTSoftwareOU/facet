@@ -15,17 +15,18 @@
   background: var(--surface);
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--outline-variant);
-  transition: margin-left 260ms var(--ease-emph);
+  border-inline-end: 1px solid var(--outline-variant);
+  transition: margin-inline-start 260ms var(--ease-emph);
 }
 .sidebar.collapsed {
-  margin-left: calc(-1 * var(--sidebar-w));
+  margin-inline-start: calc(-1 * var(--sidebar-w));
 }
 .sidebar-head {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 14px 10px 6px 16px;
+  padding-block: 14px 6px;
+  padding-inline: 16px 10px;
 }
 .wordmark {
   display: flex;
@@ -49,13 +50,13 @@
   color: var(--text-3);
   font-size: 14.5px;
   width: calc(100% - 24px);
-  text-align: left;
+  text-align: start;
 }
 .sidebar-search:hover {
   color: var(--text-2);
 }
 .sidebar-search kbd {
-  margin-left: auto;
+  margin-inline-start: auto;
   font-family: var(--font-sans);
   font-size: 11.5px;
   color: var(--text-3);
@@ -131,11 +132,12 @@
   gap: 8px;
   width: 100%;
   height: 38px;
-  padding: 0 6px 0 10px;
+  padding-block: 0;
+  padding-inline: 10px 6px;
   border-radius: 11px;
   font-size: 14.5px;
   color: var(--text);
-  text-align: left;
+  text-align: start;
 }
 .chat-item:hover {
   background: var(--surface-high);
@@ -178,7 +180,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 10px 12px 14px;
+  padding-block: 10px 12px;
+  padding-inline: 14px 10px;
   border-top: 1px solid var(--outline-variant);
 }
 .sidebar-foot .who {
@@ -186,7 +189,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  text-align: left;
+  text-align: start;
   border-radius: 10px;
   padding: 2px 4px;
 }
@@ -195,7 +198,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  margin-right: 6px;
+  margin-inline-end: 6px;
   vertical-align: 1px;
   background: var(--text-3);
 }
@@ -242,7 +245,7 @@
   gap: 6px;
   padding: 4px 10px;
   border-radius: 12px;
-  text-align: left;
+  text-align: start;
   min-width: 0;
 }
 .model-title:hover {
@@ -296,12 +299,16 @@
 .user-bubble {
   max-width: min(86%, 600px);
   padding: 11px 16px;
-  border-radius: var(--r-bubble) var(--r-bubble) 8px var(--r-bubble);
+  border-radius: var(--r-bubble);
+  border-end-end-radius: 8px;
   background: var(--user-bubble);
   font-size: calc(16.5px * var(--chat-scale));
   line-height: calc(26px * var(--chat-scale));
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  /* Each line reads in its own direction (English in the Arabic interface, and vice versa). */
+  unicode-bidi: plaintext;
+  text-align: start;
 }
 .user-actions {
   display: flex;
@@ -327,6 +334,7 @@
   resize: none;
   font-size: calc(16.5px * var(--chat-scale));
   line-height: calc(26px * var(--chat-scale));
+  unicode-bidi: plaintext;
 }
 
 .assistant-head {
@@ -349,7 +357,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 8px 4px 4px;
+  padding-block: 4px;
+  padding-inline: 4px 8px;
   border-radius: 10px;
   color: var(--text-2);
   font-size: 14.5px;
@@ -359,13 +368,17 @@
   color: var(--text);
 }
 .thinking-body {
-  margin: 6px 0 4px 10px;
-  padding: 2px 0 2px 16px;
-  border-left: 2px solid var(--outline);
+  margin-block: 6px 4px;
+  margin-inline: 10px 0;
+  padding-block: 2px;
+  padding-inline: 16px 0;
+  border-inline-start: 2px solid var(--outline);
   color: var(--text-2);
   font-size: 14.5px;
   line-height: 22px;
   white-space: pre-wrap;
+  unicode-bidi: plaintext;
+  text-align: start;
   max-height: 340px;
   overflow-y: auto;
 }
@@ -393,7 +406,7 @@
   padding: 9px 12px;
   font-size: 14px;
   color: var(--text-2);
-  text-align: left;
+  text-align: start;
 }
 .tool-line:hover {
   color: var(--text);
@@ -424,11 +437,16 @@
   overflow-y: auto;
   color: var(--text-2);
   background: var(--code-bg);
+  /* Arguments, commands, diffs and results read left to right, also in right-to-left languages. */
+  direction: ltr;
+  text-align: left;
 }
 .tool-detail .k {
   color: var(--text-3);
   font-family: var(--font-sans);
   font-size: 12px;
+  unicode-bidi: plaintext;
+  text-align: start;
 }
 .approval {
   padding: 12px;
@@ -493,10 +511,10 @@
   align-items: center;
   gap: 2px;
   margin-top: 8px;
-  margin-left: -8px;
+  margin-inline-start: -8px;
 }
 .msg-meta {
-  margin-left: auto;
+  margin-inline-start: auto;
   font-size: 12.5px;
   color: var(--text-3);
   padding: 4px 6px;
@@ -560,10 +578,11 @@ button.msg-meta:hover {
   align-items: center;
   gap: 10px;
   max-width: 280px;
-  padding: 8px 12px 8px 10px;
+  padding-block: 8px;
+  padding-inline: 10px 12px;
   border-radius: 14px;
   background: var(--surface-high);
-  text-align: left;
+  text-align: start;
 }
 .file-chip .ic {
   width: 32px;
@@ -639,7 +658,7 @@ button.msg-meta:hover {
   min-height: 64px;
   border-radius: 18px;
   border: 1px solid var(--outline);
-  text-align: left;
+  text-align: start;
   font-size: 14.5px;
   line-height: 21px;
   transition: background-color 120ms, border-color 120ms;
@@ -666,7 +685,8 @@ button.msg-meta:hover {
   align-items: center;
   gap: 8px;
   height: 40px;
-  padding: 0 14px 0 6px;
+  padding-block: 0;
+  padding-inline: 6px 14px;
   border-radius: var(--r-pill);
   border: 1px solid var(--outline);
   font-size: 14.5px;
@@ -714,6 +734,8 @@ button.msg-meta:hover {
   font-size: 16.5px;
   line-height: 25px;
   max-height: 40vh;
+  /* What's typed reads in its own direction, paragraph by paragraph (like dir="auto"). */
+  unicode-bidi: plaintext;
 }
 .composer textarea::placeholder {
   color: var(--text-3);
@@ -767,7 +789,7 @@ button.msg-meta:hover {
 .composer-att .x {
   position: absolute;
   top: -6px;
-  right: -6px;
+  inset-inline-end: -6px;
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -794,8 +816,7 @@ button.msg-meta:hover {
 }
 .slash-menu {
   position: absolute;
-  left: 12px;
-  right: 12px;
+  inset-inline: 12px;
   bottom: calc(100% + 8px);
   max-height: 280px;
   overflow-y: auto;
@@ -896,7 +917,7 @@ button.msg-meta:hover {
 .lightbox-bar {
   position: absolute;
   top: 14px;
-  right: 14px;
+  inset-inline-end: 14px;
   display: flex;
   gap: 6px;
 }
@@ -911,19 +932,23 @@ button.msg-meta:hover {
   .sidebar {
     position: fixed;
     z-index: 40;
-    left: 0;
+    inset-inline-start: 0;
     top: 0;
     bottom: 0;
-    margin-left: 0;
+    margin-inline-start: 0;
     transform: translateX(-100%);
     transition: transform 280ms var(--ease-emph);
     box-shadow: var(--shadow);
   }
-  .sidebar.open {
+  [dir='rtl'] .sidebar {
+    transform: translateX(100%);
+  }
+  .sidebar.open,
+  [dir='rtl'] .sidebar.open {
     transform: none;
   }
   .sidebar.collapsed {
-    margin-left: 0;
+    margin-inline-start: 0;
   }
   .drawer-scrim {
     display: block;

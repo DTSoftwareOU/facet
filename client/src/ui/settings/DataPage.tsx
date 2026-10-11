@@ -6,6 +6,8 @@ import { Dates, Format } from '../../core/format';
 import { toJson } from '../../core/json';
 import { db } from '../../data/db';
 import type { AttachmentEntity } from '../../data/entities';
+import { formatNumber, t, tn } from '../../i18n';
+import { tRich } from '../../i18n/rich';
 import { platform } from '../../platform';
 import { Button, Confirm, Divider, Group, Row, SwitchRow, useToast } from '../components/primitives';
 import { useAccount, useAutoFreed, useSyncState, useSyncedPrefs } from '../hooks';
@@ -93,56 +95,62 @@ export function DataPage(_props: PageProps) {
   return (
     <div className="col gap-16">
       {signedIn && (
-        <Group title="Sync storage">
+        <Group title={t('Sync storage')}>
           <div className="col gap-12" style={{ padding: 16 }}>
             <div className="row" style={{ alignItems: 'baseline', gap: 6 }}>
-              <span className="t-title-l">{Format.bytes(signedIn.usedBytes)}</span>
-              <span className="t-label-m c-2 grow" style={{ fontWeight: 400 }}>of {Format.bytes(signedIn.quotaBytes)}</span>
+              <span className="t-label-m c-2 grow" style={{ fontWeight: 400 }}>
+                {tRich('{used} of {total}', {
+                  used: <span className="t-title-l" style={{ color: 'var(--text)' }}>{Format.bytes(signedIn.usedBytes)}</span>,
+                  total: Format.bytes(signedIn.quotaBytes),
+                })}
+              </span>
               {signedIn.quotaBytes > 0 && (
-                <span className={'t-label-m ' + (full ? 'c-warning' : 'c-2')}>{Math.min(100, Math.round((signedIn.usedBytes * 100) / signedIn.quotaBytes))}%</span>
+                <span className={'t-label-m ' + (full ? 'c-warning' : 'c-2')}>{formatNumber(Math.min(100, Math.round((signedIn.usedBytes * 100) / signedIn.quotaBytes)) / 100, { style: 'percent' })}</span>
               )}
             </div>
             <UsageBar records={signedIn.recordBytes} blobs={signedIn.blobBytes} quota={signedIn.quotaBytes} />
             <div className="row gap-16 t-label-s c-2" style={{ fontWeight: 400 }}>
-              <span><span className="legend-dot" style={{ background: 'var(--primary)' }} />Chats & settings · {Format.bytes(signedIn.recordBytes)}</span>
-              <span><span className="legend-dot" style={{ background: 'var(--flash)' }} />Files · {Format.bytes(signedIn.blobBytes)}</span>
+              <span><span className="legend-dot" style={{ background: 'var(--primary)' }} />{t('Chats & settings · {size}', { size: Format.bytes(signedIn.recordBytes) })}</span>
+              <span><span className="legend-dot" style={{ background: 'var(--flash)' }} />{t('Files · {size}', { size: Format.bytes(signedIn.blobBytes) })}</span>
             </div>
             <span className={'t-label-s ' + (full ? 'c-warning' : 'c-3')} style={{ fontWeight: 400 }}>
               {!full
-                ? 'Everything here is end-to-end encrypted. Chats are compressed before upload; files sync until the space is used.'
+                ? t('Everything here is end-to-end encrypted. Chats are compressed before upload; files sync until the space is used.')
                 : synced.autoFreeSpace
-                  ? 'Storage is full and this device has no older files left to clear. New changes wait here until you free up space below or delete old chats.'
-                  : 'Storage is full. New changes and files wait on this device until you free up space below or delete old chats.'}
+                  ? t('Storage is full and this device has no older files left to clear. New changes wait here until you free up space below or delete old chats.')
+                  : t('Storage is full. New changes and files wait on this device until you free up space below or delete old chats.')}
             </span>
           </div>
           <Divider full />
           <SwitchRow
             icon={<CloudOff size={20} />}
-            title="Free up space automatically"
-            subtitle="When storage is full, the oldest files leave sync storage. They stay on the devices that have them."
+            title={t('Free up space automatically')}
+            subtitle={t('When storage is full, the oldest files leave sync storage. They stay on the devices that have them.')}
             checked={synced.autoFreeSpace}
             onChange={(v) => app.settings.updateSynced((s) => ({ ...s, autoFreeSpace: v }))}
           />
           {autoFreed && (
             <p className="t-label-s c-3" style={{ margin: '0 16px 14px', fontWeight: 400 }}>
-              Last clean-up, {Dates.relative(autoFreed.at).replace('Just now', 'just now')}: cleared {autoFreed.files === 1 ? '1 old file' : `${autoFreed.files} old files`} ({Format.bytes(autoFreed.bytes)}) from sync storage.
+              {Dates.justNow(autoFreed.at)
+                ? tn('Last clean-up, just now: cleared {count} old file ({size}) from sync storage.', 'Last clean-up, just now: cleared {count} old files ({size}) from sync storage.', autoFreed.files, { size: Format.bytes(autoFreed.bytes) })
+                : tn('Last clean-up, {time}: cleared {count} old file ({size}) from sync storage.', 'Last clean-up, {time}: cleared {count} old files ({size}) from sync storage.', autoFreed.files, { time: Dates.relative(autoFreed.at), size: Format.bytes(autoFreed.bytes) })}
             </p>
           )}
         </Group>
       )}
 
-      <Group title="On this device">
-        <Row icon={<HardDrive size={20} />} title={platform().kind === 'web' ? 'Used by Facet in this browser' : 'Used on this computer'} subtitle={deviceBytes != null ? Format.bytes(deviceBytes) : 'Calculating…'} />
+      <Group title={t('On this device')}>
+        <Row icon={<HardDrive size={20} />} title={platform().kind === 'web' ? t('Used by Facet in this browser') : t('Used on this computer')} subtitle={deviceBytes != null ? Format.bytes(deviceBytes) : t('Calculating…')} />
         {signedIn && (
           <>
             <Divider />
             <Row
               icon={<Download size={20} />}
-              title="Remove downloaded copies"
-              subtitle="Files already in your sync storage download again when you open them."
+              title={t('Remove downloaded copies')}
+              subtitle={t('Files already in your sync storage download again when you open them.')}
               onClick={async () => {
                 const freed = await app.sync.clearDownloadedCopies();
-                toast(freed > 0 ? `Freed ${Format.bytes(freed)} on this device.` : 'Nothing to remove.');
+                toast(freed > 0 ? t('Freed {size} on this device.', { size: Format.bytes(freed) }) : t('Nothing to remove.'));
                 setRefresh((x) => x + 1);
               }}
             />
@@ -153,11 +161,11 @@ export function DataPage(_props: PageProps) {
             <Divider />
             <Row
               icon={<CloudOff size={20} />}
-              title={deviceOnly === 1 ? '1 file is only on this device' : `${deviceOnly} files are only on this device`}
-              subtitle={`Cleared from sync storage to make room. Upload ${deviceOnly === 1 ? 'it' : 'them'} again if there's space.`}
+              title={tn('{count} file is only on this device', '{count} files are only on this device', deviceOnly)}
+              subtitle={tn("Cleared from sync storage to make room. Upload it again if there's space.", "Cleared from sync storage to make room. Upload them again if there's space.", deviceOnly)}
               onClick={async () => {
                 await app.sync.retryDeviceOnlyFiles();
-                toast('Trying again. Files upload while there’s space.');
+                toast(t('Trying again. Files upload while there’s space.'));
               }}
             />
           </>
@@ -165,14 +173,14 @@ export function DataPage(_props: PageProps) {
       </Group>
 
       {largest.length > 0 && (
-        <Group title="Largest files">
+        <Group title={t('Largest files')}>
           {largest.map((f, i) => (
             <div key={f.id}>
               {i > 0 && <Divider />}
               <Row
                 icon={kindIcon(f)}
-                title={<span className="ellipsis" style={{ display: 'block' }}>{f.name}</span>}
-                subtitle={`${Format.bytes(f.sizeBytes)} · ${f.localOnly ? 'This device only' : f.uploaded ? 'Synced' : 'Waiting to sync'}`}
+                title={<span className="ellipsis" style={{ display: 'block' }}><bdi>{f.name}</bdi></span>}
+                subtitle={`${Format.bytes(f.sizeBytes)} · ${f.localOnly ? t('This device only') : f.uploaded ? t('Synced') : t('Waiting to sync')}`}
                 trailing={
                   signedIn && f.uploaded && !f.localOnly ? (
                     <Button
@@ -181,13 +189,13 @@ export function DataPage(_props: PageProps) {
                       onClick={async () => {
                         try {
                           await app.sync.keepOnDeviceOnly(f.id);
-                          toast(`${f.name} is now kept on this device only.`);
+                          toast(t('{name} is now kept on this device only.', { name: f.name }));
                         } catch {
-                          toast('Couldn’t free that file. Check your connection.');
+                          toast(t('Couldn’t free that file. Check your connection.'));
                         }
                       }}
                     >
-                      Free up
+                      {t('Free up')}
                     </Button>
                   ) : undefined
                 }
@@ -197,33 +205,33 @@ export function DataPage(_props: PageProps) {
         </Group>
       )}
 
-      <Group title="Your data">
+      <Group title={t('Your data')}>
         <Row
           icon={<Download size={20} />}
-          title="Export everything"
-          subtitle="Chats, assistants, prompts, skills and settings as JSON. API keys are left out."
+          title={t('Export everything')}
+          subtitle={t('Chats, assistants, prompts, skills and settings as JSON. API keys are left out.')}
           onClick={async () => platform().saveFile(`facet-export-${Dates.isoDate(Date.now())}.json`, await exportEverything())}
         />
         <Divider />
         <Row
           icon={<Trash2 size={20} />}
-          title={signedIn ? 'Remove data from this device' : 'Delete all data'}
-          subtitle={signedIn ? 'Signs out and clears chats, keys and files here. Your account keeps its copy.' : 'Chats, keys and files on this device are deleted for good.'}
+          title={signedIn ? t('Remove data from this device') : t('Delete all data')}
+          subtitle={signedIn ? t('Signs out and clears chats, keys and files here. Your account keeps its copy.') : t('Chats, keys and files on this device are deleted for good.')}
           danger
           onClick={() => setConfirmWipe(true)}
         />
       </Group>
       {confirmWipe && (
         <Confirm
-          title={signedIn ? 'Remove data from this device?' : 'Delete all data?'}
-          body={signedIn ? 'You’ll be signed out here. Sign in again to get everything back.' : 'This can’t be undone.'}
-          confirm={signedIn ? 'Sign out and remove' : 'Delete everything'}
+          title={signedIn ? t('Remove data from this device?') : t('Delete all data?')}
+          body={signedIn ? t('You’ll be signed out here. Sign in again to get everything back.') : t('This can’t be undone.')}
+          confirm={signedIn ? t('Sign out and remove') : t('Delete everything')}
           danger
           onConfirm={async () => {
             if (signedIn) await app.auth.logout();
             await app.sync.wipeLocalData();
             await db().transaction('rw', db().providers, async () => db().providers.clear());
-            toast('Data removed from this device.');
+            toast(t('Data removed from this device.'));
           }}
           onClose={() => setConfirmWipe(false)}
         />

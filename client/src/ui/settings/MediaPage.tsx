@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { getApp } from '../../app';
 import { mediaRef, withMediaRef, type MediaPrefs, type ModelRef } from '../../data/prefs';
 import { MEDIA_OUTPUTS, type MediaChoice } from '../../domain/media/service';
+import { formatNumber, sentences, t, tm } from '../../i18n';
 import { ASPECT_INFO, ASPECTS, type Aspect, type Voice } from '../../llm/media/gen';
 import { providerKind } from '../../llm/providers';
 import { MODEL_OUTPUT_INFO, type ModelOutput } from '../../llm/types';
@@ -13,7 +14,7 @@ import { Button, Dialog, Divider, Group, Row, Spinner, SwitchRow } from '../comp
 import { useProviders, useSyncedPrefs } from '../hooks';
 import { ui } from '../nav';
 import type { PageProps } from './SettingsDialog';
-import { BLOCKED_HINT, BlockedBadge, ChoiceRow, FilterBox, Notice, OutlinedGroup, Sep, useStableCallback } from './common';
+import { BlockedBadge, ChoiceRow, FilterBox, Notice, OutlinedGroup, Sep, useStableCallback } from './common';
 
 type MediaOutput = (typeof MEDIA_OUTPUTS)[number];
 
@@ -27,14 +28,59 @@ const ICONS: Record<ModelOutput, ReactNode> = {
 };
 
 /** Who makes each kind, for the empty picker. */
-const WHO_MAKES: Record<ModelOutput, string> = {
-  TEXT: '',
-  IMAGE: 'OpenAI, Google, OpenRouter, xAI, Together, Stability AI and Black Forest Labs do.',
-  VIDEO: 'Google (Gemini API) does.',
-  SPEECH: 'OpenAI, Google, Mistral, ElevenLabs and Deepgram do.',
-  MUSIC: 'Google, ElevenLabs and Stability AI do.',
-  TRANSCRIPTION: 'OpenAI, Mistral, Groq, Together, ElevenLabs and Deepgram do.',
-};
+function whoMakes(o: ModelOutput): string {
+  switch (o) {
+    case 'IMAGE': return t('OpenAI, Google, OpenRouter, xAI, Together, Stability AI and Black Forest Labs do.');
+    case 'VIDEO': return t('Google (Gemini API) does.');
+    case 'SPEECH': return t('OpenAI, Google, Mistral, ElevenLabs and Deepgram do.');
+    case 'MUSIC': return t('Google, ElevenLabs and Stability AI do.');
+    case 'TRANSCRIPTION': return t('OpenAI, Mistral, Groq, Together, ElevenLabs and Deepgram do.');
+    default: return '';
+  }
+}
+
+/** Row subtitle when nothing makes this kind. */
+function noneMakes(o: ModelOutput): string {
+  switch (o) {
+    case 'IMAGE': return t('None of your providers makes images');
+    case 'VIDEO': return t('None of your providers makes video');
+    case 'SPEECH': return t('None of your providers makes speech');
+    case 'MUSIC': return t('None of your providers makes music');
+    case 'TRANSCRIPTION': return t('None of your providers makes transcripts');
+    default: return '';
+  }
+}
+
+/** The empty picker's first sentence. */
+function noneMakesYet(o: ModelOutput): string {
+  switch (o) {
+    case 'IMAGE': return t('None of your providers makes images yet.');
+    case 'VIDEO': return t('None of your providers makes video yet.');
+    case 'SPEECH': return t('None of your providers makes speech yet.');
+    case 'MUSIC': return t('None of your providers makes music yet.');
+    case 'TRANSCRIPTION': return t('None of your providers makes transcripts yet.');
+    default: return '';
+  }
+}
+
+/** The picker's title. */
+function pickerTitle(o: ModelOutput): string {
+  switch (o) {
+    case 'IMAGE': return t('Image model');
+    case 'VIDEO': return t('Video model');
+    case 'SPEECH': return t('Speech model');
+    case 'MUSIC': return t('Music & sound model');
+    case 'TRANSCRIPTION': return t('Transcription model');
+    default: return t('Model');
+  }
+}
+
+/** A music length: "15s", "1 min" in the interface language. */
+function musicLength(s: number): string {
+  return s < 60
+    ? formatNumber(s, { style: 'unit', unit: 'second', unitDisplay: 'narrow' })
+    : formatNumber(s / 60, { style: 'unit', unit: 'minute', unitDisplay: 'short' });
+}
 
 const VIDEO_ASPECTS: Aspect[] = ['LANDSCAPE', 'PORTRAIT'];
 const MUSIC_LENGTHS = [15, 30, 60, 120];
@@ -76,7 +122,7 @@ export function MediaPage(_props: PageProps) {
     };
   }, [providers, prefs]);
 
-  const update = (t: (m: MediaPrefs) => MediaPrefs) => void app.settings.updateSynced((s) => ({ ...s, media: t(s.media) }));
+  const update = (change: (m: MediaPrefs) => MediaPrefs) => void app.settings.updateSynced((s) => ({ ...s, media: change(s.media) }));
   const addProvider = () => ui.openSettings('providers');
 
   if (!state) return <Spinner />;
@@ -86,13 +132,13 @@ export function MediaPage(_props: PageProps) {
       <div className="col gap-16">
         <div className="empty">
           <div className="empty-icon"><ImageIcon size={24} /></div>
-          <div className="t-title-m" style={{ color: 'var(--text)' }}>No media models yet</div>
+          <div className="t-title-m" style={{ color: 'var(--text)' }}>{t('No media models yet')}</div>
           <div className="t-body" style={{ maxWidth: 460 }}>
-            Add a provider that makes images, video, speech, music or transcripts. OpenAI and Google keys cover several kinds; ElevenLabs, Stability AI, Black Forest Labs and Deepgram add more.
+            {t('Add a provider that makes images, video, speech, music or transcripts. OpenAI and Google keys cover several kinds; ElevenLabs, Stability AI, Black Forest Labs and Deepgram add more.')}
           </div>
           <Button onClick={addProvider}>
             <Plus size={18} />
-            Add a provider
+            {t('Add a provider')}
           </Button>
         </div>
       </div>
@@ -105,7 +151,7 @@ export function MediaPage(_props: PageProps) {
   return (
     <div className="col gap-16">
       <p className="settings-intro t-body">
-        Pick the model that makes each kind of media. Chat models use them when you ask for a picture, a video, a voiceover or a song, and the results are saved in the chat. Models are sorted automatically by what they make.
+        {t('Pick the model that makes each kind of media. Chat models use them when you ask for a picture, a video, a voiceover or a song, and the results are saved in the chat. Models are sorted automatically by what they make.')}
       </p>
       <Group>
         {MEDIA_OUTPUTS.map((o, i) => {
@@ -116,8 +162,8 @@ export function MediaPage(_props: PageProps) {
               {i > 0 && <Divider />}
               <Row
                 icon={ICONS[o]}
-                title={info.label}
-                subtitle={!r ? `None of your providers makes ${info.what}` : r.explicit ? r.label : `Automatic · ${r.label}`}
+                title={tm(info.label)}
+                subtitle={!r ? noneMakes(o) : r.explicit ? r.label : t('Automatic · {model}', { model: r.label })}
                 trailing={r?.browserBlocked ? <BlockedBadge /> : undefined}
                 chevron
                 onClick={() => setPicking(o)}
@@ -127,19 +173,19 @@ export function MediaPage(_props: PageProps) {
         })}
       </Group>
 
-      <Group title="Options">
+      <Group title={t('Options')}>
         <div className="col gap-16 group-pad">
-          <Option title="Image shape">
-            <Segmented options={[...ASPECTS]} selected={prefs.imageAspect} label={(a) => ASPECT_INFO[a].label} onSelect={(a) => update((m) => ({ ...m, imageAspect: a }))} />
+          <Option title={t('Image shape')}>
+            <Segmented options={[...ASPECTS]} selected={prefs.imageAspect} label={(a) => tm(ASPECT_INFO[a].label)} onSelect={(a) => update((m) => ({ ...m, imageAspect: a }))} />
           </Option>
-          <Option title="Video shape">
-            <Segmented options={VIDEO_ASPECTS} selected={prefs.videoAspect} label={(a) => ASPECT_INFO[a].label} onSelect={(a) => update((m) => ({ ...m, videoAspect: a }))} />
+          <Option title={t('Video shape')}>
+            <Segmented options={VIDEO_ASPECTS} selected={prefs.videoAspect} label={(a) => tm(ASPECT_INFO[a].label)} onSelect={(a) => update((m) => ({ ...m, videoAspect: a }))} />
           </Option>
-          <Option title="Music length">
+          <Option title={t('Music length')}>
             <Segmented
               options={MUSIC_LENGTHS}
               selected={prefs.musicSeconds}
-              label={(s) => (s < 60 ? `${s}s` : `${s / 60} min`)}
+              label={musicLength}
               onSelect={(s) => update((m) => ({ ...m, musicSeconds: s }))}
             />
           </Option>
@@ -147,8 +193,8 @@ export function MediaPage(_props: PageProps) {
         <Divider full />
         <Row
           icon={<AudioLines size={20} />}
-          title="Voice"
-          subtitle={speech ? app.media.voiceName(speech, app.media.voiceFor(speech)) : 'Choose a speech model first'}
+          title={t('Voice')}
+          subtitle={speech ? <bdi>{app.media.voiceName(speech, app.media.voiceFor(speech))}</bdi> : t('Choose a speech model first')}
           chevron={!!speech}
           onClick={speech ? () => setPickingVoice(true) : undefined}
         />
@@ -157,16 +203,16 @@ export function MediaPage(_props: PageProps) {
       <Group>
         <SwitchRow
           icon={<Sparkles size={20} />}
-          title="Let chat models create media"
-          subtitle="Gives tool-capable chat models image, video, speech and music tools."
+          title={t('Let chat models create media')}
+          subtitle={t('Gives tool-capable chat models image, video, speech and music tools.')}
           checked={prefs.chatTools}
           onChange={(v) => update((m) => ({ ...m, chatTools: v }))}
         />
         <Divider />
         <SwitchRow
           icon={<Speech size={20} />}
-          title="Read aloud with this voice"
-          subtitle={prefs.speech ? 'Read aloud uses your speech model instead of the system voice.' : 'Choose a speech model above to use it for Read aloud.'}
+          title={t('Read aloud with this voice')}
+          subtitle={prefs.speech ? t('Read aloud uses your speech model instead of the system voice.') : t('Choose a speech model above to use it for Read aloud.')}
           checked={prefs.aiReadAloud && !!prefs.speech}
           disabled={!prefs.speech}
           onChange={(v) => update((m) => ({ ...m, aiReadAloud: v }))}
@@ -174,8 +220,8 @@ export function MediaPage(_props: PageProps) {
         <Divider />
         <SwitchRow
           icon={<Mic size={20} />}
-          title="Dictate with this model"
-          subtitle={prefs.transcription ? 'The mic records, then your transcription model writes it down.' : 'Choose a transcription model above to use it for dictation.'}
+          title={t('Dictate with this model')}
+          subtitle={prefs.transcription ? t('The mic records, then your transcription model writes it down.') : t('Choose a transcription model above to use it for dictation.')}
           checked={prefs.aiDictation && !!prefs.transcription}
           disabled={!prefs.transcription}
           onChange={(v) => update((m) => ({ ...m, aiDictation: v }))}
@@ -185,11 +231,11 @@ export function MediaPage(_props: PageProps) {
       <div className="row">
         <Button variant="tonal" onClick={addProvider}>
           <Plus size={18} />
-          Add a media provider
+          {t('Add a media provider')}
         </Button>
       </div>
       <p className="field-hint" style={{ margin: '-4px 6px 0' }}>
-        Media is made by the provider you pick, with your own key, and billed by them. OpenAI, Google, OpenRouter, xAI, Together and Groq keys cover several kinds; ElevenLabs, Stability AI, Black Forest Labs and Deepgram add more.
+        {t('Media is made by the provider you pick, with your own key, and billed by them. OpenAI, Google, OpenRouter, xAI, Together and Groq keys cover several kinds; ElevenLabs, Stability AI, Black Forest Labs and Deepgram add more.')}
       </p>
 
       {picking && (
@@ -244,7 +290,6 @@ function MediaModelPicker({ output, choices, selected, automatic, onPick, onAddP
   onClose: () => void;
 }) {
   const close = useStableCallback(onClose);
-  const info = MODEL_OUTPUT_INFO[output];
   // A saved choice whose provider or model is gone counts as Automatic.
   const autoChecked = !choices.some((c) => sameRef(selected, c));
   const groups: Array<{ id: string; label: string; kindName: string; blocked: boolean; choices: MediaChoice[] }> = [];
@@ -259,25 +304,25 @@ function MediaModelPicker({ output, choices, selected, automatic, onPick, onAddP
   const anyBlocked = groups.some((g) => g.blocked);
 
   return (
-    <Dialog title={`${info.label} model`} onClose={close}>
+    <Dialog title={pickerTitle(output)} onClose={close}>
       {choices.length === 0 ? (
         <div className="col gap-16">
-          <p className="t-body c-2" style={{ margin: 0 }}>None of your providers makes {info.what} yet. {WHO_MAKES[output]}</p>
+          <p className="t-body c-2" style={{ margin: 0 }}>{sentences(noneMakesYet(output), whoMakes(output))}</p>
           <div className="row">
             <Button onClick={onAddProvider}>
               <Plus size={18} />
-              Add a provider
+              {t('Add a provider')}
             </Button>
           </div>
         </div>
       ) : (
         <div className="col gap-12">
-          {anyBlocked && <Notice tone="warn">Some of your providers don’t accept requests from web browsers. Their models work in the Facet app for Windows and Android.</Notice>}
+          {anyBlocked && <Notice tone="warn">{t('Some of your providers don’t accept requests from web browsers. Their models work in the Facet app for Windows and Android.')}</Notice>}
           <div className="group outlined">
             <ChoiceRow
               leading={<span className="srow-icon c-primary"><Sparkles size={20} /></span>}
-              title="Automatic"
-              subtitle={automatic ? `Now: ${automatic.label}` : 'The best model you have'}
+              title={t('Automatic')}
+              subtitle={automatic ? t('Now: {model}', { model: automatic.label }) : t('The best model you have')}
               checked={autoChecked}
               onClick={() => onPick(null)}
             />
@@ -287,7 +332,7 @@ function MediaModelPicker({ output, choices, selected, automatic, onPick, onAddP
               key={g.id}
               title={
                 <span className="row gap-8">
-                  <span className="grow ellipsis">{g.label}</span>
+                  <span className="grow ellipsis"><bdi>{g.label}</bdi></span>
                   {g.blocked && <BlockedBadge />}
                 </span>
               }
@@ -303,7 +348,7 @@ function MediaModelPicker({ output, choices, selected, automatic, onPick, onAddP
                       subtitle={c.model.id}
                       checked={checked}
                       disabled={c.browserBlocked && !checked}
-                      hint={c.browserBlocked ? BLOCKED_HINT : undefined}
+                      hint={c.browserBlocked ? t('This provider doesn’t accept requests from web browsers. It works in the Facet app for Windows and Android.') : undefined}
                       onClick={() => onPick(c.ref)}
                     />
                   </div>
@@ -338,17 +383,17 @@ function VoicePicker({ choice, current, onPick, onClose }: { choice: MediaChoice
   const shown = voices && q ? voices.filter((v) => v.name.toLowerCase().includes(q)) : voices;
 
   return (
-    <Dialog title="Voice" onClose={close}>
+    <Dialog title={t('Voice')} onClose={close}>
       <div className="col gap-12">
         <span className="t-label-m c-3" style={{ fontWeight: 400, marginTop: -6 }}>{choice.label}</span>
-        {voices && voices.length > 12 && <FilterBox value={query} onChange={setQuery} placeholder="Search voices" />}
+        {voices && voices.length > 12 && <FilterBox value={query} onChange={setQuery} placeholder={t('Search voices')} />}
         {!shown ? (
           <div className="row gap-8 c-3 t-body" style={{ padding: '8px 4px' }}>
             <Spinner />
-            Loading voices…
+            {t('Loading voices…')}
           </div>
         ) : shown.length === 0 ? (
-          <p className="t-body c-3" style={{ margin: 0 }}>{q ? `No voices match “${query.trim()}”.` : 'No voices found for this model.'}</p>
+          <p className="t-body c-3" style={{ margin: 0 }}>{q ? t('No voices match “{query}”.', { query: query.trim() }) : t('No voices found for this model.')}</p>
         ) : (
           <div className="group outlined">
             {shown.map((v, i) => (
@@ -356,7 +401,7 @@ function VoicePicker({ choice, current, onPick, onClose }: { choice: MediaChoice
                 {i > 0 && <Sep />}
                 <ChoiceRow
                   leading={<span className="srow-icon"><AudioLines size={20} /></span>}
-                  title={v.name}
+                  title={<bdi>{v.name}</bdi>}
                   checked={v.id === current}
                   onClick={() => onPick(v.id)}
                 />

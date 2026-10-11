@@ -5,11 +5,13 @@
  */
 import { newId } from '../core/ids';
 import { isObject } from '../core/json';
+import { t } from '../i18n';
 import { attachmentRef, type AttachmentEntity } from '../data/entities';
 import type { Aspect, SettingsStore } from '../data/prefs';
 import type { GenParams, ModelCaps, ModelOutput } from '../llm/types';
 import { platform, type ComputerInfo } from '../platform';
 import type { ChatComputer } from '../remote/computers';
+import { createdWithLabel, fetchLabel, localizeComputerLabel, searchLabel, skillLabel } from './labels';
 import type { McpManager } from './mcpManager';
 import type { SkillRepository } from './skills';
 import type { ToolContext, ToolDef, ToolOutcome } from './types';
@@ -216,21 +218,21 @@ export class ToolRegistry {
           const auto = mcp.autoApproved(server);
           const approval = mcp.approval(server);
           const prefix = 'mcp_' + slug(server.name).slice(0, 14);
-          for (const t of mcp.tools(server)) {
-            if (disabled.has(t.name)) continue;
-            let name = (prefix + '_' + slug(t.name)).slice(0, 64);
+          for (const tool of mcp.tools(server)) {
+            if (disabled.has(tool.name)) continue;
+            let name = (prefix + '_' + slug(tool.name)).slice(0, 64);
             let n = 2;
-            while (used.has(name)) name = (prefix + '_' + slug(t.name)).slice(0, 60) + '_' + n++;
+            while (used.has(name)) name = (prefix + '_' + slug(tool.name)).slice(0, 60) + '_' + n++;
             used.add(name);
             // YOLO is checked when the tool runs, so turning it off mid-reply takes effect.
-            const needsApproval = !auto.has(t.name) && (approval === 'ALWAYS' || (approval === 'WRITES' && t.readOnlyHint !== true));
-            const desc = (`[${server.name}] ` + ((t.description?.trim() || null) ?? t.title ?? t.name)).slice(0, 1024);
+            const needsApproval = !auto.has(tool.name) && (approval === 'ALWAYS' || (approval === 'WRITES' && tool.readOnlyHint !== true));
+            const desc = (`[${server.name}] ` + ((tool.description?.trim() || null) ?? tool.title ?? tool.name)).slice(0, 1024);
             defs.push({
-              spec: { name, description: desc, inputSchemaJson: t.inputSchemaJson.trim() ? t.inputSchemaJson : EMPTY_SCHEMA },
+              spec: { name, description: desc, inputSchemaJson: tool.inputSchemaJson.trim() ? tool.inputSchemaJson : EMPTY_SCHEMA },
               kind: 'MCP',
               serverId: server.id,
               serverName: server.name,
-              remoteName: t.name,
+              remoteName: tool.name,
               needsApproval,
             });
           }
@@ -266,23 +268,23 @@ export class ToolRegistry {
     const cwd = target.folder;
     if (tools.length === 0) return;
     const used = new Set(defs.map((d) => d.spec.name));
-    for (const t of tools) {
-      let name = t.name.slice(0, 64);
+    for (const tool of tools) {
+      let name = tool.name.slice(0, 64);
       if (used.has(name)) {
-        const base = ('computer_' + slug(t.name)).slice(0, 60);
+        const base = ('computer_' + slug(tool.name)).slice(0, 60);
         name = base;
         let n = 2;
         while (used.has(name)) name = base + '_' + n++;
       }
       used.add(name);
       // YOLO is checked when the tool runs, as for MCP.
-      const needsApproval = local.computerApproval === 'ALWAYS' || (local.computerApproval === 'WRITES' && !t.readOnly);
+      const needsApproval = local.computerApproval === 'ALWAYS' || (local.computerApproval === 'WRITES' && !tool.readOnly);
       defs.push({
-        spec: { name, description: t.description, inputSchemaJson: t.inputSchemaJson.trim() ? t.inputSchemaJson : EMPTY_SCHEMA },
+        spec: { name, description: tool.description, inputSchemaJson: tool.inputSchemaJson.trim() ? tool.inputSchemaJson : EMPTY_SCHEMA },
         kind: 'COMPUTER',
         serverId: null,
         serverName: COMPUTER_SERVER_NAME,
-        remoteName: t.name,
+        remoteName: tool.name,
         needsApproval,
       });
     }
@@ -323,7 +325,7 @@ export class ToolRegistry {
         const config = await this.searchConfig();
         if (!config) return { content: "Web search isn't set up.", isError: true };
         const results = await search.search(config, q, intOrNull(args.max_results) ?? 6, ctx.signal);
-        return { content: search.formatResults(q, results), citations: search.citations(results), label: `Searched “${q.slice(0, 60)}”` };
+        return { content: search.formatResults(q, results), citations: search.citations(results), label: searchLabel(q.slice(0, 60), true) };
       }
       case 'FETCH': {
         const url = str('url');
@@ -333,7 +335,7 @@ export class ToolRegistry {
         let content = page.viaReader ? READER_NOTE + '\n' : '';
         if (page.title.trim()) content += `# ${page.title}\n`;
         content += `${url}\n\n${page.text.trim() ? page.text : '(The page had no readable text.)'}`;
-        return { content, citations: [{ url, title: page.title.trim() ? page.title : host }], label: `Read ${host}` };
+        return { content, citations: [{ url, title: page.title.trim() ? page.title : host }], label: fetchLabel(host, true) };
       }
       case 'SKILL': {
         if (def.spec.name === USE_SKILL) {
@@ -346,14 +348,14 @@ export class ToolRegistry {
             content += '\n\nBundled files (read with read_skill_file):\n';
             for (const f of files) content += `- ${f.path}\n`;
           }
-          return { content, label: `Used skill ${s.name}` };
+          return { content, label: skillLabel(s.name, '', true) };
         }
         const s = (await skills.all()).find((x) => x.enabled && x.name.toLowerCase() === str('skill').toLowerCase());
         if (!s) return { content: `No enabled skill named "${str('skill')}".`, isError: true };
         const path = str('path').replace(/^\/+/, '');
         const f = skills.resources(s).find((r) => r.path === path);
         if (!f) return { content: `The skill ${s.name} has no file "${str('path')}".`, isError: true };
-        return { content: f.content, label: `Read ${f.path} from ${s.name}` };
+        return { content: f.content, label: t('Read {path} from {skill}', { path: f.path, skill: s.name }) };
       }
       case 'MEDIA': {
         const output = def.output;
@@ -372,7 +374,7 @@ export class ToolRegistry {
           content:
             `Created the ${spec.noun} with ${model.displayName} (${att.mimeType}${size}). It is already shown to the user ` +
             "below your message; don't link or describe a file path. Briefly say what you made, and offer changes.",
-          label: `Created ${spec.noun} with ${model.displayName}`,
+          label: createdWithLabel(output, model.displayName),
           attachments: [attachmentRef(att)],
         };
       }
@@ -401,7 +403,7 @@ export class ToolRegistry {
     ctx.signal?.addEventListener('abort', onAbort, { once: true });
     try {
       const r = await computer.call(remote, argumentsJson, { cwd, callId });
-      return { content: r.content, isError: r.isError, label: r.label || `${COMPUTER_SERVER_NAME}: ${remote}` };
+      return { content: r.content, isError: r.isError, label: r.label ? localizeComputerLabel(r.label) : `${COMPUTER_SERVER_NAME}: ${remote}` };
     } finally {
       ctx.signal?.removeEventListener('abort', onAbort);
     }
@@ -422,10 +424,10 @@ export class ToolRegistry {
   }
 
   private mediaTool(output: ModelOutput, modelName: string): ToolDef {
-    const t = MEDIA_TOOLS[output]!;
+    const tool = MEDIA_TOOLS[output]!;
     // Video clips can cost a few dollars each, so they ask first (unless YOLO is on).
     return {
-      spec: { name: t.name, description: t.description.replace('{model}', () => modelName), inputSchemaJson: t.schema },
+      spec: { name: tool.name, description: tool.description.replace('{model}', () => modelName), inputSchemaJson: tool.schema },
       kind: 'MEDIA',
       needsApproval: output === 'VIDEO',
       output,

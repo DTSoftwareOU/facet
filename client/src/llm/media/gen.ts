@@ -5,10 +5,11 @@
  * WAV); the sync layer compresses WAV itself, so there's no re-encoding here.
  */
 import { isObject } from '../../core/json';
+import { msg, sentences, t, type Msg } from '../../i18n';
 import type { Aspect } from '../../data/prefs';
 import { HttpStatusError } from '../errors';
 import { ProviderKinds, type ProviderKind } from '../providers';
-import { LlmException, MODEL_OUTPUT_INFO, type ModelInfo, type ModelOutput, type ProviderConfig } from '../types';
+import { LlmException, type ModelInfo, type ModelOutput, type ProviderConfig } from '../types';
 import { chunks, concatParts, fileFromBase64, fileFromDataUrl, normalizeAudio, type MediaFile } from './files';
 import {
   delay,
@@ -32,10 +33,11 @@ export { mediaHeaders } from './http';
 
 /** Shapes of a picture or video, in the order the settings screen shows them. */
 export const ASPECTS: readonly Aspect[] = ['SQUARE', 'PORTRAIT', 'LANDSCAPE'];
-export const ASPECT_INFO: Record<Aspect, { label: string; ratio: string }> = {
-  SQUARE: { label: 'Square', ratio: '1:1' },
-  PORTRAIT: { label: 'Portrait', ratio: '9:16' },
-  LANDSCAPE: { label: 'Landscape', ratio: '16:9' },
+/** `label` is shown with tm(). */
+export const ASPECT_INFO: Record<Aspect, { label: Msg; ratio: string }> = {
+  SQUARE: { label: msg('Square'), ratio: '1:1' },
+  PORTRAIT: { label: msg('Portrait'), ratio: '9:16' },
+  LANDSCAPE: { label: msg('Landscape'), ratio: '16:9' },
 };
 
 /** What to make. [seconds] applies to video and music; [voice] to speech. */
@@ -94,8 +96,28 @@ const o = (x: unknown, k: string): Json | null => (isObject(x) && isObject(x[k])
 const a = (x: unknown, k: string): unknown[] => (isObject(x) && Array.isArray(x[k]) ? (x[k] as unknown[]) : []);
 const titlecase = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
+function unsupportedMessage(provider: string, output: ModelOutput): string {
+  switch (output) {
+    case 'TEXT': return t('Facet can\'t chat with {provider} yet.', { provider });
+    case 'IMAGE': return t('Facet can\'t make images with {provider} yet.', { provider });
+    case 'VIDEO': return t('Facet can\'t make video with {provider} yet.', { provider });
+    case 'SPEECH': return t('Facet can\'t make speech with {provider} yet.', { provider });
+    case 'MUSIC': return t('Facet can\'t make music with {provider} yet.', { provider });
+    case 'TRANSCRIPTION': return t('Facet can\'t make transcripts with {provider} yet.', { provider });
+  }
+}
+
 function unsupported(config: ProviderConfig, output: ModelOutput): never {
-  throw new LlmException({ kind: 'BAD_REQUEST', message: `Facet can't make ${MODEL_OUTPUT_INFO[output].what} with ${config.label} yet.` });
+  throw new LlmException({ kind: 'BAD_REQUEST', message: unsupportedMessage(config.label, output) });
+}
+
+/** The provider answered without the image, video or audio it was asked for. */
+function noResult(config: ProviderConfig, type: string, status?: string | null): LlmException {
+  const provider = config.label;
+  const none = type === 'image' ? t('{provider} returned no image.', { provider })
+    : type === 'video' ? t('{provider} returned no video.', { provider })
+      : t('{provider} returned no audio.', { provider });
+  return failure(status ? sentences(none, t('Status: {status}.', { status })) : none);
 }
 
 // ------------------------------------------------------------------ public API
@@ -183,7 +205,7 @@ export async function listVoices(config: ProviderConfig, modelId: string, option
     } catch {
       // Only the default voice then.
     }
-    return [{ id: '', name: 'Default voice' }, ...saved];
+    return [{ id: '', name: t('Default voice') }, ...saved];
   }
   return staticVoices(config.kind, modelId);
 }
@@ -215,7 +237,7 @@ export function defaultVoice(kind: ProviderKind, _modelId: string): string {
 
 /** Voice ids are opaque for some providers (ElevenLabs); a friendly name when we know one. */
 export function voiceName(kind: ProviderKind, voice: string): string {
-  if (!voice.trim()) return 'Default voice';
+  if (!voice.trim()) return t('Default voice');
   if (kind.id === ProviderKinds.ELEVENLABS.id && voice === ELEVEN_DEFAULT_VOICE) return 'George';
   return titlecase(voice);
 }
@@ -246,12 +268,12 @@ async function image(ctx: Ctx, id: string, job: MediaJob): Promise<MediaFile> {
   }
   const res = await requestJson(ctx, `${ctx.base}/images/generations`, { json: body });
   const first = a(res, 'data')[0];
-  if (!isObject(first)) throw failure(config, 'returned no image');
+  if (!isObject(first)) throw noResult(config, 'image');
   const b64 = s(first, 'b64_json');
   if (b64) return fileFromBase64(b64, null);
   const url = s(first, 'url');
   if (url) return download(ctx, url, null, false);
-  throw failure(config, 'returned no image');
+  throw noResult(config, 'image');
 }
 
 function openAiSize(id: string, aspect: Aspect): string {
@@ -271,8 +293,11 @@ async function openRouterImage(ctx: Ctx, id: string, job: MediaJob): Promise<Med
   const message = o(a(res, 'choices')[0], 'message');
   const url = s(o(a(message, 'images')[0], 'image_url'), 'url');
   if (!url) {
-    const said = s(message, 'content')?.trim() ? `: ${s(message, 'content')!.slice(0, 200)}` : '';
-    throw failure(ctx.config, `didn't return an image${said}`);
+    const said = s(message, 'content')?.trim() ? s(message, 'content')!.slice(0, 200) : '';
+    const provider = ctx.config.label;
+    throw failure(said
+      ? t('{provider} didn\'t return an image: {reason}.', { provider, reason: said })
+      : t('{provider} didn\'t return an image.', { provider }));
   }
   return url.startsWith('data:') ? fileFromDataUrl(url) : download(ctx, url, null, false);
 }
@@ -300,7 +325,7 @@ async function fluxImage(ctx: Ctx, id: string, job: MediaJob): Promise<MediaFile
   const start = await requestJson(ctx, `${ctx.base}/v1/${id}`, { json: body });
   const taskId = s(start, 'id');
   const pollUrl = s(start, 'polling_url') ?? (taskId ? `${ctx.base}/v1/get_result?id=${encodeURIComponent(taskId)}` : null);
-  if (!pollUrl) throw failure(config, "didn't start the image");
+  if (!pollUrl) throw failure(t('{provider} didn\'t start the image.', { provider: config.label }));
   const began = Date.now();
   while (Date.now() - began < MAX_POLL_MS) {
     await delay(FLUX_POLL_MS, ctx.signal);
@@ -308,15 +333,15 @@ async function fluxImage(ctx: Ctx, id: string, job: MediaJob): Promise<MediaFile
     const status = s(res, 'status');
     if (status === 'Ready') {
       const sample = s(o(res, 'result'), 'sample');
-      if (!sample) throw failure(config, 'returned no image');
+      if (!sample) throw noResult(config, 'image');
       // The sample is a pre-signed URL: sending the key along would leak it to the CDN.
       return download(ctx, sample, null, false);
     }
     if (status !== null && status !== 'Pending' && status !== 'Queued' && status !== 'Processing') {
-      throw failure(config, `couldn't make that image (${status})`);
+      throw failure(t('{provider} couldn\'t make that image ({status}).', { provider: config.label, status }));
     }
   }
-  throw failure(config, 'took too long to make the image');
+  throw failure(t('{provider} took too long to make the image.', { provider: config.label }));
 }
 
 // ------------------------------------------------------------------ video
@@ -326,7 +351,7 @@ async function video(ctx: Ctx, id: string, job: MediaJob): Promise<MediaFile> {
   if (!is(config, ProviderKinds.GOOGLE)) unsupported(config, 'VIDEO');
   const aspect = job.aspect === 'PORTRAIT' ? '9:16' : '16:9';
   if (!id.startsWith('veo')) {
-    ctx.onProgress('Creating video');
+    ctx.onProgress(t('Creating video'));
     return interaction(ctx, id, job.prompt, 'video', { aspect_ratio: aspect });
   }
   // Veo: a long-running operation, polled until done.
@@ -334,23 +359,28 @@ async function video(ctx: Ctx, id: string, job: MediaJob): Promise<MediaFile> {
   const body = { instances: [{ prompt: job.prompt }], parameters: { aspectRatio: aspect } };
   const op = await requestJson(ctx, `${native}/models/${id}:predictLongRunning`, { json: body });
   const name = s(op, 'name');
-  if (!name) throw failure(config, "didn't start the video");
+  if (!name) throw failure(t('{provider} didn\'t start the video.', { provider: config.label }));
   const began = Date.now();
   while (Date.now() - began < MAX_POLL_MS) {
     await delay(VEO_POLL_MS, ctx.signal);
     const elapsed = Math.floor((Date.now() - began) / 1000);
-    ctx.onProgress(`Creating video · ${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`);
+    ctx.onProgress(t('Creating video · {time}', { time: `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}` }));
     const res = await requestJson(ctx, `${native}/${name}`);
     const error = o(res, 'error');
-    if (error) throw failure(config, s(error, 'message') ?? "couldn't make that video");
+    if (error) {
+      const reason = s(error, 'message');
+      throw failure(reason
+        ? t('{provider} couldn\'t make that video: {reason}', { provider: config.label, reason })
+        : t('{provider} couldn\'t make that video.', { provider: config.label }));
+    }
     if (res.done === true || res.done === 'true') {
       const sample = a(o(o(res, 'response'), 'generateVideoResponse'), 'generatedSamples')[0];
       const uri = s(o(sample, 'video'), 'uri');
-      if (!uri) throw failure(config, 'finished without a video (it may have been filtered)');
+      if (!uri) throw failure(t('{provider} finished without a video (it may have been filtered).', { provider: config.label }));
       return download(ctx, uri, 'video/mp4', true);
     }
   }
-  throw failure(config, 'took too long to make the video');
+  throw failure(t('{provider} took too long to make the video.', { provider: config.label }));
 }
 
 // ------------------------------------------------------------------ speech
@@ -377,7 +407,7 @@ async function speech(ctx: Ctx, id: string, text: string, voice: string): Promis
       if (voice.trim()) body.voice_id = voice;
       const res = await requestJson(ctx, `${base}/audio/speech`, { json: body });
       const data = s(res, 'audio_data');
-      if (!data) throw failure(config, 'returned no audio');
+      if (!data) throw noResult(config, 'audio');
       return fileFromBase64(data, 'audio/mpeg');
     });
   }
@@ -440,18 +470,23 @@ async function interactionResult(ctx: Ctx, body: Json, type: string): Promise<Me
   const native = geminiNative(ctx);
   const res = await requestJson(ctx, `${native}/interactions`, { json: body });
   const error = a(res, 'errors')[0];
-  if (isObject(error)) throw failure(config, s(error, 'message') ?? "couldn't make that");
+  if (isObject(error)) {
+    const reason = s(error, 'message');
+    throw failure(reason
+      ? t('{provider} couldn\'t make that: {reason}', { provider: config.label, reason })
+      : t('{provider} couldn\'t make that.', { provider: config.label }));
+  }
   const blocks = a(res, 'steps').flatMap((step) => a(step, 'content')).filter((b) => s(b, 'type') === type);
   const block = blocks[blocks.length - 1];
   if (!block) {
     const status = s(res, 'status');
-    throw failure(config, `returned no ${type}${status ? ` (status: ${status})` : ''}`);
+    throw noResult(config, type, status);
   }
   const mime = s(block, 'mime_type');
   const data = s(block, 'data');
   if (data) return normalizeAudio(fileFromBase64(data, mime));
   const uri = s(block, 'uri');
-  if (!uri) throw failure(config, `returned no ${type}`);
+  if (!uri) throw noResult(config, type);
   const url = uri.startsWith('http') ? uri : `${native}/${uri}:download?alt=media`;
   return normalizeAudio(await download(ctx, url, mime, true));
 }

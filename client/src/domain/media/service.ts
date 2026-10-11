@@ -20,7 +20,20 @@ import {
 } from '../../llm/media/gen';
 import { browserBlocked } from '../../llm/media/http';
 import { LlmException, MODEL_OUTPUT_INFO, type ModelInfo, type ModelOutput, type ProviderConfig } from '../../llm/types';
+import { t } from '../../i18n';
 import { platform } from '../../platform';
+
+/** Nothing is set up to make [output]: what to do about it. */
+function noModelMessage(output: ModelOutput): string {
+  switch (output) {
+    case 'IMAGE': return t('No image model is set up. Add a provider that makes images in Settings → Media models.');
+    case 'VIDEO': return t('No video model is set up. Add a provider that makes video in Settings → Media models.');
+    case 'SPEECH': return t('No speech model is set up. Add a provider that makes speech in Settings → Media models.');
+    case 'MUSIC': return t('No music model is set up. Add a provider that makes music in Settings → Media models.');
+    case 'TRANSCRIPTION': return t('No transcription model is set up. Add a provider that makes transcripts in Settings → Media models.');
+    default: return t('No model is set up for this. Add one in Settings → Media models.');
+  }
+}
 
 /** The kinds of media, in the order Settings → Media models lists them. */
 export const MEDIA_OUTPUTS: readonly ModelOutput[] = ['IMAGE', 'VIDEO', 'SPEECH', 'MUSIC', 'TRANSCRIPTION'];
@@ -163,14 +176,8 @@ export class MediaService {
     onProgress: (label: string) => void = () => {},
     signal?: AbortSignal,
   ): Promise<CreatedMedia> {
-    const info = MODEL_OUTPUT_INFO[output];
     const choice = await this.resolve(output);
-    if (!choice) {
-      throw new LlmException({
-        kind: 'BAD_REQUEST',
-        message: `No ${info.noun} model is set up. Add a provider that makes ${info.what} in Settings → Media models.`,
-      });
-    }
+    if (!choice) throw new LlmException({ kind: 'BAD_REQUEST', message: noModelMessage(output) });
     if (choice.browserBlocked) throw browserBlocked(choice.config);
     const prefs = this.media;
     const job: MediaJob = {
@@ -232,7 +239,7 @@ export class MediaService {
   /** Writes down a recording (e.g. MediaRecorder's audio/webm) with the transcription model chosen in Settings. */
   async transcribe(audio: Blob, signal?: AbortSignal): Promise<string> {
     const choice = await this.resolve('TRANSCRIPTION', true);
-    if (!choice) throw new LlmException({ kind: 'BAD_REQUEST', message: 'Choose a transcription model in Settings → Media models.' });
+    if (!choice) throw new LlmException({ kind: 'BAD_REQUEST', message: t('Choose a transcription model in Settings → Media models.') });
     if (choice.browserBlocked) throw browserBlocked(choice.config);
     const mimeType = audio.type || 'audio/webm';
     const ext = mediaExtension(mimeType);

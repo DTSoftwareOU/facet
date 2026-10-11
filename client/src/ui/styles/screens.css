@@ -21,18 +21,22 @@
   gap: 2px;
 }
 .settings-nav h2 {
-  margin: 0 0 12px 12px;
+  margin-block: 0 12px;
+  margin-inline: 12px 0;
 }
 .settings-nav button {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 40px;
-  padding: 0 12px;
+  min-height: 40px;
+  padding: 6px 12px;
   border-radius: 12px;
   font-size: 14.5px;
   color: var(--text-2);
-  text-align: left;
+  text-align: start;
+}
+.settings-nav button svg {
+  flex: none;
 }
 .settings-nav button:hover {
   background: var(--surface-high);
@@ -58,7 +62,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 14px 14px 6px 28px;
+  padding-block: 14px 6px;
+  padding-inline: 28px 14px;
   min-height: 62px;
 }
 .settings-head h2 {
@@ -96,7 +101,7 @@
     display: none;
   }
   .settings-head {
-    padding-left: 10px;
+    padding-inline-start: 10px;
   }
   .settings-body {
     padding: 0 16px 24px;
@@ -112,13 +117,17 @@
 }
 .segmented button {
   flex: 1;
-  height: 34px;
+  /* Long translations wrap onto a second line instead of spilling out. */
+  min-width: 0;
+  min-height: 34px;
   border-radius: 10px;
   font-size: 13.5px;
+  line-height: 16px;
   font-weight: 500;
   color: var(--text-2);
-  padding: 0 8px;
-  white-space: nowrap;
+  padding: 4px 8px;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 .segmented button:hover {
   color: var(--text);
@@ -150,7 +159,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  margin-right: 6px;
+  margin-inline-end: 6px;
 }
 
 /* ---- Account flows ---- */
@@ -173,7 +182,7 @@
 .auth-close {
   position: absolute;
   top: 12px;
-  right: 12px;
+  inset-inline-end: 12px;
 }
 .gap-20 {
   gap: 20px;
@@ -208,7 +217,7 @@
   border-radius: 14px;
   padding: 0 12px;
   gap: 8px;
-  margin-right: 8px;
+  margin-inline-end: 8px;
 }
 .search-box .input {
   background: transparent;
@@ -229,6 +238,7 @@ mark.hit {
 
 .list-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
 }
@@ -337,10 +347,15 @@ mark.hit {
   align-items: center;
 }
 .input-wrap .input {
-  padding-right: 46px;
+  padding-inline-end: 46px;
 }
 .input-wrap .icon-btn {
   position: absolute;
+  inset-inline-end: 6px;
+}
+/* Key fields read left to right in every language, so their button stays at their right end. */
+:is(.input-wrap, .tools-secret):has(> .input.mono) .icon-btn {
+  inset-inline-end: auto;
   right: 6px;
 }
 .fields-2 {
@@ -373,7 +388,7 @@ mark.hit {
   padding-bottom: 10px;
 }
 .search-box.filter-box {
-  margin-right: 0;
+  margin-inline-end: 0;
 }
 .search-box.filter-box .input {
   padding: 8px 0;
@@ -403,7 +418,8 @@ mark.hit {
 
 /* Rows with their own buttons: the row body is one button, the actions beside it are others. */
 .srow.split {
-  padding: 0 8px 0 0;
+  padding-block: 0;
+  padding-inline: 0 8px;
   gap: 2px;
 }
 .srow.split:hover {
@@ -416,8 +432,9 @@ mark.hit {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 12px 8px 12px 16px;
-  text-align: left;
+  padding-block: 12px;
+  padding-inline: 16px 8px;
+  text-align: start;
 }
 .srow-main:focus-visible {
   outline-offset: -2px;
@@ -452,7 +469,7 @@ mark.hit {
   display: block;
   width: 100%;
   padding: 12px 16px;
-  text-align: left;
+  text-align: start;
   font-size: 13.5px;
   font-weight: 500;
   color: var(--primary);
@@ -589,7 +606,8 @@ mark.hit {
   color: var(--text-2);
 }
 .tools-status > .btn {
-  margin: -6px -6px -6px 0;
+  margin-block: -6px;
+  margin-inline: 0 -6px;
 }
 .tools-status.ok {
   background: var(--primary-container);
@@ -613,7 +631,8 @@ mark.hit {
 
 /* Rows whose main area is a button, with controls beside it */
 .srow.tools-row {
-  padding: 0 16px 0 0;
+  padding-block: 0;
+  padding-inline: 0 16px;
   gap: 12px;
 }
 .tools-row-main {
@@ -623,8 +642,9 @@ mark.hit {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 56px;
-  padding: 12px 0 12px 16px;
-  text-align: left;
+  padding-block: 12px;
+  padding-inline: 16px 0;
+  text-align: start;
   border-radius: 0;
 }
 .srow.tools-row.link:hover {
@@ -699,7 +719,8 @@ mark.hit {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 6px 0 14px;
+  padding-block: 0;
+  padding-inline: 14px 6px;
   border-radius: 14px;
   background: var(--surface-high);
   color: var(--text-3);
@@ -724,11 +745,11 @@ mark.hit {
   display: block;
 }
 .tools-secret .input {
-  padding-right: 46px;
+  padding-inline-end: 46px;
 }
 .tools-secret .icon-btn {
   position: absolute;
-  right: 6px;
+  inset-inline-end: 6px;
   top: 50%;
   transform: translateY(-50%);
 }
@@ -778,8 +799,12 @@ mark.hit {
 .tools-details[open] .tools-details-chev {
   transform: rotate(90deg);
 }
+[dir='rtl'] .tools-details:not([open]) .tools-details-chev {
+  transform: scaleX(-1);
+}
 .tools-details-body {
-  padding: 0 16px 16px 44px;
+  padding-block: 0 16px;
+  padding-inline: 44px 16px;
   font-size: 14px;
   line-height: 21px;
   color: var(--text-2);
@@ -797,7 +822,7 @@ mark.hit {
   padding: 18px;
 }
 .tools-callout-actions {
-  padding-left: 52px;
+  padding-inline-start: 52px;
 }
 
 /* MCP server page */
@@ -888,7 +913,8 @@ mark.hit {
   overflow-wrap: anywhere;
 }
 .computer-folder-actions {
-  padding: 0 16px 14px 54px;
+  padding-block: 0 14px;
+  padding-inline: 54px 16px;
 }
 .srow.computer-tool {
   display: grid;
@@ -939,17 +965,17 @@ mark.hit {
     justify-content: flex-end;
   }
   .tools-callout-actions {
-    padding-left: 0;
+    padding-inline-start: 0;
   }
   .mcp-hero {
     flex-wrap: wrap;
   }
   .mcp-hero > .tools-actions {
     width: 100%;
-    padding-left: 54px;
+    padding-inline-start: 54px;
   }
   .computer-folder-actions {
-    padding-left: 16px;
+    padding-inline-start: 16px;
   }
   .computer-tool .badge {
     grid-column: 2;

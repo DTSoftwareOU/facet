@@ -148,3 +148,46 @@
   --sidebar-w: 284px;
   --column: 760px;
 }
+
+/*
+ * The bundled fonts cover Latin only. Other scripts get a good system font for their script
+ * (named per language, so Han characters take Japanese, Chinese or Korean shapes); languages
+ * whose letters are partly missing from the bundled set (Turkish, Vietnamese) or not in it at all
+ * (Russian) use the system font throughout, so no word mixes two fonts.
+ */
+:root:is(:lang(ru), :lang(tr), :lang(vi)) {
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+  --font-serif: 'Times New Roman', Cambria, 'Noto Serif', serif;
+}
+:root:is(:lang(ar), :lang(ur)) {
+  --font-sans: 'Instrument Sans', 'Segoe UI', 'Noto Sans Arabic', 'Geeza Pro', Tahoma, system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', 'Noto Naskh Arabic', 'Sakkal Majalla', 'Segoe UI', 'Geeza Pro', serif;
+}
+:root:is(:lang(hi), :lang(mr)) {
+  --font-sans: 'Instrument Sans', 'Nirmala UI', 'Noto Sans Devanagari', 'Kohinoor Devanagari', 'Devanagari Sangam MN', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', 'Nirmala UI', 'Noto Serif Devanagari', 'Kohinoor Devanagari', serif;
+}
+:root:lang(bn) {
+  --font-sans: 'Instrument Sans', 'Nirmala UI', 'Noto Sans Bengali', 'Kohinoor Bangla', 'Bangla Sangam MN', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', 'Nirmala UI', 'Noto Serif Bengali', 'Kohinoor Bangla', serif;
+}
+:root:lang(ta) {
+  --font-sans: 'Instrument Sans', 'Nirmala UI', 'Noto Sans Tamil', 'Tamil Sangam MN', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', 'Nirmala UI', 'Noto Serif Tamil', 'Tamil Sangam MN', serif;
+}
+:root:lang(te) {
+  --font-sans: 'Instrument Sans', 'Nirmala UI', 'Noto Sans Telugu', 'Kohinoor Telugu', 'Telugu Sangam MN', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', 'Nirmala UI', 'Noto Serif Telugu', 'Kohinoor Telugu', serif;
+}
+:root:lang(ja) {
+  --font-sans: 'Instrument Sans', 'Yu Gothic UI', 'Meiryo UI', Meiryo, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Noto Sans CJK JP', sans-serif;
+  --font-serif: 'Instrument Serif', 'Yu Mincho', 'Hiragino Mincho ProN', 'Noto Serif JP', 'Noto Serif CJK JP', serif;
+}
+:root:lang(zh-CN) {
+  --font-sans: 'Instrument Sans', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Noto Sans CJK SC', sans-serif;
+  --font-serif: 'Instrument Serif', 'Songti SC', 'Noto Serif SC', 'Noto Serif CJK SC', SimSun, serif;
+}
+:root:lang(ko) {
+  --font-sans: 'Instrument Sans', 'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Noto Sans CJK KR', sans-serif;
+  --font-serif: 'Instrument Serif', 'Noto Serif KR', 'Noto Serif CJK KR', AppleMyungjo, Batang, serif;
+}

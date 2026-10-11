@@ -2,6 +2,7 @@ import { Bot, Heading, MessageSquareText, Type } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getApp } from '../../app';
 import type { ModelRef } from '../../data/prefs';
+import { t } from '../../i18n';
 import { ModelPicker, resolveModel } from '../chat/ModelPicker';
 import { Divider, Field, Group, Row, SwitchRow } from '../components/primitives';
 import { useCatalog, useSyncedPrefs } from '../hooks';
@@ -13,8 +14,8 @@ function useDebouncedSave(value: string, save: (v: string) => void, delay = 700)
   useEffect(() => setDraft(value), [value]);
   useEffect(() => {
     if (draft === value) return;
-    const t = setTimeout(() => save(draft), delay);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => save(draft), delay);
+    return () => clearTimeout(timer);
   }, [draft]);
   return [draft, setDraft] as const;
 }
@@ -37,53 +38,53 @@ export function ChatPrefsPage(_props: PageProps) {
 
   return (
     <div className="col gap-16">
-      <Group title="Custom instructions" footer="Added to every chat, on every device. Assistants and per-chat instructions add to these.">
-        <SwitchRow icon={<MessageSquareText size={20} />} title="Use custom instructions" checked={synced.customInstructionsEnabled} onChange={(v) => update({ customInstructionsEnabled: v })} />
+      <Group title={t('Custom instructions')} footer={t('Added to every chat, on every device. Assistants and per-chat instructions add to these.')}>
+        <SwitchRow icon={<MessageSquareText size={20} />} title={t('Use custom instructions')} checked={synced.customInstructionsEnabled} onChange={(v) => update({ customInstructionsEnabled: v })} />
       </Group>
       {synced.customInstructionsEnabled && (
         <div className="col gap-12">
-          <Field label="About you" hint="Your work, interests, location, anything that helps.">
-            <textarea className="textarea" rows={4} value={about} onChange={(e) => setAbout(e.target.value)} placeholder="e.g. I'm a product designer in Lisbon. I prefer metric units." />
+          <Field label={t('About you')} hint={t('Your work, interests, location, anything that helps.')}>
+            <textarea className="textarea" dir="auto" rows={4} value={about} onChange={(e) => setAbout(e.target.value)} placeholder={t("e.g. I'm a product designer in Lisbon. I prefer metric units.")} />
           </Field>
-          <Field label="How to respond" hint="Tone, length, format.">
-            <textarea className="textarea" rows={4} value={style} onChange={(e) => setStyle(e.target.value)} placeholder="e.g. Be direct. Use short paragraphs and tables for comparisons." />
+          <Field label={t('How to respond')} hint={t('Tone, length, format.')}>
+            <textarea className="textarea" dir="auto" rows={4} value={style} onChange={(e) => setStyle(e.target.value)} placeholder={t('e.g. Be direct. Use short paragraphs and tables for comparisons.')} />
           </Field>
         </div>
       )}
-      <Group title="Models">
+      <Group title={t('Models')}>
         <Row
           icon={<Bot size={20} />}
-          title="Default model for new chats"
-          subtitle={defaultModel ? `${defaultModel.model.displayName} · ${defaultModel.providerLabel}` : 'The model you used last'}
+          title={t('Default model for new chats')}
+          subtitle={defaultModel ? `${defaultModel.model.displayName} · ${defaultModel.providerLabel}` : t('The model you used last')}
           onClick={() => setPicking('default')}
-          trailing={synced.defaultModel ? <button type="button" className="btn btn-text btn-sm" onClick={(e) => { e.stopPropagation(); update({ defaultModel: null }); }}>Reset</button> : undefined}
+          trailing={synced.defaultModel ? <button type="button" className="btn btn-text btn-sm" onClick={(e) => { e.stopPropagation(); update({ defaultModel: null }); }}>{t('Reset')}</button> : undefined}
           chevron
         />
         <Divider />
-        <SwitchRow icon={<Heading size={20} />} title="Name chats automatically" subtitle="A short title from the first exchange." checked={synced.autoTitle} onChange={(v) => update({ autoTitle: v })} />
+        <SwitchRow icon={<Heading size={20} />} title={t('Name chats automatically')} subtitle={t('A short title from the first exchange.')} checked={synced.autoTitle} onChange={(v) => update({ autoTitle: v })} />
         {synced.autoTitle && (
           <>
             <Divider />
             <Row
               icon={<Type size={20} />}
-              title="Model for titles"
-              subtitle={titleModel ? `${titleModel.model.displayName} · ${titleModel.providerLabel}` : 'The chat’s own model'}
+              title={t('Model for titles')}
+              subtitle={titleModel ? `${titleModel.model.displayName} · ${titleModel.providerLabel}` : t('The chat’s own model')}
               onClick={() => setPicking('title')}
-              trailing={synced.titleModel ? <button type="button" className="btn btn-text btn-sm" onClick={(e) => { e.stopPropagation(); update({ titleModel: null }); }}>Reset</button> : undefined}
+              trailing={synced.titleModel ? <button type="button" className="btn btn-text btn-sm" onClick={(e) => { e.stopPropagation(); update({ titleModel: null }); }}>{t('Reset')}</button> : undefined}
               chevron
             />
           </>
         )}
       </Group>
       <p className="field-hint" style={{ margin: '0 6px' }}>
-        To change reasoning, search and length defaults, open a chat's settings and choose “Use these settings for new chats”.
+        {t("To change reasoning, search and length defaults, open a chat's settings and choose “{action}”.", { action: t('Use these settings for new chats') })}
       </p>
       {picking && (
         <ModelPicker
           current={picking === 'default' ? synced.defaultModel ?? null : synced.titleModel ?? null}
           onPick={pick}
           onClose={() => setPicking(null)}
-          title={picking === 'default' ? 'Default model' : 'Model for titles'}
+          title={picking === 'default' ? t('Default model') : t('Model for titles')}
         />
       )}
     </div>

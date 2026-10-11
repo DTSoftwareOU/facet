@@ -3,8 +3,13 @@
  * autolinks), LaTeX math ($…$, $$…$$, \(…\), \[…\]) and highlighted code blocks. Raw HTML in
  * model output is escaped, never rendered. KaTeX and highlight.js load on first use; until then
  * math and code render as plain text, and listeners re-render once they arrive.
+ *
+ * Bidirectional text: every paragraph, heading, list, quote and table gets dir="auto", so it
+ * reads in its own text's direction (an English reply in the Arabic interface, an Arabic
+ * paragraph in an English reply). Code and math are always left to right.
  */
 import markdownIt, { type MarkdownIt, type StateBlock, type StateInline, type Token } from 'markdown-it';
+import { t } from '../../i18n';
 
 type Katex = typeof import('katex').default;
 type Hljs = typeof import('highlight.js').default;
@@ -54,13 +59,13 @@ const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
 function renderMath(tex: string, display: boolean): string {
   if (!katex) {
     needKatex();
-    return `<span class="${display ? 'math-block' : 'math-inline'} math-pending">${escapeHtml(display ? tex : tex)}</span>`;
+    return `<span class="${display ? 'math-block' : 'math-inline'} math-pending" dir="ltr">${escapeHtml(tex)}</span>`;
   }
   try {
     const html = katex.renderToString(tex, { displayMode: display, throwOnError: false, strict: 'ignore', output: 'htmlAndMathml', trust: false });
-    return display ? `<div class="math-block">${html}</div>` : `<span class="math-inline">${html}</span>`;
+    return display ? `<div class="math-block" dir="ltr">${html}</div>` : `<span class="math-inline" dir="ltr">${html}</span>`;
   } catch {
-    return `<code>${escapeHtml(tex)}</code>`;
+    return `<code dir="ltr">${escapeHtml(tex)}</code>`;
   }
 }
 
@@ -166,18 +171,28 @@ function taskLists(md: MarkdownIt) {
   md.core.ruler.after('inline', 'task_lists', (state) => {
     const tokens = state.tokens;
     for (let i = 2; i < tokens.length; i++) {
-      const t = tokens[i];
-      if (t.type !== 'inline' || tokens[i - 1].type !== 'paragraph_open' || tokens[i - 2].type !== 'list_item_open') continue;
-      const m = /^\[([ xX])\]\s/.exec(t.content);
-      if (!m || !t.children?.length) continue;
-      const first = t.children[0];
+      const inline = tokens[i];
+      if (inline.type !== 'inline' || tokens[i - 1].type !== 'paragraph_open' || tokens[i - 2].type !== 'list_item_open') continue;
+      const m = /^\[([ xX])\]\s/.exec(inline.content);
+      if (!m || !inline.children?.length) continue;
+      const first = inline.children[0];
       if (first.type !== 'text') continue;
       first.content = first.content.replace(/^\[[ xX]\]\s/, '');
       const box = new state.Token('html_inline', '', 0);
       box.content = `<span class="md-task${m[1] === ' ' ? '' : ' done'}" aria-hidden="true"></span>`;
-      t.children.unshift(box);
+      inline.children.unshift(box);
       tokens[i - 2].attrJoin('class', 'md-task-item');
     }
+  });
+}
+
+// ---- direction: each text block follows its own text (tables get it on their scrolling wrapper) ----
+
+const AUTO_DIR = new Set(['paragraph_open', 'heading_open', 'bullet_list_open', 'ordered_list_open', 'list_item_open', 'blockquote_open']);
+
+function autoDirection(md: MarkdownIt) {
+  md.core.ruler.push('auto_dir', (state) => {
+    for (const token of state.tokens) if (AUTO_DIR.has(token.type)) token.attrSet('dir', 'auto');
   });
 }
 
@@ -189,11 +204,12 @@ function createMd(): MarkdownIt {
   md.renderer.rules.math_block_inline = (tokens: Token[], idx: number) => renderMath(tokens[idx].content, true);
   md.renderer.rules.math_block = (tokens: Token[], idx: number) => renderMath(tokens[idx].content, true);
   taskLists(md);
+  autoDirection(md);
 
   md.renderer.rules.fence = (tokens: Token[], idx: number) => {
-    const t = tokens[idx];
-    const lang = (t.info || '').trim().split(/\s+/)[0] || '';
-    const code = t.content.replace(/\n$/, '');
+    const token = tokens[idx];
+    const lang = (token.info || '').trim().split(/\s+/)[0] || '';
+    const code = token.content.replace(/\n$/, '');
     let body: string;
     if (lang && hljs?.getLanguage(lang)) {
       try {
@@ -206,19 +222,21 @@ function createMd(): MarkdownIt {
       body = escapeHtml(code);
     }
     const label = escapeHtml(lang || 'text');
+    const wrap = escapeHtml(t('Wrap lines'));
+    const copy = escapeHtml(t('Copy code'));
     return (
-      `<div class="md-code"><div class="md-code-head"><span class="md-code-lang">${label}</span>` +
-      `<button type="button" class="md-code-btn" data-md="wrap" title="Wrap lines" aria-label="Wrap lines"></button>` +
-      `<button type="button" class="md-code-btn" data-md="copy" title="Copy code" aria-label="Copy code"></button></div>` +
+      `<div class="md-code" dir="ltr"><div class="md-code-head"><span class="md-code-lang">${label}</span>` +
+      `<button type="button" class="md-code-btn" data-md="wrap" title="${wrap}" aria-label="${wrap}"></button>` +
+      `<button type="button" class="md-code-btn" data-md="copy" title="${copy}" aria-label="${copy}"></button></div>` +
       `<pre><code class="hljs">${body}</code></pre></div>`
     );
   };
   md.renderer.rules.code_block = (tokens: Token[], idx: number) =>
-    `<div class="md-code"><pre><code>${escapeHtml(tokens[idx].content.replace(/\n$/, ''))}</code></pre></div>`;
+    `<div class="md-code" dir="ltr"><pre><code>${escapeHtml(tokens[idx].content.replace(/\n$/, ''))}</code></pre></div>`;
 
   const defaultTableOpen = md.renderer.rules.table_open ?? ((tokens: Token[], idx: number, options: any, _env: any, self: any) => self.renderToken(tokens, idx, options));
   md.renderer.rules.table_open = (tokens: Token[], idx: number, options: any, env: any, self: any) =>
-    '<div class="md-table">' + defaultTableOpen(tokens, idx, options, env, self);
+    '<div class="md-table" dir="auto">' + defaultTableOpen(tokens, idx, options, env, self);
   const defaultTableClose = md.renderer.rules.table_close ?? ((tokens: Token[], idx: number, options: any, _env: any, self: any) => self.renderToken(tokens, idx, options));
   md.renderer.rules.table_close = (tokens: Token[], idx: number, options: any, env: any, self: any) =>
     defaultTableClose(tokens, idx, options, env, self) + '</div>';

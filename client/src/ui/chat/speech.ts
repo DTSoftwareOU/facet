@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getApp } from '../../app';
+import { t } from '../../i18n';
 import { markdownToPlain } from '../markdown/render';
 
 let current: { id: string; stop: () => void } | null = null;
@@ -60,7 +61,7 @@ export function useReadAloud(): { speaking: string | null; loading: string | nul
       if ((e as Error)?.name === 'AbortError') return;
       throw e;
     }
-    if (typeof speechSynthesis === 'undefined') throw new Error('This browser can’t read text aloud. Choose a speech model in Settings → Media models.');
+    if (typeof speechSynthesis === 'undefined') throw new Error(t('This browser can’t read text aloud. Choose a speech model in Settings → Media models.'));
     const u = new SpeechSynthesisUtterance(text);
     u.onend = () => {
       if (current?.id === id) setCurrent(null);
@@ -117,15 +118,15 @@ export function useDictation(onText: (text: string) => void, onError: (message: 
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch {
-        onError('Facet can’t use the microphone. Allow microphone access and try again.');
+        onError(t('Facet can’t use the microphone. Allow microphone access and try again.'));
         return;
       }
-      const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find((t) => MediaRecorder.isTypeSupported(t));
+      const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find((mime) => MediaRecorder.isTypeSupported(mime));
       const rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
       const chunks: Blob[] = [];
       rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
       rec.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
+        stream.getTracks().forEach((track) => track.stop());
         const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
         if (blob.size < 2000) {
           setState('idle');
@@ -136,7 +137,7 @@ export function useDictation(onText: (text: string) => void, onError: (message: 
           const text = await app.media.transcribe(blob);
           if (text.trim()) onText(text.trim());
         } catch (e) {
-          onError((e as Error).message || 'Couldn’t transcribe the recording.');
+          onError((e as Error).message || t('Couldn’t transcribe the recording.'));
         } finally {
           setState('idle');
         }
@@ -148,7 +149,7 @@ export function useDictation(onText: (text: string) => void, onError: (message: 
     }
     const r = browserRecognizer();
     if (!r) {
-      onError('Choose a transcription model in Settings → Media models to dictate here.');
+      onError(t('Choose a transcription model in Settings → Media models to dictate here.'));
       return;
     }
     r.lang = navigator.language;
@@ -159,7 +160,9 @@ export function useDictation(onText: (text: string) => void, onError: (message: 
       for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) text += e.results[i][0].transcript;
     };
     r.onerror = (e: any) => {
-      if (e?.error !== 'no-speech' && e?.error !== 'aborted') onError('Speech recognition stopped: ' + (e?.error ?? 'unknown error'));
+      if (e?.error !== 'no-speech' && e?.error !== 'aborted') {
+        onError(e?.error ? t('Speech recognition stopped: {error}', { error: String(e.error) }) : t('Speech recognition stopped.'));
+      }
     };
     r.onend = () => {
       setState('idle');

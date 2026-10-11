@@ -6,6 +6,7 @@ import { getApp } from '../../app';
 import { Dates } from '../../core/format';
 import { db } from '../../data/db';
 import type { McpServerEntity } from '../../data/entities';
+import { sentences, t, tm, tn } from '../../i18n';
 import { McpAuthRequiredException, type McpPendingAuth, type McpTool } from '../../mcp/types';
 import { platform } from '../../platform';
 import { MCP_BROWSER_BLOCKED, MCP_STATUS_SIGN_IN } from '../../tools/mcpManager';
@@ -17,18 +18,25 @@ import { ui } from '../nav';
 import { connectMcp, useMcpConnecting } from './McpConnect';
 import { McpLocalDialog, McpRemoteDialog } from './McpForms';
 import { mcpAddress } from './McpServers';
-import { ToolsStatus, ToolsToggleChip, errorText, isAbort, plural, useStableCallback } from './ToolsShared';
+import { ToolsStatus, ToolsToggleChip, errorText, isAbort, useStableCallback } from './ToolsShared';
 
 const APPROVALS: ToolApproval[] = ['ALWAYS', 'WRITES', 'NEVER'];
 
 function updatedAgo(ms: number): string {
-  const r = Dates.relative(ms);
-  return r === 'Just now' ? 'updated just now' : `updated ${r}`;
+  return Dates.justNow(ms) ? t('updated just now') : t('updated {time}', { time: Dates.relative(ms) });
 }
 
 function firstLine(text: string | null | undefined, max = 180): string {
   const line = (text ?? '').split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? '';
   return line.length > max ? line.slice(0, max - 1).trimEnd() + '…' : line;
+}
+
+/** "Signed in to Notion. 12 tools available." */
+function connectedToast(signedIn: boolean, name: string, tools: number): string {
+  return sentences(
+    signedIn ? t('Signed in to {name}.', { name }) : t('Connected to {name}.', { name }),
+    tn('{count} tool available.', '{count} tools available.', tools),
+  );
 }
 
 /** Sign-in for OAuth servers. On the website the sign-in is prepared ahead, so the popup opens during the click. */
@@ -63,7 +71,7 @@ function useSignIn(server: McpServerEntity | null | undefined) {
       },
       (e) => {
         if (!live) return;
-        setPrepareError(errorText(e, 'Couldn’t start sign-in. Try again.'));
+        setPrepareError(errorText(e, t('Couldn’t start sign-in. Try again.')));
         setPreparing(false);
       },
     );
@@ -89,9 +97,9 @@ function useSignIn(server: McpServerEntity | null | undefined) {
     setRunning(true);
     run
       .then(
-        (tools) => toast(`Signed in to ${server.name}. ${plural(tools.length, 'tool')} available.`),
+        (tools) => toast(connectedToast(true, server.name, tools.length)),
         (e) => {
-          if (!isAbort(e) && !ctrl.signal.aborted) setError(errorText(e, 'Sign-in didn’t complete. Try again.'));
+          if (!isAbort(e) && !ctrl.signal.aborted) setError(errorText(e, t('Sign-in didn’t complete. Try again.')));
         },
       )
       .finally(() => {
@@ -143,9 +151,9 @@ export function McpServerPage({ id }: { id: string }) {
   if (!server || server.deleted) {
     return (
       <div className="col gap-16 tools-page">
-        <ToolsStatus tone="info">This server was removed.</ToolsStatus>
+        <ToolsStatus tone="info">{t('This server was removed.')}</ToolsStatus>
         <span>
-          <Button variant="tonal" onClick={() => ui.openSettings('tools')}>Back to Tools</Button>
+          <Button variant="tonal" onClick={() => ui.openSettings('tools')}>{t('Back to Tools')}</Button>
         </span>
       </div>
     );
@@ -158,39 +166,39 @@ export function McpServerPage({ id }: { id: string }) {
   const yolo = synced.yoloMode;
   const signedIn = !local && s.authMode === 'OAUTH' && mcp.isSignedIn(s) && s.status !== MCP_STATUS_SIGN_IN;
   const genericProblem = s.status && s.status !== MCP_STATUS_SIGN_IN && s.status !== MCP_BROWSER_BLOCKED ? s.status : null;
-  const enabledCount = tools.filter((t) => !disabled.has(t.name)).length;
+  const enabledCount = tools.filter((tool) => !disabled.has(tool.name)).length;
 
   const state =
-    !s.enabled ? { text: 'Off. Its tools aren’t offered to models.' }
-      : cantRun ? { text: 'Runs only in the Facet app for Windows', warn: true }
-        : connecting ? { text: 'Connecting…' }
-          : s.status === MCP_STATUS_SIGN_IN ? { text: 'Sign in required', warn: true }
-            : s.status === MCP_BROWSER_BLOCKED ? { text: 'Doesn’t work in web browsers', warn: true }
-              : s.status ? { text: 'Couldn’t connect', warn: true }
-                : s.toolsFetchedAt === 0 ? { text: 'Connecting…' }
-                  : { text: `Connected · ${plural(tools.length, 'tool')} · ${updatedAgo(s.toolsFetchedAt)}`, ok: true };
+    !s.enabled ? { text: t('Off. Its tools aren’t offered to models.') }
+      : cantRun ? { text: t('Runs only in the Facet app for Windows'), warn: true }
+        : connecting ? { text: t('Connecting…') }
+          : s.status === MCP_STATUS_SIGN_IN ? { text: t('Sign in required'), warn: true }
+            : s.status === MCP_BROWSER_BLOCKED ? { text: t('Doesn’t work in web browsers'), warn: true }
+              : s.status ? { text: t('Couldn’t connect'), warn: true }
+                : s.toolsFetchedAt === 0 ? { text: t('Connecting…') }
+                  : { text: `${t('Connected')} · ${tn('{count} tool', '{count} tools', tools.length)} · ${updatedAgo(s.toolsFetchedAt)}`, ok: true };
 
   const refresh = async () => {
     setConnectError(null);
     signIn.clearError();
     try {
       const list = await connectMcp(id);
-      toast(`Connected to ${s.name}. ${plural(list.length, 'tool')} available.`);
+      toast(connectedToast(false, s.name, list.length));
     } catch (e) {
       // refreshTools saves the problem as the server's status; keep only problems it didn't save.
-      const msg = errorText(e, 'Couldn’t connect.');
+      const msg = errorText(e, t('Couldn’t connect.'));
       const fresh = await mcp.get(id);
       if (!(e instanceof McpAuthRequiredException) && fresh?.status !== msg) setConnectError(msg);
     }
   };
 
   const setAllTools = async (on: boolean) => {
-    for (const t of tools) if (disabled.has(t.name) === on) await mcp.setToolEnabled(id, t.name, on);
+    for (const tool of tools) if (disabled.has(tool.name) === on) await mcp.setToolEnabled(id, tool.name, on);
   };
 
   const q = filter.trim().toLowerCase();
   const shown = q
-    ? tools.filter((t) => t.name.toLowerCase().includes(q) || (t.title ?? '').toLowerCase().includes(q) || (t.description ?? '').toLowerCase().includes(q))
+    ? tools.filter((tool) => tool.name.toLowerCase().includes(q) || (tool.title ?? '').toLowerCase().includes(q) || (tool.description ?? '').toLowerCase().includes(q))
     : tools;
 
   return (
@@ -199,10 +207,10 @@ export function McpServerPage({ id }: { id: string }) {
         <span className="onboard-icon">{local ? <Terminal size={20} /> : <Server size={20} />}</span>
         <div className="col grow gap-4" style={{ minWidth: 0 }}>
           <div className="row gap-8" style={{ minWidth: 0 }}>
-            <span className="t-title-m ellipsis">{s.name}</span>
-            {local && <span className="badge">Local</span>}
+            <span className="t-title-m ellipsis"><bdi>{s.name}</bdi></span>
+            {local && <span className="badge">{t('Local')}</span>}
           </div>
-          <span className="mono mcp-hero-addr">{mcpAddress(s)}</span>
+          <span className="mono mcp-hero-addr" dir="ltr">{mcpAddress(s)}</span>
           <span className={'t-label-m row gap-6 ' + (state.warn ? 'c-warning' : 'c-2')} style={{ fontWeight: 400 }}>
             {state.ok && <span className="mcp-dot" aria-hidden />}
             {state.text}
@@ -211,18 +219,23 @@ export function McpServerPage({ id }: { id: string }) {
         {s.enabled && !cantRun && !signIn.needed && (
           <div className="tools-actions">
             <Button variant="tonal" small busy={connecting} onClick={refresh}>
-              {!connecting && <RefreshCw size={15} />} {s.toolsFetchedAt === 0 || s.status ? 'Connect' : 'Refresh tools'}
+              {!connecting && <RefreshCw size={15} />} {s.toolsFetchedAt === 0 || s.status ? t('Connect') : t('Refresh tools')}
             </Button>
           </div>
         )}
       </div>
 
-      {cantRun && <ToolsStatus tone="warning">Local servers run only in the Facet app for Windows.</ToolsStatus>}
+      {cantRun && <ToolsStatus tone="warning">{t('Local servers run only in the Facet app for Windows.')}</ToolsStatus>}
       {s.enabled && s.status === MCP_BROWSER_BLOCKED && (
-        <ToolsStatus tone="warning">{MCP_BROWSER_BLOCKED} Its settings sync, so it’s ready there.</ToolsStatus>
+        <ToolsStatus tone="warning">
+          {sentences(
+            t("This server doesn't accept connections from web browsers. Use it in the Facet app for Windows or Android."),
+            t('Its settings sync, so it’s ready there.'),
+          )}
+        </ToolsStatus>
       )}
       {s.enabled && genericProblem && !connecting && (
-        <ToolsStatus tone="error" action={<Button variant="text" small onClick={() => setDialog('edit')}>Edit</Button>}>
+        <ToolsStatus tone="error" action={<Button variant="text" small onClick={() => setDialog('edit')}>{t('Edit')}</Button>}>
           {genericProblem}
         </ToolsStatus>
       )}
@@ -233,27 +246,30 @@ export function McpServerPage({ id }: { id: string }) {
           <div className="row gap-12" style={{ alignItems: 'flex-start' }}>
             <span className="onboard-icon"><LogIn size={20} /></span>
             <div className="col grow gap-4" style={{ minWidth: 0 }}>
-              <span className="t-label-l">Sign in to {s.name}</span>
+              <span className="t-label-l">{t('Sign in to {name}', { name: s.name })}</span>
               <span className="t-label-m c-2" style={{ fontWeight: 400 }}>
-                {s.name} needs you to sign in before its tools work. {signIn.web ? 'A sign-in window opens.' : 'Your browser opens.'} Tokens
-                are encrypted and sync to your devices.
+                {sentences(
+                  t('{name} needs you to sign in before its tools work.', { name: s.name }),
+                  signIn.web ? t('A sign-in window opens.') : t('Your browser opens.'),
+                  t('Tokens are encrypted and sync to your devices.'),
+                )}
               </span>
             </div>
           </div>
           {signIn.prepareError ? (
-            <ToolsStatus tone="error" action={<Button variant="text" small onClick={signIn.retryPrepare}>Try again</Button>}>
+            <ToolsStatus tone="error" action={<Button variant="text" small onClick={signIn.retryPrepare}>{t('Try again')}</Button>}>
               {signIn.prepareError}
             </ToolsStatus>
           ) : signIn.running ? (
             <div className="row gap-12 tools-callout-actions">
               <Spinner />
-              <span className="t-body c-2 grow">Waiting for you to finish signing in…</span>
-              <Button variant="text" onClick={signIn.cancel}>Cancel</Button>
+              <span className="t-body c-2 grow">{t('Waiting for you to finish signing in…')}</span>
+              <Button variant="text" onClick={signIn.cancel}>{t('Cancel')}</Button>
             </div>
           ) : (
             <div className="row gap-8 tools-callout-actions">
               <Button busy={signIn.preparing} disabled={!signIn.ready} onClick={signIn.start}>
-                <LogIn size={16} /> Sign in
+                <LogIn size={16} className="flip-rtl" /> {t('Sign in')}
               </Button>
             </div>
           )}
@@ -264,11 +280,11 @@ export function McpServerPage({ id }: { id: string }) {
       <div className="group">
         <SwitchRow
           icon={<Power size={20} />}
-          title="Use this server"
+          title={t('Use this server')}
           subtitle={
             s.enabled
-              ? 'Its tools are offered to every model that supports tools.'
-              : local ? 'Off: its tools aren’t offered and the program isn’t running.' : 'Off: its tools aren’t offered to models.'
+              ? t('Its tools are offered to every model that supports tools.')
+              : local ? t('Off: its tools aren’t offered and the program isn’t running.') : t('Off: its tools aren’t offered to models.')
           }
           checked={s.enabled}
           onChange={(v) => void mcp.setEnabled(id, v)}
@@ -276,21 +292,21 @@ export function McpServerPage({ id }: { id: string }) {
       </div>
 
       {signedIn && (
-        <Group title="Account">
+        <Group title={t('Account')}>
           <Row
             icon={<CircleCheck size={20} />}
-            title="Signed in"
-            subtitle="Tokens refresh automatically and sync to your devices."
+            title={t('Signed in')}
+            subtitle={t('Tokens refresh automatically and sync to your devices.')}
             trailing={
               <Button
                 variant="text"
                 small
                 onClick={async () => {
                   await mcp.signOut(id);
-                  toast(`Signed out of ${s.name}.`);
+                  toast(t('Signed out of {name}.', { name: s.name }));
                 }}
               >
-                Sign out
+                {t('Sign out')}
               </Button>
             }
           />
@@ -298,18 +314,18 @@ export function McpServerPage({ id }: { id: string }) {
       )}
 
       <section className="col gap-8">
-        <h3 className="group-title" style={{ margin: '6px 4px 0' }}>When to ask first</h3>
-        <Segmented options={APPROVALS} selected={approval} label={(a) => TOOL_APPROVAL_INFO[a].label} onSelect={(a) => void mcp.setApproval(id, a)} />
+        <h3 className="group-title" style={{ margin: '6px 4px 0' }}>{t('When to ask first')}</h3>
+        <Segmented options={APPROVALS} selected={approval} label={(a) => tm(TOOL_APPROVAL_INFO[a].label)} onSelect={(a) => void mcp.setApproval(id, a)} />
         {yolo ? (
-          <span className="field-hint c-warning row gap-8" style={{ marginLeft: 4, flexWrap: 'wrap' }}>
-            YOLO mode is on, so these tools run without asking.
+          <span className="field-hint c-warning row gap-8" style={{ marginInlineStart: 4, flexWrap: 'wrap' }}>
+            {t('YOLO mode is on, so these tools run without asking.')}
             <button type="button" className="tools-link" onClick={() => void app.settings.updateSynced((p) => ({ ...p, yoloMode: false }))}>
-              Turn off YOLO mode
+              {t('Turn off YOLO mode')}
             </button>
           </span>
         ) : (
-          <span className="field-hint" style={{ marginLeft: 4 }}>
-            {TOOL_APPROVAL_INFO[approval].blurb} “Always allow” on a tool skips the question for that tool.
+          <span className="field-hint" style={{ marginInlineStart: 4 }}>
+            {sentences(tm(TOOL_APPROVAL_INFO[approval].blurb), t('“Always allow” on a tool skips the question for that tool.'))}
           </span>
         )}
       </section>
@@ -318,43 +334,45 @@ export function McpServerPage({ id }: { id: string }) {
         <section>
           <div className="tools-group-head">
             <h3 className="group-title grow">
-              Tools ({enabledCount === tools.length ? tools.length : `${enabledCount} of ${tools.length} on`})
+              {enabledCount === tools.length
+                ? t('Tools ({count})', { count: tools.length })
+                : t('Tools ({on} of {total} on)', { on: enabledCount, total: tools.length })}
             </h3>
             {tools.length > 1 && (
               <div className="tools-actions">
-                <Button variant="text" small disabled={enabledCount === tools.length} onClick={() => void setAllTools(true)}>Turn all on</Button>
-                <Button variant="text" small disabled={enabledCount === 0} onClick={() => void setAllTools(false)}>Turn all off</Button>
+                <Button variant="text" small disabled={enabledCount === tools.length} onClick={() => void setAllTools(true)}>{t('Turn all on')}</Button>
+                <Button variant="text" small disabled={enabledCount === 0} onClick={() => void setAllTools(false)}>{t('Turn all off')}</Button>
               </div>
             )}
           </div>
           {tools.length > 8 && (
             <div className="tools-search" style={{ marginBottom: 10 }}>
               <Search size={17} aria-hidden />
-              <input className="input" type="search" value={filter} placeholder="Filter tools" aria-label="Filter tools" onChange={(e) => setFilter(e.target.value)} />
+              <input className="input" type="search" dir="auto" value={filter} placeholder={t('Filter tools')} aria-label={t('Filter tools')} onChange={(e) => setFilter(e.target.value)} />
               {filter && (
-                <IconButton small label="Clear filter" onClick={() => setFilter('')}>
+                <IconButton small label={t('Clear filter')} onClick={() => setFilter('')}>
                   <X size={16} />
                 </IconButton>
               )}
             </div>
           )}
           <div className="group">
-            {shown.map((t, i) => {
-              const on = !disabled.has(t.name);
-              const always = auto.has(t.name);
-              const asks = approval === 'ALWAYS' || (approval === 'WRITES' && t.readOnlyHint !== true);
-              const desc = firstLine(t.description);
+            {shown.map((tool, i) => {
+              const on = !disabled.has(tool.name);
+              const always = auto.has(tool.name);
+              const asks = approval === 'ALWAYS' || (approval === 'WRITES' && tool.readOnlyHint !== true);
+              const desc = firstLine(tool.description);
               return (
-                <div key={t.name}>
+                <div key={tool.name}>
                   {i > 0 && <Divider full />}
                   <div className={'srow mcp-tool' + (on ? '' : ' off')}>
                     <span className="srow-text">
-                      <span className="srow-title">{t.title || t.name}</span>
-                      {t.title && t.title !== t.name && <span className="mono mcp-tool-name">{t.name}</span>}
-                      {desc && <span className="srow-sub mcp-tool-desc">{desc}</span>}
-                      {(t.readOnlyHint === true || t.destructiveHint === true) && (
+                      <span className="srow-title" dir="auto">{tool.title || tool.name}</span>
+                      {tool.title && tool.title !== tool.name && <span className="mono mcp-tool-name" dir="ltr">{tool.name}</span>}
+                      {desc && <span className="srow-sub mcp-tool-desc" dir="auto">{desc}</span>}
+                      {(tool.readOnlyHint === true || tool.destructiveHint === true) && (
                         <span className="row gap-6" style={{ marginTop: 4 }}>
-                          {t.readOnlyHint === true ? <span className="badge">Read-only</span> : <span className="badge warning">Can delete or overwrite data</span>}
+                          {tool.readOnlyHint === true ? <span className="badge">{t('Read-only')}</span> : <span className="badge warning">{t('Can delete or overwrite data')}</span>}
                         </span>
                       )}
                     </span>
@@ -362,52 +380,52 @@ export function McpServerPage({ id }: { id: string }) {
                       <ToolsToggleChip
                         on={always}
                         disabled={!on || (!asks && !always)}
-                        title={!asks && !always ? 'This tool already runs without asking.' : always ? 'Runs without asking. Click to ask again.' : 'Run this tool without asking'}
+                        title={!asks && !always ? t('This tool already runs without asking.') : always ? t('Runs without asking. Click to ask again.') : t('Run this tool without asking')}
                         icon={always ? <CircleCheck size={14} /> : undefined}
-                        onChange={(v) => void mcp.setAutoApprove(id, t.name, v)}
+                        onChange={(v) => void mcp.setAutoApprove(id, tool.name, v)}
                       >
-                        Always allow
+                        {t('Always allow')}
                       </ToolsToggleChip>
-                      <Switch checked={on} label={`Use ${t.title || t.name}`} onChange={(v) => void mcp.setToolEnabled(id, t.name, v)} />
+                      <Switch checked={on} label={t('Use {name}', { name: tool.title || tool.name })} onChange={(v) => void mcp.setToolEnabled(id, tool.name, v)} />
                     </div>
                   </div>
                 </div>
               );
             })}
-            {shown.length === 0 && <div className="srow t-body c-3">No tools match “{filter.trim()}”.</div>}
+            {shown.length === 0 && <div className="srow t-body c-3">{t('No tools match “{query}”.', { query: filter.trim() })}</div>}
           </div>
         </section>
       ) : (
-        s.toolsFetchedAt > 0 && <ToolsStatus tone="info">This server offers no tools.</ToolsStatus>
+        s.toolsFetchedAt > 0 && <ToolsStatus tone="info">{t('This server offers no tools.')}</ToolsStatus>
       )}
 
       {s.instructions?.trim() && (
         <details className="group tools-details">
           <summary>
-            <ChevronRight size={18} className="tools-details-chev" aria-hidden />
-            <span className="grow">Server instructions</span>
-            <span className="field-hint">Shown to models with the tools</span>
+            <ChevronRight size={18} className="tools-details-chev flip-rtl" aria-hidden />
+            <span className="grow">{t('Server instructions')}</span>
+            <span className="field-hint">{t('Shown to models with the tools')}</span>
           </summary>
-          <div className="tools-details-body">{s.instructions.trim()}</div>
+          <div className="tools-details-body" dir="auto">{s.instructions.trim()}</div>
         </details>
       )}
 
       <div className="group">
-        <Row icon={<Pencil size={20} />} title="Edit connection" subtitle={local ? 'Command, folder and environment' : 'Address, name and authentication'} onClick={() => setDialog('edit')} />
+        <Row icon={<Pencil size={20} />} title={t('Edit connection')} subtitle={local ? t('Command, folder and environment') : t('Address, name and authentication')} onClick={() => setDialog('edit')} />
         <Divider />
-        <Row icon={<Trash2 size={20} />} title="Remove server" danger chevron={false} onClick={() => setDialog('delete')} />
+        <Row icon={<Trash2 size={20} />} title={t('Remove server')} danger chevron={false} onClick={() => setDialog('delete')} />
       </div>
 
       {dialog === 'edit' && (local ? <McpLocalDialog existing={s} onClose={closeDialog} /> : <McpRemoteDialog existing={s} onClose={closeDialog} />)}
       {dialog === 'delete' && (
         <Confirm
-          title={`Remove ${s.name}?`}
-          body={local ? 'It’s removed from this computer and its program stops.' : 'Its tools and sign-in are removed from all your devices.'}
-          confirm="Remove"
+          title={t('Remove {name}?', { name: s.name })}
+          body={local ? t('It’s removed from this computer and its program stops.') : t('Its tools and sign-in are removed from all your devices.')}
+          confirm={t('Remove')}
           danger
           onConfirm={async () => {
             await mcp.delete(id);
-            toast(`Removed ${s.name}.`);
+            toast(t('Removed {name}.', { name: s.name }));
             ui.openSettings('tools');
           }}
           onClose={closeDialog}

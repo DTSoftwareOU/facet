@@ -5,6 +5,7 @@
  * EXIF/location data; orientation is applied first.
  */
 import { newId } from '../core/ids';
+import { t } from '../i18n';
 import { db } from './db';
 import { attachmentRef, type AttachmentEntity, type AttachmentRef } from './entities';
 
@@ -77,7 +78,7 @@ async function canvasFor(width: number, height: number): Promise<OffscreenCanvas
 async function encode(canvas: OffscreenCanvas | HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
   if ('convertToBlob' in canvas) return canvas.convertToBlob({ type, quality });
   return new Promise((resolve, reject) =>
-    (canvas as HTMLCanvasElement).toBlob((b) => (b ? resolve(b) : reject(new AttachmentError('Couldn’t encode the image.'))), type, quality),
+    (canvas as HTMLCanvasElement).toBlob((b) => (b ? resolve(b) : reject(new AttachmentError(t('Couldn’t encode the image.')))), type, quality),
   );
 }
 
@@ -88,7 +89,7 @@ async function draw(bitmap: ImageBitmap, maxEdge: number, checkAlpha: boolean) {
   const h = Math.max(1, Math.round(bitmap.height * scale));
   const canvas = await canvasFor(w, h);
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
-  if (!ctx) throw new AttachmentError('Couldn’t read that image.');
+  if (!ctx) throw new AttachmentError(t('Couldn’t read that image.'));
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(bitmap, 0, 0, w, h);
   let alpha = false;
@@ -123,7 +124,7 @@ export class AttachmentStore {
     if (mime.startsWith('image/') && mime !== 'image/svg+xml') return this.importImage(file, name, mime);
     if (mime === 'application/pdf') return this.importRaw(file, name, mime, 'pdf', MAX_PDF);
     if (mime.startsWith('text/') || TEXT_EXTENSIONS.has(ext) || TEXT_MIMES.has(mime)) return this.importRaw(file, name, 'text/plain', 'text', MAX_TEXT);
-    throw new AttachmentError(`Facet can attach images, PDFs and text files. "${name}" isn't one of those.`);
+    throw new AttachmentError(t('Facet can attach images, PDFs and text files. “{name}” isn’t one of those.', { name }));
   }
 
   private async importImage(file: Blob, name: string, mime: string): Promise<AttachmentEntity> {
@@ -131,7 +132,7 @@ export class AttachmentStore {
     try {
       bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     } catch {
-      throw new AttachmentError('That image couldn’t be read.');
+      throw new AttachmentError(t('That image couldn’t be read.'));
     }
     try {
       const mayHaveAlpha = mime === 'image/png' || mime === 'image/webp' || mime === 'image/gif';
@@ -155,7 +156,7 @@ export class AttachmentStore {
   }
 
   private async importRaw(file: Blob, name: string, mime: string, kind: string, max: number): Promise<AttachmentEntity> {
-    if (file.size > max) throw new AttachmentError(`"${name}" is larger than ${Math.round(max / (1024 * 1024))} MB.`);
+    if (file.size > max) throw new AttachmentError(t('“{name}” is larger than {size} MB.', { name, size: Math.round(max / (1024 * 1024)) }));
     const now = Date.now();
     const data = new Blob([await file.arrayBuffer()], { type: mime });
     const entity: AttachmentEntity = {

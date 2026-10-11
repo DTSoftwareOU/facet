@@ -7,6 +7,7 @@ import { AppWindow, Download, FileText, FolderOpen, FolderSearch, Monitor, Monit
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { getApp } from '../../app';
 import type { ToolApprovalName } from '../../data/prefs';
+import { isRtl, t } from '../../i18n';
 import { platform, type ComputerBridge, type ComputerInfo, type ComputerToolInfo } from '../../platform';
 import type { DesktopSettings } from '../../platform/platform';
 import { Button, Divider, Group, Row, Spinner, SwitchRow, useToast } from '../components/primitives';
@@ -15,11 +16,13 @@ import { ui } from '../nav';
 import type { PageProps } from './SettingsDialog';
 import { ToolsRow, ToolsStatus, errorText, firstSentence } from './ToolsShared';
 
-const CHOICES: { id: ToolApprovalName; title: string; subtitle: string }[] = [
-  { id: 'ALWAYS', title: 'Ask before every action', subtitle: 'Even reading a file or listing a folder waits for you.' },
-  { id: 'WRITES', title: 'Ask before commands and file changes', subtitle: 'Reading and searching files runs without asking. Recommended.' },
-  { id: 'NEVER', title: 'Never ask', subtitle: 'Only for folders you trust. Commands run without asking and can reach anything your Windows account can.' },
-];
+function choices(): { id: ToolApprovalName; title: string; subtitle: string }[] {
+  return [
+    { id: 'ALWAYS', title: t('Ask before every action'), subtitle: t('Even reading a file or listing a folder waits for you.') },
+    { id: 'WRITES', title: t('Ask before commands and file changes'), subtitle: t('Reading and searching files runs without asking. Recommended.') },
+    { id: 'NEVER', title: t('Never ask'), subtitle: t('Only for folders you trust. Commands run without asking and can reach anything your Windows account can.') },
+  ];
+}
 
 function toolIcon(name: string) {
   if (/command|process/.test(name)) return <Terminal size={20} />;
@@ -41,10 +44,14 @@ function ApprovalChoices({ dim }: { dim: boolean }) {
   const local = useLocalPrefs();
   const synced = useSyncedPrefs();
   const choiceRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const CHOICES = choices();
   const approval = local.computerApproval;
   const setApproval = (a: ToolApprovalName) => app.settings.updateLocal((l) => ({ ...l, computerApproval: a }));
   const onChoiceKey = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
-    const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0;
+    // Left and right follow the reading direction.
+    const fwd = isRtl() ? 'ArrowLeft' : 'ArrowRight';
+    const back = isRtl() ? 'ArrowRight' : 'ArrowLeft';
+    const step = e.key === 'ArrowDown' || e.key === fwd ? 1 : e.key === 'ArrowUp' || e.key === back ? -1 : 0;
     if (!step) return;
     e.preventDefault();
     const next = (i + step + CHOICES.length) % CHOICES.length;
@@ -53,7 +60,7 @@ function ApprovalChoices({ dim }: { dim: boolean }) {
   };
   return (
     <section className={dim ? 'computer-dim' : undefined}>
-      <h3 className="group-title" id="computer-ask">When to ask first</h3>
+      <h3 className="group-title" id="computer-ask">{t('When to ask first')}</h3>
       <div className="group" role="radiogroup" aria-labelledby="computer-ask">
         {CHOICES.map((c, i) => {
           const selected = approval === c.id;
@@ -88,14 +95,14 @@ function ApprovalChoices({ dim }: { dim: boolean }) {
             tone="warning"
             action={
               <Button variant="text" small onClick={() => void app.settings.updateSynced((s) => ({ ...s, yoloMode: false }))}>
-                Turn off
+                {t('Turn off')}
               </Button>
             }
           >
-            YOLO mode is on, so computer tools run without asking, whatever you choose here.
+            {t('YOLO mode is on, so computer tools run without asking, whatever you choose here.')}
           </ToolsStatus>
         ) : (
-          <p className="field-hint" style={{ margin: '0 6px' }}>YOLO mode (in Tools) skips all approvals, including these.</p>
+          <p className="field-hint" style={{ margin: '0 6px' }}>{t('YOLO mode (in Tools) skips all approvals, including these.')}</p>
         )}
       </div>
     </section>
@@ -113,10 +120,9 @@ function YourPcSettings() {
       <div className="group computer-hero">
         <span className="onboard-icon"><MonitorSmartphone size={20} /></span>
         <div className="col gap-6 grow">
-          <span className="t-label-l">Work on your PC from here</span>
+          <span className="t-label-l">{t('Work on your PC from here')}</span>
           <span className="t-body c-2">
-            When Facet for Windows is running on one of your PCs, chats here can run commands and read and edit files in a folder on it.
-            Choose the PC and folder from the message box. Requests to the PC are end-to-end encrypted; Facet’s server can’t read them.
+            {t('When Facet for Windows is running on one of your PCs, chats here can run commands and read and edit files in a folder on it. Choose the PC and folder from the message box. Requests to the PC are end-to-end encrypted; Facet’s server can’t read them.')}
           </span>
         </div>
       </div>
@@ -124,8 +130,8 @@ function YourPcSettings() {
       <div className="group">
         <SwitchRow
           icon={<Power size={20} />}
-          title="Let models use your PC"
-          subtitle={on ? 'On for chats that work on a PC.' : 'Off in every chat.'}
+          title={t('Let models use your PC')}
+          subtitle={on ? t('On for chats that work on a PC.') : t('Off in every chat.')}
           checked={on}
           onChange={(v) => app.settings.updateLocal((l) => ({ ...l, computerTools: v }))}
         />
@@ -134,18 +140,18 @@ function YourPcSettings() {
       <ApprovalChoices dim={!on} />
 
       <Group
-        title="Your PCs"
+        title={t('Your PCs')}
         footer={
           hosts.some((h) => !h.remote)
-            ? 'A PC with remote use off needs one switch first: in Facet on that PC, open Settings → Computer access and turn on “Let your other devices use this PC”.'
-            : 'PCs show up here while Facet for Windows is running and signed in to this account.'
+            ? t('A PC with remote use off needs one switch first: in Facet on that PC, open Settings → Computer access and turn on “Let your other devices use this PC”.')
+            : t('PCs show up here while Facet for Windows is running and signed in to this account.')
         }
       >
         {hosts.length === 0 ? (
           <Row
             icon={<MonitorOff size={20} />}
-            title="No PC is online"
-            subtitle="Install Facet for Windows, sign in with this account and keep it running."
+            title={t('No PC is online')}
+            subtitle={t('Install Facet for Windows, sign in with this account and keep it running.')}
             onClick={() => platform().openExternal('https://facet.dtsoftware.io/#download')}
             trailing={<Download size={18} className="c-3" />}
           />
@@ -155,8 +161,8 @@ function YourPcSettings() {
               {i > 0 && <Divider />}
               <Row
                 icon={h.remote ? <Monitor size={20} /> : <MonitorOff size={20} />}
-                title={h.name}
-                subtitle={h.remote ? `Online · ${h.os || 'Windows'}` : 'Online · remote use is off'}
+                title={<bdi>{h.name}</bdi>}
+                subtitle={h.remote ? t('Online · {os}', { os: h.os || 'Windows' }) : t('Online · remote use is off')}
               />
             </div>
           ))
@@ -184,35 +190,35 @@ function DesktopHostSettings() {
   if (!host || !settings) return null;
   const set = (patch: Partial<Omit<DesktopSettings, 'hostId'>>) => {
     setSettings({ ...settings, ...patch });
-    host.setSettings(patch).then(setSettings, (e) => toast(errorText(e, 'Couldn’t change that setting.')));
+    host.setSettings(patch).then(setSettings, (e) => toast(errorText(e, t('Couldn’t change that setting.'))));
   };
   return (
     <>
       <Group
-        title="Your other devices"
-        footer="Your phone and other devices signed in to this account can then run commands and read and edit files here, in the folders they choose. Requests are end-to-end encrypted, and the device you use asks before changes, as set there."
+        title={t('Your other devices')}
+        footer={t('Your phone and other devices signed in to this account can then run commands and read and edit files here, in the folders they choose. Requests are end-to-end encrypted, and the device you use asks before changes, as set there.')}
       >
         <SwitchRow
           icon={<MonitorSmartphone size={20} />}
-          title="Let your other devices use this PC"
-          subtitle={settings.remoteAccess ? 'On while Facet is running.' : 'Off. Other devices can see that this PC is online, but can’t use it.'}
+          title={t('Let your other devices use this PC')}
+          subtitle={settings.remoteAccess ? t('On while Facet is running.') : t('Off. Other devices can see that this PC is online, but can’t use it.')}
           checked={settings.remoteAccess}
           onChange={(v) => set({ remoteAccess: v })}
         />
       </Group>
-      <Group title="Background" footer="Facet keeps an icon in the notification area while it runs in the background, so your other devices can reach this PC. Quit it from that icon.">
+      <Group title={t('Background')} footer={t('Facet keeps an icon in the notification area while it runs in the background, so your other devices can reach this PC. Quit it from that icon.')}>
         <SwitchRow
           icon={<Power size={20} />}
-          title="Start with Windows"
-          subtitle="Opens hidden in the notification area when you sign in."
+          title={t('Start with Windows')}
+          subtitle={t('Opens hidden in the notification area when you sign in.')}
           checked={settings.startWithWindows}
           onChange={(v) => set({ startWithWindows: v })}
         />
         <Divider />
         <SwitchRow
           icon={<AppWindow size={20} />}
-          title="Keep running when closed"
-          subtitle="Closing the window keeps Facet in the notification area."
+          title={t('Keep running when closed')}
+          subtitle={t('Closing the window keeps Facet in the notification area.')}
           checked={settings.keepRunning}
           onChange={(v) => set({ keepRunning: v })}
         />
@@ -242,11 +248,11 @@ function ComputerSettings({ computer }: { computer: ComputerBridge }) {
     let live = true;
     computer.info().then(
       (i) => live && setInfo(i),
-      (e) => live && setInfoError(errorText(e, 'Couldn’t read this computer’s details.')),
+      (e) => live && setInfoError(errorText(e, t('Couldn’t read this computer’s details.'))),
     );
     computer.tools().then(
-      (t) => live && setTools(t),
-      (e) => live && setToolsError(errorText(e, 'Couldn’t load the tools. Restart Facet and try again.')),
+      (list) => live && setTools(list),
+      (e) => live && setToolsError(errorText(e, t('Couldn’t load the tools. Restart Facet and try again.'))),
     );
     computer.defaultWorkspace().then(
       (w) => live && setFallback(w),
@@ -269,7 +275,7 @@ function ComputerSettings({ computer }: { computer: ComputerBridge }) {
       const picked = await computer.pickFolder(folder || undefined);
       if (picked) app.settings.updateLocal((l) => ({ ...l, defaultWorkspace: picked }));
     } catch (e) {
-      toast(errorText(e, 'Couldn’t open the folder picker.'));
+      toast(errorText(e, t('Couldn’t open the folder picker.')));
     }
   };
 
@@ -278,10 +284,9 @@ function ComputerSettings({ computer }: { computer: ComputerBridge }) {
       <div className="group computer-hero">
         <span className="onboard-icon"><Monitor size={20} /></span>
         <div className="col gap-6 grow">
-          <span className="t-label-l">Let models work on this computer</span>
+          <span className="t-label-l">{t('Let models work on this computer')}</span>
           <span className="t-body c-2">
-            Models that support tools can run {shell} commands and read, write and edit files in a chat’s working folder, the way coding
-            agents like Claude Code do. Replies show every step, and risky steps ask you first.
+            {t('Models that support tools can run {shell} commands and read, write and edit files in a chat’s working folder, the way coding agents like Claude Code do. Replies show every step, and risky steps ask you first.', { shell })}
           </span>
         </div>
       </div>
@@ -289,8 +294,8 @@ function ComputerSettings({ computer }: { computer: ComputerBridge }) {
       <div className="group">
         <SwitchRow
           icon={<Power size={20} />}
-          title="Let models use this computer"
-          subtitle={on ? 'On for chats with tools. You can turn it off for one chat in its settings.' : 'Off in every chat.'}
+          title={t('Let models use this computer')}
+          subtitle={on ? t('On for chats with tools. You can turn it off for one chat in its settings.') : t('Off in every chat.')}
           checked={on}
           onChange={(v) => app.settings.updateLocal((l) => ({ ...l, computerTools: v }))}
         />
@@ -300,38 +305,38 @@ function ComputerSettings({ computer }: { computer: ComputerBridge }) {
 
       <DesktopHostSettings />
 
-      <Group title="Default working folder" footer="New chats work in this folder. Each chat can pick its own folder from the composer.">
+      <Group title={t('Default working folder')} footer={t('New chats work in this folder. Each chat can pick its own folder from the composer.')}>
         <div className="srow">
           <span className="srow-icon"><FolderOpen size={20} /></span>
           <span className="srow-text">
-            <span className="srow-title mono computer-path">{folder || (fallback == null ? ' ' : 'No folder')}</span>
-            <span className="srow-sub">{custom ? 'Chosen by you' : 'The default folder'}</span>
+            <span className="srow-title mono computer-path">{folder ? <bdi>{folder}</bdi> : fallback == null ? ' ' : t('No folder')}</span>
+            <span className="srow-sub">{custom ? t('Chosen by you') : t('The default folder')}</span>
           </span>
         </div>
         <div className="tools-actions computer-folder-actions">
-          <Button variant="tonal" small onClick={changeFolder}>Change…</Button>
+          <Button variant="tonal" small onClick={changeFolder}>{t('Change…')}</Button>
           <Button
             variant="text"
             small
             disabled={!folder}
-            onClick={() => void computer.open(folder).catch((e) => toast(errorText(e, 'Couldn’t open the folder.')))}
+            onClick={() => void computer.open(folder).catch((e) => toast(errorText(e, t('Couldn’t open the folder.'))))}
           >
-            Open
+            {t('Open')}
           </Button>
           {custom && (
             <Button variant="text" small onClick={() => app.settings.updateLocal((l) => ({ ...l, defaultWorkspace: '' }))}>
-              Reset
+              {t('Reset')}
             </Button>
           )}
         </div>
       </Group>
 
       <Group
-        title="What models can do"
+        title={t('What models can do')}
         footer={
-          approval === 'ALWAYS' ? 'Every tool asks before it runs.'
-            : approval === 'NEVER' ? 'No tool asks before it runs.'
-              : 'Tools that can change things ask before they run; tools that only read run without asking.'
+          approval === 'ALWAYS' ? t('Every tool asks before it runs.')
+            : approval === 'NEVER' ? t('No tool asks before it runs.')
+              : t('Tools that can change things ask before they run; tools that only read run without asking.')
         }
       >
         {toolsError && <div className="srow t-body c-error">{toolsError}</div>}
@@ -340,22 +345,23 @@ function ComputerSettings({ computer }: { computer: ComputerBridge }) {
             <Spinner />
           </div>
         )}
-        {tools?.map((t, i) => (
-          <div key={t.name}>
+        {tools?.map((tool, i) => (
+          <div key={tool.name}>
             {i > 0 && <Divider />}
             <div className="srow computer-tool">
-              <span className="srow-icon">{toolIcon(t.name)}</span>
+              <span className="srow-icon">{toolIcon(tool.name)}</span>
               <span className="srow-text">
-                <span className="srow-title mono computer-tool-name">{t.name}</span>
-                <span className="srow-sub">{firstSentence(t.description, 200)}</span>
+                <span className="srow-title mono computer-tool-name">{tool.name}</span>
+                {/* The description is the one the model reads, so it stays English. */}
+                <span className="srow-sub" dir="auto">{firstSentence(tool.description, 200)}</span>
               </span>
-              {t.readOnly ? <span className="badge">Reads only</span> : <span className="badge warning">Can change things</span>}
+              {tool.readOnly ? <span className="badge">{t('Reads only')}</span> : <span className="badge warning">{t('Can change things')}</span>}
             </div>
           </div>
         ))}
       </Group>
 
-      <Group title="This computer">
+      <Group title={t('This computer')}>
         <div className="computer-info">
           {infoError ? (
             <span className="t-body c-error">{infoError}</span>
@@ -363,14 +369,14 @@ function ComputerSettings({ computer }: { computer: ComputerBridge }) {
             <Spinner />
           ) : (
             <dl className="kv">
-              <dt>System</dt>
-              <dd>{info.os}</dd>
-              <dt>Shell</dt>
-              <dd>{info.shell}</dd>
-              <dt>User</dt>
-              <dd>{info.user}</dd>
-              <dt>Computer name</dt>
-              <dd>{info.hostname}</dd>
+              <dt>{t('System')}</dt>
+              <dd><bdi>{info.os}</bdi></dd>
+              <dt>{t('Shell')}</dt>
+              <dd><bdi>{info.shell}</bdi></dd>
+              <dt>{t('User')}</dt>
+              <dd><bdi>{info.user}</bdi></dd>
+              <dt>{t('Computer name')}</dt>
+              <dd><bdi>{info.hostname}</bdi></dd>
             </dl>
           )}
         </div>
@@ -379,8 +385,8 @@ function ComputerSettings({ computer }: { computer: ComputerBridge }) {
       <div className="group">
         <ToolsRow
           icon={<Server size={20} />}
-          title="Add local MCP servers"
-          subtitle="Run MCP servers on this computer, like npx or uvx packages, and give models their tools."
+          title={t('Add local MCP servers')}
+          subtitle={t('Run MCP servers on this computer, like npx or uvx packages, and give models their tools.')}
           onClick={() => ui.openSettings('tools', 'mcp:add:local')}
         />
       </div>

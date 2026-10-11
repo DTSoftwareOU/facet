@@ -10,6 +10,7 @@
  */
 import { isObject } from '../core/json';
 import { readSse } from '../core/sse';
+import { t } from '../i18n';
 import { platform, type StdioBridge } from '../platform';
 import {
   discard,
@@ -175,7 +176,7 @@ class LegacyChannel extends PendingRequests {
     } catch {
       // Stream dropped or was cancelled: fail pending requests below.
     } finally {
-      this.rejectEndpoint(new McpException(`${this.serverName} closed the connection.`));
+      this.rejectEndpoint(new McpException(t('{server} closed the connection.', { server: this.serverName })));
       this.end(null);
     }
   }
@@ -278,8 +279,8 @@ export class McpClient {
       const params: Json | null = cursor != null ? { cursor } : null;
       const result = await this.request('tools/list', params, McpClient.REQUEST_TIMEOUT_MS, signal);
       for (const el of jarr(result, 'tools') ?? []) {
-        const t = isObject(el) ? parseTool(el) : null;
-        if (t) out.push(t);
+        const tool = isObject(el) ? parseTool(el) : null;
+        if (tool) out.push(tool);
       }
       const next = jstr(result, 'nextCursor');
       cursor = next ? next : null;
@@ -333,12 +334,12 @@ export class McpClient {
         const result = await withDeadline(timeoutMs, signal, (s) => this.send(id, method, params, s));
         if (result === TIMED_OUT) {
           this.notifyCancelled(id, 'Timed out');
-          throw new McpException(`${this.config.name} didn't answer within ${timeoutMs / 1000} seconds.`);
+          throw new McpException(t('{server} didn\'t answer within {seconds} seconds.', { server: this.config.name, seconds: timeoutMs / 1000 }));
         }
         return result;
       } catch (e) {
         if (e instanceof SessionExpired) {
-          if (reinitialized) throw new McpException(`${this.config.name} keeps ending the session. Try again in a moment.`);
+          if (reinitialized) throw new McpException(t('{server} keeps ending the session. Try again in a moment.', { server: this.config.name }));
           reinitialized = true;
           await this.invalidate(gen);
           continue;
@@ -354,8 +355,8 @@ export class McpClient {
           this.notifyCancelled(id, 'Cancelled by the user');
           throw e;
         }
-        if (this.closed) throw new McpException(`This connection to ${this.config.name} was closed.`);
-        throw new McpException(`Couldn't reach ${this.config.name}. Check the address and your connection.`, null, e);
+        if (this.closed) throw new McpException(t('This connection to {server} was closed.', { server: this.config.name }));
+        throw new McpException(t('Couldn\'t reach {server}. Check the address and your connection.', { server: this.config.name }), null, e);
       }
     }
   }
@@ -372,10 +373,10 @@ export class McpClient {
   }
 
   private async ensureSession(): Promise<{ info: McpServerInfo; gen: number }> {
-    if (this.closed) throw new McpException(`This connection to ${this.config.name} was closed.`);
+    if (this.closed) throw new McpException(t('This connection to {server} was closed.', { server: this.config.name }));
     if (this.info) return { info: this.info, gen: this.generation };
     return this.initLock.run(async () => {
-      if (this.closed) throw new McpException(`This connection to ${this.config.name} was closed.`);
+      if (this.closed) throw new McpException(t('This connection to {server} was closed.', { server: this.config.name }));
       if (this.info) return { info: this.info, gen: this.generation };
       let refreshed = false;
       while (true) {
@@ -388,10 +389,10 @@ export class McpClient {
             refreshed = true;
             continue;
           }
-          if (e instanceof RpcError) throw new McpException(`${this.config.name} refused to start a session: ${e.message}`);
-          if (e instanceof SessionExpired) throw new McpException(`Couldn't start a session with ${this.config.name}.`);
+          if (e instanceof RpcError) throw new McpException(t('{server} refused to start a session: {reason}', { server: this.config.name, reason: e.message }));
+          if (e instanceof SessionExpired) throw new McpException(t('Couldn\'t start a session with {server}.', { server: this.config.name }));
           if (e instanceof McpException || e instanceof McpAuthRequiredException) throw e;
-          throw new McpException(`Couldn't reach ${this.config.name}. Check the address and your connection.`, null, e);
+          throw new McpException(t('Couldn\'t reach {server}. Check the address and your connection.', { server: this.config.name }), null, e);
         }
       }
     });
@@ -425,7 +426,7 @@ export class McpClient {
         try {
           result = await this.initLegacy();
         } catch (legacyError) {
-          if (legacyError instanceof McpException) throw new McpException(`No MCP server answered at this address (HTTP ${e.status}).`, e.status);
+          if (legacyError instanceof McpException) throw new McpException(t('No MCP server answered at this address (HTTP {status}).', { status: String(e.status) }), e.status);
           throw legacyError;
         }
       }
@@ -444,9 +445,9 @@ export class McpClient {
 
   private serverInfo(result: Json): McpServerInfo {
     const version = jstr(result, 'protocolVersion');
-    if (version == null) throw new McpException(`${this.config.name} didn't say which MCP version it speaks.`);
+    if (version == null) throw new McpException(t('{server} didn\'t say which MCP version it speaks.', { server: this.config.name }));
     if (!Mcp.SUPPORTED_VERSIONS.includes(version)) {
-      throw new McpException(`${this.config.name} uses MCP version ${version}, which Facet doesn't support yet.`);
+      throw new McpException(t('{server} uses MCP version {version}, which Facet doesn\'t support yet.', { server: this.config.name, version }));
     }
     const si = jobj(result, 'serverInfo');
     this.negotiated = version;
@@ -477,7 +478,7 @@ export class McpClient {
       const session = sent.response.headers.get(Mcp.HEADER_SESSION);
       return { result: await this.readResponse(sent.response, id, signal), session };
     });
-    if (answer === TIMED_OUT) throw new McpException(`${this.config.name} didn't answer the initialize request.`);
+    if (answer === TIMED_OUT) throw new McpException(t('{server} didn\'t answer the initialize request.', { server: this.config.name }));
     this.sessionId = answer.session;
     this.mode = 'STREAMABLE';
     const built = this.serverInfo(answer.result);
@@ -520,12 +521,12 @@ export class McpClient {
     const name = this.config.name;
     if (code === 401) throw new Unauthorized(challenge, tokenUsed);
     if (code === 403 && parseBearerChallenge(challenge).error === 'insufficient_scope') throw new McpAuthRequiredException(this.config.id, challenge);
-    if (code === 403) throw new McpException(`${name} refused access (HTTP 403).`, 403);
+    if (code === 403) throw new McpException(t('{server} refused access (HTTP 403).', { server: name }), 403);
     if (code === 404 && !initializing && this.sessionId != null) throw new SessionExpired();
-    if (code === 404) throw new McpException('No MCP server was found at this address (HTTP 404).', 404);
-    if (code === 429) throw new McpException(`${name} is rate limiting requests. Try again shortly.`, 429);
-    if (code >= 500) throw new McpException(`${name} had a server error (HTTP ${code}).`, code);
-    throw new McpException(`${name} rejected the request (HTTP ${code}).`, code);
+    if (code === 404) throw new McpException(t('No MCP server was found at this address (HTTP 404).'), 404);
+    if (code === 429) throw new McpException(t('{server} is rate limiting requests. Try again shortly.', { server: name }), 429);
+    if (code >= 500) throw new McpException(t('{server} had a server error (HTTP {status}).', { server: name, status: String(code) }), code);
+    throw new McpException(t('{server} rejected the request (HTTP {status}).', { server: name, status: String(code) }), code);
   }
 
   /** Reads a JSON or SSE response until the JSON-RPC response for [id] arrives. */
@@ -546,11 +547,11 @@ export class McpClient {
           if (found) return found;
         }
       }
-      throw new McpException(`${name} closed the stream before answering.`);
+      throw new McpException(t('{server} closed the stream before answering.', { server: name }));
     }
     const text = await response.text();
-    if (response.status === 202 || !text.trim()) throw new McpException(`${name} accepted the request but sent no answer.`);
-    const notMcp = 'The address answered, but not as an MCP server.';
+    if (response.status === 202 || !text.trim()) throw new McpException(t('{server} accepted the request but sent no answer.', { server: name }));
+    const notMcp = t('The address answered, but not as an MCP server.');
     let msg: unknown;
     try {
       msg = JSON.parse(text);
@@ -559,7 +560,7 @@ export class McpClient {
     }
     if (!isObject(msg) && !Array.isArray(msg)) throw new McpException(notMcp);
     const found = this.handleIncoming(msg, id);
-    if (!found) throw new McpException(`${name} answered a different request.`);
+    if (!found) throw new McpException(t('{server} answered a different request.', { server: name }));
     return found;
   }
 
@@ -623,7 +624,7 @@ export class McpClient {
     try {
       response = await platform().fetch(this.config.url, { method: 'GET', headers, signal: ctrl.signal });
     } catch (e) {
-      if (isAbortError(e)) throw new McpException('No MCP server answered at this address.');
+      if (isAbortError(e)) throw new McpException(t('No MCP server answered at this address.'));
       throw e;
     } finally {
       clearTimeout(timer);
@@ -636,13 +637,13 @@ export class McpClient {
     const type = (response.headers.get('Content-Type') ?? '').toLowerCase();
     if (!response.ok || !type.includes('text/event-stream') || !response.body) {
       ctrl.abort();
-      throw new McpException('No MCP server answered at this address.');
+      throw new McpException(t('No MCP server answered at this address.'));
     }
     const channel = new LegacyChannel(ctrl, response.body, this.config.url, name, (o) => this.answerServerRequest(o));
     const endpoint = await withDeadline(McpClient.REQUEST_TIMEOUT_MS, undefined, () => channel.endpoint).catch(() => null);
     if (endpoint == null || endpoint === TIMED_OUT) {
       channel.close();
-      throw new McpException(`${name} didn't send its message endpoint.`);
+      throw new McpException(t('{server} didn\'t send its message endpoint.', { server: name }));
     }
     this.legacy?.close();
     this.legacy = channel;
@@ -651,7 +652,7 @@ export class McpClient {
     this.negotiated = null;
     const id = this.ids++;
     const result = await withDeadline(McpClient.REQUEST_TIMEOUT_MS, undefined, (s) => this.legacyRequest(id, 'initialize', this.initParams(), s));
-    if (result === TIMED_OUT) throw new McpException(`${name} didn't answer the initialize request.`);
+    if (result === TIMED_OUT) throw new McpException(t('{server} didn\'t answer the initialize request.', { server: name }));
     const built = this.serverInfo(result);
     discard((await this.legacyPost(channel, rpc(null, 'notifications/initialized', null))).response);
     return built;
@@ -668,7 +669,7 @@ export class McpClient {
       discard(sent.response);
       if (code === 401) throw new Unauthorized(challenge, sent.token);
       if (code === 404) throw new SessionExpired();
-      if (!sent.response.ok) throw new McpException(`${this.config.name} rejected the request (HTTP ${code}).`, code);
+      if (!sent.response.ok) throw new McpException(t('{server} rejected the request (HTTP {status}).', { server: this.config.name, status: String(code) }), code);
       const msg = await raceAbort(waiting, signal);
       const error = jobj(msg, 'error');
       if (error) throw new RpcError(error);
@@ -694,12 +695,12 @@ export class McpClient {
     const name = this.config.name;
     const spec = this.config.stdio!;
     const bridge = platform().stdio;
-    if (!bridge) throw new McpException('Local servers run only in the Facet app for Windows.');
+    if (!bridge) throw new McpException(t('Local servers run only in the Facet app for Windows.'));
     let handle: string;
     try {
       handle = await bridge.spawn({ command: spec.command, args: spec.args ?? [], env: this.config.headers, cwd: spec.cwd ?? null });
     } catch (e) {
-      throw new McpException(`Couldn't start ${name}: ${errorText(e)}`);
+      throw new McpException(t('Couldn\'t start {server}: {reason}', { server: name, reason: errorText(e) }));
     }
     const channel = new StdioChannel(bridge, handle, (o) => this.answerServerRequest(o));
     this.stdio?.close();
@@ -710,7 +711,7 @@ export class McpClient {
     try {
       const id = this.ids++;
       const result = await withDeadline(McpClient.STDIO_START_TIMEOUT_MS, undefined, (s) => this.stdioRequest(id, 'initialize', this.initParams(), s));
-      if (result === TIMED_OUT) throw new McpException(`${name} didn't answer the initialize request.`);
+      if (result === TIMED_OUT) throw new McpException(t('{server} didn\'t answer the initialize request.', { server: name }));
       const built = this.serverInfo(result);
       await channel.send(rpc(null, 'notifications/initialized', null));
       return built;
@@ -719,7 +720,9 @@ export class McpClient {
       if (this.stdio === channel) this.stdio = null;
       this.info = null;
       if (e instanceof SessionExpired) {
-        throw new McpException(`${name} stopped before it was ready${e.detail ? ` (${e.detail})` : ''}. Check the command and its settings.`);
+        throw new McpException(e.detail
+          ? t('{server} stopped before it was ready ({reason}). Check the command and its settings.', { server: name, reason: e.detail })
+          : t('{server} stopped before it was ready. Check the command and its settings.', { server: name }));
       }
       throw e;
     }

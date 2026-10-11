@@ -4,6 +4,8 @@ import { getApp } from '../../app';
 import { Format } from '../../core/format';
 import type { ModelRef } from '../../data/prefs';
 import type { ProviderModels } from '../../data/providers';
+import { providerDisplayName } from '../../llm/providers';
+import { t, tn } from '../../i18n';
 import type { ModelInfo } from '../../llm/types';
 import { platform } from '../../platform';
 import { ProviderBadge } from '../components/Avatars';
@@ -24,7 +26,7 @@ export function resolveModel(catalog: ProviderModels[] | undefined, ref: ModelRe
   const p = catalog.find((c) => c.provider.id === ref.providerId);
   if (!p) return null;
   const model = p.models.find((m) => m.id === ref.modelId) ?? getApp().providers.modelInfo(p.provider, ref.modelId);
-  return { ref, model, providerLabel: p.provider.label || p.kind.displayName, kindName: p.kind.displayName };
+  return { ref, model, providerLabel: p.provider.label || providerDisplayName(p.kind), kindName: p.kind.displayName };
 }
 
 /** The first usable model: favorites first, then the provider's list order. */
@@ -54,7 +56,7 @@ function CapIcons({ m }: { m: ModelInfo }) {
   );
 }
 
-export function ModelPicker({ current, onPick, onClose, title = 'Choose a model' }: {
+export function ModelPicker({ current, onPick, onClose, title }: {
   current: ModelRef | null;
   onPick: (ref: ModelRef) => void;
   onClose: () => void;
@@ -81,14 +83,15 @@ export function ModelPicker({ current, onPick, onClose, title = 'Choose a model'
   const blocked = (p: ProviderModels) => platform().corsLimited && !p.kind.browserOk;
 
   return (
-    <Dialog title={title} onClose={onClose} size="wide">
+    <Dialog title={title ?? t('Choose a model')} onClose={onClose} size="wide">
       <div className="row gap-8" style={{ position: 'sticky', top: 0, background: 'var(--surface)', paddingBottom: 10, zIndex: 1 }}>
         <div className="row grow" style={{ background: 'var(--surface-high)', borderRadius: 14, padding: '0 12px', gap: 8 }}>
           <Search size={17} className="c-3" />
           <input
             className="input"
             style={{ background: 'transparent', border: 0, padding: '10px 0' }}
-            placeholder="Search models"
+            placeholder={t('Search models')}
+            aria-label={t('Search models')}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             autoFocus
@@ -98,18 +101,18 @@ export function ModelPicker({ current, onPick, onClose, title = 'Choose a model'
       {catalog && catalog.length === 0 && (
         <div className="empty">
           <div className="empty-icon"><KeyRound size={24} /></div>
-          <div className="t-title-m" style={{ color: 'var(--text)' }}>No providers yet</div>
-          <div className="t-body">Add an API key to see its models here.</div>
-          <Button onClick={() => { onClose(); ui.openSettings('providers'); }}>Add a provider</Button>
+          <div className="t-title-m" style={{ color: 'var(--text)' }}>{t('No providers yet')}</div>
+          <div className="t-body">{t('Add an API key to see its models here.')}</div>
+          <Button onClick={() => { onClose(); ui.openSettings('providers'); }}>{t('Add a provider')}</Button>
         </div>
       )}
-      {catalog && catalog.length > 0 && groups.length === 0 && <div className="empty t-body">No models match “{q}”.</div>}
+      {catalog && catalog.length > 0 && groups.length === 0 && <div className="empty t-body">{t('No models match “{query}”.', { query: q })}</div>}
       {groups.map(({ p, models }) => (
         <section key={p.provider.id} style={{ marginBottom: 14 }}>
           <div className="row gap-8" style={{ padding: '8px 4px' }}>
             <ProviderBadge name={p.kind.displayName} />
-            <span className="t-label-m c-2 grow">{p.provider.label || p.kind.displayName}</span>
-            {blocked(p) && <span className="badge warning" title="This provider doesn't accept requests from web browsers.">Windows and Android only</span>}
+            <span className="t-label-m c-2 grow"><bdi>{p.provider.label || providerDisplayName(p.kind)}</bdi></span>
+            {blocked(p) && <span className="badge warning" title={t("This provider doesn't accept requests from web browsers.")}>{t('Windows and Android only')}</span>}
           </div>
           <div className="group">
             {models.slice(0, query ? 200 : 60).map((m, i) => {
@@ -138,16 +141,18 @@ export function ModelPicker({ current, onPick, onClose, title = 'Choose a model'
                         <CapIcons m={m} />
                       </span>
                       <span className="srow-sub ellipsis">
-                        {m.id}
-                        {m.contextWindow ? ` · ${Format.contextWindow(m.contextWindow)} context` : ''}
-                        {m.pricing ? ` · $${m.pricing.input}/$${m.pricing.output} per 1M` : ''}
+                        {[
+                          m.id,
+                          m.contextWindow ? t('{size} context', { size: Format.contextWindow(m.contextWindow) }) : '',
+                          m.pricing ? t('${input}/${output} per 1M', { input: String(m.pricing.input), output: String(m.pricing.output) }) : '',
+                        ].filter(Boolean).join(' · ')}
                       </span>
                     </span>
                     <button
                       type="button"
                       className="icon-btn sm"
-                      aria-label={fav ? 'Remove from favorites' : 'Add to favorites'}
-                      title={fav ? 'Remove from favorites' : 'Add to favorites'}
+                      aria-label={fav ? t('Remove from favorites') : t('Add to favorites')}
+                      title={fav ? t('Remove from favorites') : t('Add to favorites')}
                       onClick={(e) => {
                         e.stopPropagation();
                         void app.providers.toggleFavorite(p.provider.id, m.id);
@@ -160,13 +165,13 @@ export function ModelPicker({ current, onPick, onClose, title = 'Choose a model'
                 </div>
               );
             })}
-            {!query && models.length > 60 && <div className="srow"><span className="srow-sub">{models.length - 60} more. Search to find them.</span></div>}
+            {!query && models.length > 60 && <div className="srow"><span className="srow-sub">{tn('{count} more. Search to find it.', '{count} more. Search to find them.', models.length - 60)}</span></div>}
           </div>
         </section>
       ))}
       {catalog && catalog.length > 0 && (
         <div className="row" style={{ justifyContent: 'center', padding: '6px 0 4px' }}>
-          <Button variant="text" onClick={() => { onClose(); ui.openSettings('providers'); }}>Manage providers and models</Button>
+          <Button variant="text" onClick={() => { onClose(); ui.openSettings('providers'); }}>{t('Manage providers and models')}</Button>
         </div>
       )}
     </Dialog>

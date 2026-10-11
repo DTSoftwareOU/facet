@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, type ComponentType, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { msg, t, tm, type Msg } from '../../i18n';
 import { platform } from '../../platform';
 import { IconButton } from '../components/primitives';
 import { useNarrow } from '../hooks';
@@ -39,7 +40,7 @@ export interface PageProps {
 
 interface PageDef {
   id: SettingsPage;
-  title: string;
+  title: Msg;
   icon: ReactNode;
   component: ComponentType<PageProps>;
   desktopOnly?: boolean;
@@ -47,25 +48,25 @@ interface PageDef {
 }
 
 const PAGES: PageDef[] = [
-  { id: 'account', title: 'Account and sync', icon: <Cloud size={19} />, component: AccountPage },
-  { id: 'providers', title: 'Providers and keys', icon: <KeyRound size={19} />, component: ProvidersPage, separatorBefore: true },
-  { id: 'assistants', title: 'Assistants', icon: <Bot size={19} />, component: AssistantsPage },
-  { id: 'prompts', title: 'Prompt library', icon: <Library size={19} />, component: PromptsPage },
-  { id: 'chat', title: 'Chat', icon: <MessageSquare size={19} />, component: ChatPrefsPage },
-  { id: 'tools', title: 'Tools', icon: <Wrench size={19} />, component: ToolsPage },
-  { id: 'computer', title: 'Computer access', icon: <Monitor size={19} />, component: ComputerPage },
-  { id: 'media', title: 'Media models', icon: <ImageIcon size={19} />, component: MediaPage },
-  { id: 'appearance', title: 'Appearance', icon: <Palette size={19} />, component: AppearancePage, separatorBefore: true },
-  { id: 'privacy', title: 'Privacy and security', icon: <ShieldCheck size={19} />, component: PrivacyPage },
-  { id: 'data', title: 'Data and storage', icon: <Database size={19} />, component: DataPage },
-  { id: 'about', title: 'About Facet', icon: <Info size={19} />, component: AboutPage, separatorBefore: true },
+  { id: 'account', title: msg('Account and sync'), icon: <Cloud size={19} />, component: AccountPage },
+  { id: 'providers', title: msg('Providers and keys'), icon: <KeyRound size={19} />, component: ProvidersPage, separatorBefore: true },
+  { id: 'assistants', title: msg('Assistants'), icon: <Bot size={19} />, component: AssistantsPage },
+  { id: 'prompts', title: msg('Prompt library'), icon: <Library size={19} />, component: PromptsPage },
+  { id: 'chat', title: msg('Chat'), icon: <MessageSquare size={19} />, component: ChatPrefsPage },
+  { id: 'tools', title: msg('Tools'), icon: <Wrench size={19} />, component: ToolsPage },
+  { id: 'computer', title: msg('Computer access'), icon: <Monitor size={19} />, component: ComputerPage },
+  { id: 'media', title: msg('Media models'), icon: <ImageIcon size={19} />, component: MediaPage },
+  { id: 'appearance', title: msg('Appearance'), icon: <Palette size={19} />, component: AppearancePage, separatorBefore: true },
+  { id: 'privacy', title: msg('Privacy and security'), icon: <ShieldCheck size={19} />, component: PrivacyPage },
+  { id: 'data', title: msg('Data and storage'), icon: <Database size={19} />, component: DataPage },
+  { id: 'about', title: msg('About Facet'), icon: <Info size={19} />, component: AboutPage, separatorBefore: true },
 ];
 
 export default function SettingsDialog({ page, detail }: { page: SettingsPage; detail: string | null }) {
   const narrow = useNarrow(760);
   const pages = PAGES.filter((p) => !p.desktopOnly || platform().computer).map((p) =>
     // Away from the Windows app, this page is about using a PC of the account.
-    p.id === 'computer' && !platform().computer ? { ...p, title: 'Your PC' } : p,
+    p.id === 'computer' && !platform().computer ? { ...p, title: msg('Your PC') } : p,
   );
   // On wide windows there's no separate "home": show the first page beside the menu.
   const current = page === 'home' && !narrow ? 'account' : page;
@@ -90,12 +91,12 @@ export default function SettingsDialog({ page, detail }: { page: SettingsPage; d
   }, [current, detail]);
   return createPortal(
     <div className="scrim settings-scrim" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className={'settings-dialog ' + (current === 'home' ? 'home' : 'page')} role="dialog" aria-modal="true" aria-label="Settings">
-        <nav className="settings-nav" aria-label="Settings sections">
+      <div className={'settings-dialog ' + (current === 'home' ? 'home' : 'page')} role="dialog" aria-modal="true" aria-label={t('Settings')}>
+        <nav className="settings-nav" aria-label={t('Settings sections')}>
           <div className="row" style={{ marginBottom: 8 }}>
-            <h2 className="t-title-l grow" style={{ margin: '0 0 0 12px' }}>Settings</h2>
+            <h2 className="t-title-l grow" style={{ margin: 0, marginInlineStart: 12 }}>{t('Settings')}</h2>
             {narrow && (
-              <IconButton label="Close settings" onClick={close}>
+              <IconButton label={t('Close settings')} onClick={close}>
                 <X size={20} />
               </IconButton>
             )}
@@ -105,7 +106,7 @@ export default function SettingsDialog({ page, detail }: { page: SettingsPage; d
               {p.separatorBefore && <div className="sep" />}
               <button type="button" className={p.id === current ? 'on' : ''} onClick={() => ui.openSettings(p.id)} aria-current={p.id === current ? 'page' : undefined}>
                 {p.icon}
-                {p.title}
+                {tm(p.title)}
               </button>
             </div>
           ))}
@@ -113,12 +114,12 @@ export default function SettingsDialog({ page, detail }: { page: SettingsPage; d
         <section className="settings-page">
           <header className="settings-head">
             {(narrow || detail) && (
-              <IconButton label="Back" onClick={() => (detail ? ui.openSettings(page, null) : ui.openSettings('home'))}>
-                <ArrowLeft size={20} />
+              <IconButton label={t('Back')} onClick={() => (detail ? ui.openSettings(page, null) : ui.openSettings('home'))}>
+                <ArrowLeft size={20} className="flip-rtl" />
               </IconButton>
             )}
-            <h2 className="t-title-l">{def?.title ?? 'Settings'}</h2>
-            <IconButton label="Close settings" onClick={close}>
+            <h2 className="t-title-l">{def ? tm(def.title) : t('Settings')}</h2>
+            <IconButton label={t('Close settings')} onClick={close}>
               <X size={20} />
             </IconButton>
           </header>

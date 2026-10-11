@@ -4,6 +4,7 @@
  * falls back to Jina Reader and says so.
  */
 import { isObject } from '../core/json';
+import { formatList, locale, t } from '../i18n';
 import type { Citation } from '../llm/types';
 import { platform } from '../platform';
 import { SEARCH_KINDS, type SearchKind } from './types';
@@ -83,6 +84,8 @@ const str = (o: unknown, k: string): string => {
 /** Search backends that answer requests from web pages, for the website's error message. */
 function browserKinds(): string {
   const names = SEARCH_KINDS.filter((k) => k.browserOk).map((k) => k.displayName);
+  // English house style has no serial comma; other languages list names their own way.
+  if (locale() !== 'en') return formatList(names, 'disjunction');
   return names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}` : names.join('');
 }
 
@@ -101,8 +104,7 @@ export class WebSearch {
     const name = config.kind.displayName;
     if (platform().corsLimited && !config.kind.browserOk) {
       throw new SearchException(
-        `${name} doesn't accept requests from web browsers, so it can't search here. ` +
-          `Switch to ${browserKinds()} in Settings → Web search, or use the Facet app for Windows or Android.`,
+        t('{service} doesn\'t accept requests from web browsers, so it can\'t search here. Switch to {alternatives} in Settings → Web search, or use the Facet app for Windows or Android.', { service: name, alternatives: browserKinds() }),
       );
     }
     const n = Math.min(10, Math.max(1, Math.trunc(count) || 1));
@@ -139,7 +141,7 @@ export class WebSearch {
         init = { headers: { Accept: 'application/json' } };
         break;
       default:
-        throw new SearchException(`${name} isn't a search service Facet knows.`);
+        throw new SearchException(t('{service} isn\'t a search service Facet knows.', { service: name }));
     }
     const d = deadline(TIMEOUT_MS, signal);
     let body: string;
@@ -149,20 +151,20 @@ export class WebSearch {
       if (!resp.ok) {
         throw new SearchException(
           resp.status === 401 || resp.status === 403
-            ? `${name} rejected the search key. Check it in Settings → Web search.`
+            ? t('{service} rejected the search key. Check it in Settings → Web search.', { service: name })
             : resp.status === 429
-              ? `${name} rate limit reached. Try again shortly.`
-              : `${name} search failed (HTTP ${resp.status}).`,
+              ? t('{service} rate limit reached. Try again shortly.', { service: name })
+              : t('{service} search failed (HTTP {status}).', { service: name, status: String(resp.status) }),
         );
       }
     } catch (e) {
       if (e instanceof SearchException) throw e;
       if (signal?.aborted) throw e;
-      if (d.timedOut()) throw new SearchException(`${name} didn't answer in time. Try again.`);
+      if (d.timedOut()) throw new SearchException(t('{service} didn\'t answer in time. Try again.', { service: name }));
       throw new SearchException(
         platform().corsLimited
-          ? `Couldn't reach ${name}. Check your connection; if the service blocks requests from web browsers, use the Facet app for Windows or Android.`
-          : `Couldn't reach ${name}. Check your connection.`,
+          ? t('Couldn\'t reach {service}. Check your connection; if the service blocks requests from web browsers, use the Facet app for Windows or Android.', { service: name })
+          : t('Couldn\'t reach {service}. Check your connection.', { service: name }),
       );
     } finally {
       d.done();
@@ -177,7 +179,7 @@ export class WebSearch {
     } catch {
       root = null;
     }
-    if (!isObject(root)) throw new SearchException('The search service returned something unexpected.');
+    if (!isObject(root)) throw new SearchException(t('The search service returned something unexpected.'));
     const items =
       kind.id === 'search.brave' ? (isObject(root.web) ? root.web.results : undefined)
         : kind.id === 'search.jina' ? root.data

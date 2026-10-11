@@ -19,6 +19,7 @@ import { getApp } from '../app';
 import { Dates } from '../core/format';
 import { db } from '../data/db';
 import type { ConversationEntity, FolderEntity } from '../data/entities';
+import { formatNumber, isRtl, t } from '../i18n';
 import { shownName } from '../sync/auth';
 import { AssistantAvatar, UserAvatar, accent } from './components/Avatars';
 import { Gem } from './components/Gem';
@@ -50,7 +51,7 @@ export function Sidebar({ narrow }: { narrow: boolean }) {
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.lastActivityAt - a.lastActivityAt);
     const out: { label: string; items: ConversationEntity[] }[] = [];
     for (const c of list) {
-      const label = c.pinned && !showArchived ? 'Pinned' : Dates.bucketLabel(c.lastActivityAt);
+      const label = c.pinned && !showArchived ? t('Pinned') : Dates.bucketLabel(c.lastActivityAt);
       const last = out[out.length - 1];
       if (last && last.label === label) last.items.push(c);
       else out.push({ label, items: [c] });
@@ -64,37 +65,37 @@ export function Sidebar({ narrow }: { narrow: boolean }) {
   return (
     <>
       {narrow && drawer && <div className="drawer-scrim" onClick={() => ui.set({ drawer: false })} />}
-      <aside className={'sidebar' + (collapsed ? ' collapsed' : '') + (narrow && drawer ? ' open' : '')} aria-label="Chats">
+      <aside className={'sidebar' + (collapsed ? ' collapsed' : '') + (narrow && drawer ? ' open' : '')} aria-label={t('Chats')}>
         <div className="sidebar-head">
           <div className="wordmark">
             <Gem size={26} />
             <span>facet</span>
           </div>
-          <IconButton label="New chat (Ctrl+Shift+O)" onClick={() => navigate({ name: 'home', folderId: folderFilter })}>
+          <IconButton label={t('New chat (Ctrl+Shift+O)')} onClick={() => navigate({ name: 'home', folderId: folderFilter })}>
             <SquarePen size={20} />
           </IconButton>
           {!narrow && (
-            <IconButton label="Hide sidebar" onClick={() => app.settings.updateLocal((l) => ({ ...l, sidebarOpen: false }))}>
-              <PanelLeftClose size={20} />
+            <IconButton label={t('Hide sidebar')} onClick={() => app.settings.updateLocal((l) => ({ ...l, sidebarOpen: false }))}>
+              <PanelLeftClose size={20} className="flip-rtl" />
             </IconButton>
           )}
         </div>
         <button type="button" className="sidebar-search" onClick={() => navigate({ name: 'search' })}>
           <Search size={17} />
-          <span>Search chats</span>
+          <span>{t('Search chats')}</span>
           <kbd>Ctrl K</kbd>
         </button>
         <div className="assistant-strip">
           {assistants.map((a) => (
             <button key={a.id} type="button" className="assistant-tile" title={a.name} onClick={() => navigate({ name: 'home', assistantId: a.id, folderId: folderFilter })}>
               <AssistantAvatar assistant={a} size={38} />
-              <span>{a.name}</span>
+              <span><bdi>{a.name}</bdi></span>
             </button>
           ))}
         </div>
         <div className="folder-row">
           <button type="button" className={'chip' + (!folderFilter ? ' sel' : '')} onClick={() => setFolderFilter(null)}>
-            All chats
+            {t('All chats')}
           </button>
           {folders.map((f) => (
             <button
@@ -107,13 +108,13 @@ export function Sidebar({ narrow }: { narrow: boolean }) {
                 e.preventDefault();
                 setFolderDialog(f);
               }}
-              title="Double-click to edit"
+              title={t('Double-click to edit')}
             >
               <span className="folder-dot" style={{ background: accent(f.colorIndex) }} />
-              {f.name}
+              <bdi>{f.name}</bdi>
             </button>
           ))}
-          <IconButton label="New folder" small onClick={() => setFolderDialog('new')}>
+          <IconButton label={t('New folder')} small onClick={() => setFolderDialog('new')}>
             <FolderPlus size={17} />
           </IconButton>
         </div>
@@ -121,7 +122,7 @@ export function Sidebar({ narrow }: { narrow: boolean }) {
           {showArchived && (
             <button type="button" className="chat-item" onClick={() => setShowArchived(false)}>
               <ArchiveRestore size={17} className="c-2" />
-              <span className="title c-2">Back to chats</span>
+              <span className="title c-2">{t('Back to chats')}</span>
             </button>
           )}
           {sections.map((s) => (
@@ -134,14 +135,14 @@ export function Sidebar({ narrow }: { narrow: boolean }) {
           ))}
           {conversations && sections.length === 0 && (
             <div className="empty" style={{ padding: '32px 12px' }}>
-              <span className="t-label-m">{showArchived ? 'No archived chats.' : folderFilter ? 'No chats in this folder yet.' : 'Your chats appear here.'}</span>
+              <span className="t-label-m">{showArchived ? t('No archived chats.') : folderFilter ? t('No chats in this folder yet.') : t('Your chats appear here.')}</span>
             </div>
           )}
           {!showArchived && (archivedCount ?? 0) > 0 && (
             <button type="button" className="chat-item" style={{ marginTop: 12 }} onClick={() => setShowArchived(true)}>
               <Archive size={17} className="c-2" />
-              <span className="title c-2">Archived chats</span>
-              <span className="c-3 t-label-s">{archivedCount}</span>
+              <span className="title c-2">{t('Archived chats')}</span>
+              <span className="c-3 t-label-s">{formatNumber(archivedCount ?? 0)}</span>
             </button>
           )}
         </nav>
@@ -163,8 +164,8 @@ function ChatItem({ chat, active, generating, folders }: { chat: ConversationEnt
   const remove = async () => {
     await app.conversations.delete(chat.id);
     if (active) navigate({ name: 'home' }, true);
-    toast('Chat deleted.', {
-      label: 'Undo',
+    toast(t('Chat deleted.'), {
+      label: t('Undo'),
       run: () => {
         void db().transaction('rw', db().conversations, db().messages, db().attachments, async () => {
           const now = Date.now();
@@ -177,21 +178,21 @@ function ChatItem({ chat, active, generating, folders }: { chat: ConversationEnt
   };
 
   const items: MenuItem[] = [
-    { label: 'Rename', icon: <Pencil size={17} />, onSelect: () => { setTitle(chat.title); setRenaming(true); } },
-    { label: chat.pinned ? 'Unpin' : 'Pin', icon: chat.pinned ? <PinOff size={17} /> : <Pin size={17} />, onSelect: () => app.conversations.setPinned(chat.id, !chat.pinned) },
+    { label: t('Rename'), icon: <Pencil size={17} />, onSelect: () => { setTitle(chat.title); setRenaming(true); } },
+    { label: chat.pinned ? t('Unpin') : t('Pin'), icon: chat.pinned ? <PinOff size={17} /> : <Pin size={17} />, onSelect: () => app.conversations.setPinned(chat.id, !chat.pinned) },
     {
-      label: 'Move to folder',
+      label: t('Move to folder'),
       icon: <FolderInput size={17} />,
       onSelect: () => {
         const a = menu.anchor;
         if (a instanceof HTMLElement) {
           const r = a.getBoundingClientRect();
-          folderMenu.openAt(r.left, r.bottom + 4);
+          folderMenu.openAt(isRtl() ? r.right : r.left, r.bottom + 4);
         } else if (a) folderMenu.openAt(a.x, a.y);
       },
     },
-    { label: chat.archived ? 'Unarchive' : 'Archive', icon: chat.archived ? <ArchiveRestore size={17} /> : <Archive size={17} />, onSelect: () => app.conversations.setArchived(chat.id, !chat.archived) },
-    { label: 'Delete', icon: <Trash2 size={17} />, danger: true, separatorBefore: true, onSelect: remove },
+    { label: chat.archived ? t('Unarchive') : t('Archive'), icon: chat.archived ? <ArchiveRestore size={17} /> : <Archive size={17} />, onSelect: () => app.conversations.setArchived(chat.id, !chat.archived) },
+    { label: t('Delete'), icon: <Trash2 size={17} />, danger: true, separatorBefore: true, onSelect: remove },
   ];
 
   const finishRename = (save: boolean) => {
@@ -204,6 +205,7 @@ function ChatItem({ chat, active, generating, folders }: { chat: ConversationEnt
       <div className="chat-item active">
         <input
           autoFocus
+          dir="auto"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => finishRename(true)}
@@ -211,7 +213,7 @@ function ChatItem({ chat, active, generating, folders }: { chat: ConversationEnt
             if (e.key === 'Enter') finishRename(true);
             if (e.key === 'Escape') finishRename(false);
           }}
-          aria-label="Chat title"
+          aria-label={t('Chat title')}
         />
       </div>
     );
@@ -233,10 +235,10 @@ function ChatItem({ chat, active, generating, folders }: { chat: ConversationEnt
           setRenaming(true);
         }}
       >
-        <span className="title">{chat.title || 'New chat'}</span>
-        {generating && <span className="live-dot" title="Writing a reply" />}
+        <span className="title">{chat.title ? <bdi>{chat.title}</bdi> : t('New chat')}</span>
+        {generating && <span className="live-dot" title={t('Writing a reply')} />}
         {chat.pinned && !generating && <Pin size={14} className="c-3" />}
-        <IconButton label="Chat options" small className="more" onClick={(e) => { e.stopPropagation(); menu.open(e); }}>
+        <IconButton label={t('Chat options')} small className="more" onClick={(e) => { e.stopPropagation(); menu.open(e); }}>
           <MoreHorizontal size={17} />
         </IconButton>
       </div>
@@ -246,7 +248,7 @@ function ChatItem({ chat, active, generating, folders }: { chat: ConversationEnt
           anchor={folderMenu.anchor}
           onClose={folderMenu.close}
           items={[
-            { label: 'No folder', onSelect: () => app.conversations.moveToFolder(chat.id, null) },
+            { label: t('No folder'), onSelect: () => app.conversations.moveToFolder(chat.id, null) },
             ...folders.map((f) => ({ label: f.name, icon: <span className="folder-dot" style={{ background: accent(f.colorIndex) }} />, onSelect: () => app.conversations.moveToFolder(chat.id, f.id) })),
           ]}
         />
@@ -265,33 +267,33 @@ function FolderDialog({ folder, onClose }: { folder: FolderEntity | null; onClos
   };
   return (
     <Dialog
-      title={folder ? 'Edit folder' : 'New folder'}
+      title={folder ? t('Edit folder') : t('New folder')}
       onClose={onClose}
       size="narrow"
       footer={
         <>
           {folder && (
-            <Button variant="text" style={{ marginRight: 'auto', color: 'var(--error)' }} onClick={async () => { await app.folders.delete(folder.id); onClose(); }}>
-              Delete
+            <Button variant="text" style={{ marginInlineEnd: 'auto', color: 'var(--error)' }} onClick={async () => { await app.folders.delete(folder.id); onClose(); }}>
+              {t('Delete')}
             </Button>
           )}
-          <Button variant="text" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={!name.trim()}>{folder ? 'Save' : 'Create folder'}</Button>
+          <Button variant="text" onClick={onClose}>{t('Cancel')}</Button>
+          <Button onClick={save} disabled={!name.trim()}>{folder ? t('Save') : t('Create folder')}</Button>
         </>
       }
     >
       <div className="col gap-16">
-        <Field label="Name">
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name.trim() && save()} placeholder="e.g. Work" />
+        <Field label={t('Name')}>
+          <input className="input" dir="auto" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name.trim() && save()} placeholder={t('e.g. Work')} />
         </Field>
-        <div className="row gap-8" role="radiogroup" aria-label="Color">
+        <div className="row gap-8" role="radiogroup" aria-label={t('Color')}>
           {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
             <button
               key={i}
               type="button"
               role="radio"
               aria-checked={color === i}
-              aria-label={`Color ${i + 1}`}
+              aria-label={t('Color {number}', { number: i + 1 })}
               onClick={() => setColor(i)}
               style={{ width: 30, height: 30, borderRadius: '50%', background: accent(i), outline: color === i ? '2px solid var(--text)' : 'none', outlineOffset: 2 }}
             />
@@ -310,27 +312,28 @@ function AccountFooter() {
   let status: { cls: string; text: string };
   if (account.kind === 'signedIn') {
     name = shownName(account, synced.profileName);
-    if (sync.phase === 'SYNCING') status = { cls: 'busy', text: 'Syncing…' };
-    else if (sync.storageFull) status = { cls: 'warn', text: 'Sync storage full' };
-    else if (sync.phase === 'OFFLINE') status = { cls: 'warn', text: 'Offline' };
-    else if (sync.phase === 'ERROR') status = { cls: 'err', text: 'Sync problem' };
-    else status = { cls: 'ok', text: sync.lastSyncAt ? `Synced ${Dates.relative(sync.lastSyncAt).toLowerCase()}` : 'Synced' };
+    if (sync.phase === 'SYNCING') status = { cls: 'busy', text: t('Syncing…') };
+    else if (sync.storageFull) status = { cls: 'warn', text: t('Sync storage full') };
+    else if (sync.phase === 'OFFLINE') status = { cls: 'warn', text: t('Offline') };
+    else if (sync.phase === 'ERROR') status = { cls: 'err', text: t('Sync problem') };
+    else if (!sync.lastSyncAt) status = { cls: 'ok', text: t('Synced') };
+    else status = { cls: 'ok', text: Dates.justNow(sync.lastSyncAt) ? t('Synced just now') : t('Synced {time}', { time: Dates.relative(sync.lastSyncAt) }) };
   } else if (account.kind === 'expired') {
-    status = { cls: 'err', text: 'Sign in again to sync' };
+    status = { cls: 'err', text: t('Sign in again to sync') };
   } else {
-    status = { cls: '', text: 'On this device only' };
+    status = { cls: '', text: t('On this device only') };
   }
   return (
     <div className="sidebar-foot">
       <UserAvatar name={name} size={36} />
       <button type="button" className="who" onClick={() => ui.openSettings(account.kind === 'guest' ? 'account' : 'home')} title={sync.message ?? undefined}>
-        <span className="t-label-l ellipsis">{name}</span>
+        <span className="t-label-l ellipsis"><bdi>{name}</bdi></span>
         <span className="t-label-s c-2 ellipsis" style={{ fontWeight: 400 }}>
           <span className={'sync-dot ' + status.cls} />
           {status.text}
         </span>
       </button>
-      <IconButton label="Settings" onClick={() => ui.openSettings('home')}>
+      <IconButton label={t('Settings')} onClick={() => ui.openSettings('home')}>
         <Settings size={20} />
       </IconButton>
     </div>
