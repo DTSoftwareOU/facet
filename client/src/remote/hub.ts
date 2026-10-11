@@ -6,7 +6,8 @@
  */
 import { b64, b64url, randomBytes, unb64 } from '../core/bytes';
 import { openRelay, ReplayGuard, sealRelay } from '../sync/relay';
-import { CALL_TIMEOUT_MS, parseHost, RemoteError, type HostInfo, type RemoteMessage, type RemoteMethod } from './protocol';
+import { msg } from '../i18n';
+import { CALL_TIMEOUT_MS, parseHost, RemoteError, remoteError, type HostInfo, type RemoteMessage, type RemoteMethod } from './protocol';
 
 export interface RelayPeer {
   sessionId: string;
@@ -65,7 +66,7 @@ export class RemoteHub {
 
   /** Signed out or switched accounts: forget the PCs and fail what's waiting. */
   reset(): void {
-    for (const p of [...this.pending.values()]) p.finish(new RemoteError('offline', 'Signed out.'));
+    for (const p of [...this.pending.values()]) p.finish(remoteError('offline', msg('Signed out.')));
     this.names.clear();
     if (this.hostMap.size) {
       this.hostMap.clear();
@@ -171,7 +172,7 @@ export class RemoteHub {
       }
     }
     for (const p of [...this.pending.values()]) {
-      if (p.sessionId === sessionId) p.finish(new RemoteError('offline', 'The PC went offline.'));
+      if (p.sessionId === sessionId) p.finish(remoteError('offline', msg('The PC went offline.')));
     }
     if (changed) this.emit();
   }
@@ -181,7 +182,7 @@ export class RemoteHub {
   /** Seals and sends one message; returns its id. */
   async send(to: string, body: { type: string; [field: string]: unknown }, id = messageId()): Promise<string> {
     const [key, me] = await Promise.all([this.transport.key(), this.transport.me()]);
-    if (!key || !me) throw new RemoteError('offline', 'Sign in to reach your other devices.');
+    if (!key || !me) throw remoteError('offline', msg('Sign in to reach your other devices.'));
     const message: RemoteMessage = { ...body, v: VERSION, id, ts: Date.now() };
     const sealed = await sealRelay(key, me, to, JSON.stringify(message));
     try {
@@ -237,14 +238,14 @@ export class RemoteHub {
   /** Calls [method] on a PC. Rejects with RemoteError (offline, timeout, or the PC's error). */
   call<T>(hostId: string, method: RemoteMethod, params: Record<string, unknown> = {}, options: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<T> {
     const host = this.hostMap.get(hostId);
-    if (!host) return Promise.reject(new RemoteError('offline', 'That PC is offline.'));
+    if (!host) return Promise.reject(remoteError('offline', msg('That PC is offline.')));
     const { signal } = options;
     if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException('The operation was aborted.', 'AbortError'));
     const id = messageId();
     return new Promise<T>((resolve, reject) => {
       let done = false;
       const timer = setTimeout(
-        () => finish(new RemoteError('timeout', `${host.name} didn’t answer in time.`)),
+        () => finish(remoteError('timeout', msg('{pc} didn’t answer in time.'), { pc: host.name })),
         options.timeoutMs ?? CALL_TIMEOUT_MS[method],
       );
       const onAbort = () => {

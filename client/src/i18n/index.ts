@@ -210,6 +210,11 @@ export function lookup(source: string): string {
   return typeof entry === 'string' && entry ? entry : source;
 }
 
+/** Text without the direction isolates t() adds in right-to-left languages, for text saved as data (titles, names). */
+export function plain(text: string): string {
+  return text.replace(/[⁨⁩]/g, '');
+}
+
 /** Joins whole sentences: with a space, or directly after the full-width stops of Chinese and Japanese. */
 export function sentences(...parts: (string | null | undefined | false)[]): string {
   const list = parts.filter((p): p is string => !!p && p.trim() !== '');

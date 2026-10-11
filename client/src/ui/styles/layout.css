@@ -1008,7 +1008,7 @@ button.msg-meta:hover {
   border-radius: 12px;
   color: var(--text);
   font-size: 15px;
-  text-align: left;
+  text-align: start;
 }
 .folder-item svg:first-child {
   flex: none;

@@ -17,7 +17,8 @@ import { platform } from './platform';
 import { Computers, type ChatComputer, type ComputerFields, type ComputerState } from './remote/computers';
 import { HostService } from './remote/host';
 import { RemoteHub, type RelayTransport } from './remote/hub';
-import { RemoteError } from './remote/protocol';
+import { msg } from './i18n';
+import { remoteError } from './remote/protocol';
 import { ApiError, SyncApi } from './sync/api';
 import { AuthManager } from './sync/auth';
 import { SyncEngine } from './sync/engine';
@@ -200,11 +201,11 @@ export class App {
         }
         return this.relayKeyCache;
       },
-      send: async (to, msg) => {
+      send: async (to, body) => {
         try {
-          await this.auth.authed((base, token) => api.relay(base, token, to, msg));
+          await this.auth.authed((base, token) => api.relay(base, token, to, body));
         } catch (e) {
-          if (e instanceof ApiError && e.status === 404) throw new RemoteError('offline', 'That device is offline.');
+          if (e instanceof ApiError && e.status === 404) throw remoteError('offline', msg('That device is offline.'));
           throw e;
         }
       },

@@ -7,6 +7,7 @@ import type { ConversationRepository } from '../data/conversations';
 import { db } from '../data/db';
 import type { ComputerBinding, MessageEntity } from '../data/entities';
 import type { GenParams } from '../llm/types';
+import { plain, t } from '../i18n';
 import type { AgentKind, ImportedSession } from '../platform/platform';
 
 export const AGENT_NAMES: Record<AgentKind, string> = { claude: 'Claude Code', codex: 'Codex' };
@@ -48,7 +49,7 @@ export async function importAgentSession(conversations: ConversationRepository, 
     parentId = id;
   });
   await db().messages.bulkPut(messages);
-  const title = session.title.trim().slice(0, 80) || `${AGENT_NAMES[agent]} session`;
+  const title = session.title.trim().slice(0, 80) || plain(t('{agent} session', { agent: AGENT_NAMES[agent] }));
   await conversations.update(
     conv.id,
     (c) => ({

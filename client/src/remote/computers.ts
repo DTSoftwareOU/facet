@@ -16,7 +16,8 @@ import type {
 } from '../platform/platform';
 import { platform } from '../platform';
 import type { RemoteHub } from './hub';
-import { RemoteError, type HostInfo } from './protocol';
+import { msg, t } from '../i18n';
+import { RemoteError, remoteError, type HostInfo } from './protocol';
 
 /** A computer a chat can use right now, in a folder. */
 export interface ChatComputer {
@@ -80,7 +81,7 @@ export class RemoteComputerBridge implements ComputerBridge {
       );
       return { content: typeof r?.content === 'string' ? r.content : '', isError: r?.isError === true, label: typeof r?.label === 'string' ? r.label : undefined };
     } catch (e) {
-      if (e instanceof RemoteError) return { content: e.message, isError: true };
+      if (e instanceof RemoteError) return { content: e.english, isError: true };
       throw e;
     } finally {
       this.running.delete(ctx.callId);
@@ -169,11 +170,11 @@ export class Computers {
     return {
       local: true,
       hostId: this.hostIdValue ?? 'local',
-      name: this.localName ?? 'This PC',
+      name: this.localName ?? t('This PC'),
       folder,
       bridge,
       listFolders: async (path) => {
-        if (!host) throw new RemoteError('failed', 'Folders can’t be listed here.');
+        if (!host) throw remoteError('failed', msg('Folders can’t be listed here.'));
         return host.listFolders(path, await this.recentFolders());
       },
       agentSessions: async (agent) => (host ? host.agentSessions(agent, folder) : []),

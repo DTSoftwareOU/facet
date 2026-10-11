@@ -326,14 +326,15 @@ function UsageDialog({ m, onClose }: { m: MessageEntity; onClose: () => void }) 
   const u = messageUsage(m);
   if (!u) return null;
   // [label, value, indented under the row above]
-  const rows: [string, string, boolean][] = [
+  const rows: [string, ReactNode, boolean][] = [
     [t('Input tokens'), formatNumber(u.inputTokens), false],
     [t('of which cached'), formatNumber(u.cacheReadTokens), true],
     [t('of which written to cache'), formatNumber(u.cacheWriteTokens), true],
     [t('Output tokens'), formatNumber(u.outputTokens), false],
     [t('of which reasoning'), formatNumber(u.reasoningTokens), true],
-    [t('Estimated cost'), m.costUsd != null ? Format.cost(m.costUsd) : t('Unknown (no price for this model)'), false],
-    [t('Model'), m.modelName ?? m.modelId ?? '', false],
+    // Costs stay left to right ("$0.0094"), also in Arabic and Urdu.
+    [t('Estimated cost'), m.costUsd != null ? <bdi dir="ltr">{Format.cost(m.costUsd)}</bdi> : t('Unknown (no price for this model)'), false],
+    [t('Model'), <bdi>{m.modelName ?? m.modelId ?? ''}</bdi>, false],
   ];
   return (
     <Dialog title={t('Usage')} onClose={onClose} size="narrow">
@@ -407,7 +408,7 @@ export const AssistantMessage = memo(function AssistantMessage({ item, live, act
         <div className="notice error" role="alert">
           <AlertCircle size={18} style={{ flex: 'none', marginTop: 2 }} />
           <div className="grow col gap-4">
-            <span>{err.message}</span>
+            <span dir="auto">{err.message}</span>
             {err.detail && <span className="t-label-s" dir="auto" style={{ opacity: 0.8, fontWeight: 400 }}>{err.detail}</span>}
           </div>
           {last && <Button small variant="outline" onClick={() => actions.regenerate(m.id)}>{t('Try again')}</Button>}
@@ -445,7 +446,7 @@ export const AssistantMessage = memo(function AssistantMessage({ item, live, act
           {local.showUsage && usage && (
             <button type="button" className="msg-meta" onClick={() => setUsageOpen(true)} title={t('Usage details')}>
               {t('{input} in · {output} out', { input: Format.tokens(usage.inputTokens), output: Format.tokens(usage.outputTokens) })}
-              {local.showCost && m.costUsd != null ? ` · ${Format.cost(m.costUsd)}` : ''}
+              {local.showCost && m.costUsd != null ? <> · <bdi dir="ltr">{Format.cost(m.costUsd)}</bdi></> : null}
             </button>
           )}
         </div>

@@ -173,6 +173,13 @@ a:hover {
 [dir='rtl'] .flip-rtl {
   transform: scaleX(-1);
 }
+/*
+ * An empty dir="auto" field would lay out left to right; until someone types, its placeholder
+ * follows the interface direction instead.
+ */
+[dir='rtl'] :is(input, textarea)[dir='auto']:placeholder-shown {
+  direction: rtl;
+}
 .ellipsis {
   overflow: hidden;
   text-overflow: ellipsis;

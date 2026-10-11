@@ -19,6 +19,7 @@ import {
   tn,
 } from '../../src/i18n';
 import { tRich } from '../../src/i18n/rich';
+import { RemoteError, remoteError } from '../../src/remote/protocol';
 
 afterEach(() => setLocale('en'));
 
@@ -95,6 +96,18 @@ describe('msg and tm', () => {
     expect(label).toBe('Square');
     setLocale('fr', { Square: 'Carré' });
     expect(tm(label)).toBe('Carré');
+  });
+});
+
+describe('errors between devices', () => {
+  it('keep English for the wire and models, and show the interface language', () => {
+    setLocale('de', { '{pc} didn’t answer in time.': '{pc} hat nicht rechtzeitig geantwortet.', 'That PC is offline.': 'Dieser PC ist offline.' });
+    const e = remoteError('timeout', msg('{pc} didn’t answer in time.'), { pc: 'OFFICE' });
+    expect(e.english).toBe('OFFICE didn’t answer in time.');
+    expect(e.message).toBe('OFFICE hat nicht rechtzeitig geantwortet.');
+    // An English message from another device is translated where Facet knows it.
+    expect(RemoteError.from('offline', 'That PC is offline.').message).toBe('Dieser PC ist offline.');
+    expect(RemoteError.from('failed', 'ENOENT: no such file').message).toBe('ENOENT: no such file');
   });
 });
 

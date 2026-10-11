@@ -6,7 +6,8 @@
 import type { AgentKind, DesktopSettings } from '../platform/platform';
 import { platform } from '../platform';
 import { messageId, type HostHandler, type RemoteHub } from './hub';
-import { RemoteError, type HostAnnouncement, type RemoteMessage } from './protocol';
+import { locale, msg, t } from '../i18n';
+import { RemoteError, remoteError, type HostAnnouncement, type RemoteMessage } from './protocol';
 
 /** Results larger than this are refused rather than relayed (the server takes envelopes up to 4 MiB). */
 const MAX_RESULT_CHARS = 3_000_000;
@@ -91,16 +92,17 @@ export class HostService implements HostHandler {
       this.deliver(from, { type: 'result', re: m.id, ...body });
     if (!this.remoteAccess) {
       this.warn(from);
-      await reply({ ok: false, error: { code: 'remote_disabled', message: 'This PC doesn’t allow other devices to use it. Turn it on in Facet on the PC: Settings → Computer access.' } });
+      await reply({ ok: false, error: { code: 'remote_disabled', message: msg('This PC doesn’t allow other devices to use it. Turn it on in Facet on the PC: Settings → Computer access.') } });
       return;
     }
     try {
       const value = await this.run(from, m);
-      if (JSON.stringify(value ?? null).length > MAX_RESULT_CHARS) throw new RemoteError('too_large', 'The result is too large to send.');
+      if (JSON.stringify(value ?? null).length > MAX_RESULT_CHARS) throw remoteError('too_large', msg('The result is too large to send.'));
       await reply({ ok: true, value: value ?? {} });
     } catch (e) {
-      const err = e instanceof RemoteError ? e : new RemoteError('failed', (e as Error)?.message || 'The PC couldn’t do that.');
-      await reply({ ok: false, error: { code: err.code, message: err.message } });
+      const err = e instanceof RemoteError ? e : (e as Error)?.message ? new RemoteError('failed', (e as Error).message) : remoteError('failed', msg('The PC couldn’t do that.'));
+      // English on the wire: the device that asked shows it in its own language.
+      await reply({ ok: false, error: { code: err.code, message: err.english } });
     }
   }
 
@@ -110,12 +112,12 @@ export class HostService implements HostHandler {
     const p = (m.params && typeof m.params === 'object' ? m.params : {}) as Record<string, unknown>;
     const agent = (): AgentKind => {
       const a = str(p.agent) as AgentKind | null;
-      if (!a || !AGENTS.includes(a)) throw new RemoteError('bad_request', 'Unknown agent.');
+      if (!a || !AGENTS.includes(a)) throw remoteError('bad_request', msg('Unknown agent.'));
       return a;
     };
     const folder = (key: string): string => {
       const f = str(p[key]);
-      if (!absoluteFolder(f)) throw new RemoteError('bad_request', 'A full folder path is needed.');
+      if (!absoluteFolder(f)) throw remoteError('bad_request', msg('A full folder path is needed.'));
       return f;
     };
     switch (m.method) {
@@ -127,7 +129,7 @@ export class HostService implements HostHandler {
         const name = str(p.name);
         const args = str(p.argumentsJson) ?? '{}';
         const callId = str(p.callId) ?? m.id;
-        if (!name) throw new RemoteError('bad_request', 'Which tool?');
+        if (!name) throw remoteError('bad_request', msg('Which tool?'));
         const cwd = folder('cwd');
         const localId = `remote-${from}-${callId}`;
         this.running.set(m.id, localId);
@@ -145,11 +147,11 @@ export class HostService implements HostHandler {
       }
       case 'files.list': {
         const path = p.path == null ? null : str(p.path);
-        if (path !== null && !absoluteFolder(path)) throw new RemoteError('bad_request', 'A full folder path is needed.');
+        if (path !== null && !absoluteFolder(path)) throw remoteError('bad_request', msg('A full folder path is needed.'));
         try {
           return await host.listFolders(path, await this.deps.recentFolders());
         } catch (e) {
-          throw new RemoteError('not_found', (e as Error)?.message || 'That folder doesn’t exist.');
+          throw (e as Error)?.message ? new RemoteError('not_found', (e as Error).message) : remoteError('not_found', msg('That folder doesn’t exist.'));
         }
       }
       case 'agents.list':
@@ -157,14 +159,14 @@ export class HostService implements HostHandler {
         return { sessions: await host.agentSessions(agent(), folder('cwd')) };
       case 'agents.read': {
         const id = str(p.id);
-        if (!id) throw new RemoteError('bad_request', 'Which session?');
+        if (!id) throw remoteError('bad_request', msg('Which session?'));
         const session = await host.readAgentSession(agent(), folder('cwd'), id);
-        if (!session) throw new RemoteError('not_found', 'That session isn’t in this folder anymore.');
+        if (!session) throw remoteError('not_found', msg('That session isn’t in this folder anymore.'));
         this.noteActivity(from);
         return session;
       }
       default:
-        throw new RemoteError('unknown_method', 'This version of Facet on the PC can’t do that. Update it.');
+        throw remoteError('unknown_method', msg('This version of Facet on the PC can’t do that. Update it.'));
     }
   }
 
@@ -187,8 +189,8 @@ export class HostService implements HostHandler {
 
   private noteActivity(from: string): void {
     const who = this.hub.deviceName(from);
-    const at = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    platform().host?.activity(who ? `Used from ${who} at ${at}` : `Used from another device at ${at}`);
+    const at = new Date().toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
+    platform().host?.activity(who ? t('Used from {device} at {time}', { device: who, time: at }) : t('Used from another device at {time}', { time: at }));
     if (!who) void this.hub.discover();
   }
 
@@ -196,10 +198,12 @@ export class HostService implements HostHandler {
   private warn(from: string): void {
     if (this.warned.has(from)) return;
     this.warned.add(from);
-    const who = this.hub.deviceName(from) ?? 'One of your devices';
+    const who = this.hub.deviceName(from);
     platform().notify(
       'Facet',
-      `${who} tried to use this PC. To allow it, turn on “Let your other devices use this PC” in Settings → Computer access.`,
+      who
+        ? t('{device} tried to use this PC. To allow it, turn on “Let your other devices use this PC” in Settings → Computer access.', { device: who })
+        : t('One of your devices tried to use this PC. To allow it, turn on “Let your other devices use this PC” in Settings → Computer access.'),
       () => this.deps.openSettings(),
     );
   }

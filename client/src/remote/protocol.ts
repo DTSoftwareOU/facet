@@ -1,4 +1,5 @@
 /** Messages between a PC (host) and the account's other devices (controllers): docs/REMOTE.md. */
+import { msg, tm, type Msg } from '../i18n';
 
 export type RemoteMethod = 'computer.info' | 'computer.tools' | 'computer.call' | 'computer.cancel' | 'files.list' | 'agents.list' | 'agents.read';
 
@@ -26,19 +27,35 @@ export type RemoteErrorCode = 'remote_disabled' | 'bad_request' | 'not_found' | 
 
 const CODES = new Set<RemoteErrorCode>(['remote_disabled', 'bad_request', 'not_found', 'unknown_method', 'too_large', 'failed', 'offline', 'timeout']);
 
+/**
+ * A failed call. `english` is what goes over the wire to other devices and into tool results for
+ * models; `message` is for people, in the interface language. A PC's English message that Facet
+ * knows (a msg() key) is shown translated on the device that receives it.
+ */
 export class RemoteError extends Error {
+  readonly english: string;
+
   constructor(
     readonly code: RemoteErrorCode,
-    message: string,
+    english: string,
+    shown?: string,
   ) {
-    super(message);
+    super(shown ?? english);
+    this.english = english;
     this.name = 'RemoteError';
   }
 
   static from(code: unknown, message: unknown): RemoteError {
     const c = typeof code === 'string' && CODES.has(code as RemoteErrorCode) ? (code as RemoteErrorCode) : 'failed';
-    return new RemoteError(c, typeof message === 'string' && message ? message : 'The PC couldn’t do that.');
+    if (typeof message === 'string' && message) return new RemoteError(c, message, tm(message as Msg));
+    return remoteError(c, msg('The PC couldn’t do that.'));
   }
+}
+
+/** A RemoteError from a msg()-marked sentence: English for the wire and models, translated for people. */
+export function remoteError(code: RemoteErrorCode, text: Msg, vars?: Record<string, string>): RemoteError {
+  const english = vars ? text.replace(/\{(\w+)\}/g, (m, k: string) => vars[k] ?? m) : text;
+  return new RemoteError(code, english, tm(text, vars));
 }
 
 /** How long a controller waits for each method (commands have their own timeouts on the PC). */

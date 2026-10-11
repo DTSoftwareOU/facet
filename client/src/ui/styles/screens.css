@@ -110,6 +110,8 @@
 
 .segmented {
   display: flex;
+  /* Rare: when the labels can't fit even at their narrowest, they continue on a second row. */
+  flex-wrap: wrap;
   background: var(--surface-high);
   border-radius: 14px;
   padding: 4px;
@@ -117,8 +119,8 @@
 }
 .segmented button {
   flex: 1;
-  /* Long translations wrap onto a second line instead of spilling out. */
-  min-width: 0;
+  /* Long translations wrap between words, but a segment is never narrower than its longest word (breaking inside a word would split Arabic or Devanagari letters). */
+  min-width: min-content;
   min-height: 34px;
   border-radius: 10px;
   font-size: 13.5px;
@@ -126,8 +128,6 @@
   font-weight: 500;
   color: var(--text-2);
   padding: 4px 8px;
-  overflow-wrap: break-word;
-  hyphens: auto;
 }
 .segmented button:hover {
   color: var(--text);

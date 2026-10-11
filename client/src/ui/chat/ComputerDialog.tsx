@@ -6,6 +6,7 @@ import { ArrowLeft, ChevronRight, Folder, HardDrive, Monitor, MonitorOff } from 
 import { useEffect, useState } from 'react';
 import { getApp } from '../../app';
 import type { ComputerBinding } from '../../data/entities';
+import { formatList, t } from '../../i18n';
 import type { FolderEntry, FolderListing } from '../../platform/platform';
 import type { ChatComputer } from '../../remote/computers';
 import { Button, Dialog, Divider, Group, IconButton, Row, Spinner } from '../components/primitives';
@@ -55,28 +56,28 @@ export function ComputerDialog({ binding, onPick, onClose }: {
   const disabled = hosts.filter((h) => !h.remote);
   return (
     <Dialog
-      title="Work on a PC"
+      title={t('Work on a PC')}
       onClose={onClose}
       size="narrow"
       footer={
         <>
           {binding && (
             <Button variant="text" onClick={() => { onPick(null); onClose(); }}>
-              Don’t use a PC
+              {t('Don’t use a PC')}
             </Button>
           )}
           <span className="grow" />
-          <Button variant="tonal" onClick={onClose}>Close</Button>
+          <Button variant="tonal" onClick={onClose}>{t('Close')}</Button>
         </>
       }
     >
       <p className="t-body c-2" style={{ margin: '0 0 14px' }}>
-        Models can run commands and read and edit files in a folder on the PC. Facet on the PC runs them; you approve changes here.
+        {t('Models can run commands and read and edit files in a folder on the PC. Facet on the PC runs them; you approve changes here.')}
       </p>
-      <Group footer={disabled.length > 0 ? `To use ${disabled.map((h) => h.name).join(', ')}, open Facet on it and turn on “Let your other devices use this PC” in Settings → Computer access.` : undefined}>
+      <Group footer={disabled.length > 0 ? t('To use {pcs}, open Facet on it and turn on “Let your other devices use this PC” in Settings → Computer access.', { pcs: formatList(disabled.map((h) => h.name)) }) : undefined}>
         {me && (
           <>
-            <Row icon={<Monitor size={20} />} title="This PC" subtitle={binding?.host === me ? binding.folder : 'Choose a folder'} onClick={() => setBrowsing({ hostId: me, name: 'This PC' })} />
+            <Row icon={<Monitor size={20} />} title={t('This PC')} subtitle={binding?.host === me ? <bdi dir="ltr">{binding.folder}</bdi> : t('Choose a folder')} onClick={() => setBrowsing({ hostId: me, name: t('This PC') })} />
             {hosts.length > 0 && <Divider />}
           </>
         )}
@@ -85,15 +86,15 @@ export function ComputerDialog({ binding, onPick, onClose }: {
             {i > 0 && <Divider />}
             <Row
               icon={h.remote ? <Monitor size={20} /> : <MonitorOff size={20} />}
-              title={h.name}
-              subtitle={!h.remote ? 'Remote use is off on this PC' : binding?.host === h.hostId ? binding.folder : `${h.os || 'Windows'} · online`}
+              title={<bdi>{h.name}</bdi>}
+              subtitle={!h.remote ? t('Remote use is off on this PC') : binding?.host === h.hostId ? <bdi dir="ltr">{binding.folder}</bdi> : t('{os} · online', { os: h.os || 'Windows' })}
               onClick={h.remote ? () => setBrowsing({ hostId: h.hostId, name: h.name }) : undefined}
               disabled={!h.remote}
             />
           </div>
         ))}
         {!me && hosts.length === 0 && (
-          <Row icon={<MonitorOff size={20} />} title="No PC is online" subtitle="Open Facet on your Windows PC and sign in with this account." />
+          <Row icon={<MonitorOff size={20} />} title={t('No PC is online')} subtitle={t('Open Facet on your Windows PC and sign in with this account.')} />
         )}
       </Group>
     </Dialog>
@@ -120,12 +121,12 @@ function FolderBrowser({ hostId, name, start, onBack, onPick, onClose }: {
     void (async () => {
       try {
         const computer = await computerFor(hostId);
-        if (!computer) throw new Error(`${name} isn’t available right now.`);
+        if (!computer) throw new Error(t('{pc} isn’t available right now.', { pc: name }));
         const l = await computer.listFolders(path);
         if (live) setListing(l);
       } catch (e) {
         if (!live) return;
-        setError((e as Error).message || 'Couldn’t open that folder.');
+        setError((e as Error).message || t('Couldn’t open that folder.'));
         // A remembered folder that's gone: start from the top instead.
         if (path && path === start) setPath(null);
       } finally {
@@ -147,29 +148,29 @@ function FolderBrowser({ hostId, name, start, onBack, onPick, onClose }: {
       size="narrow"
       footer={
         <>
-          <Button variant="text" onClick={onBack}>All PCs</Button>
+          <Button variant="text" onClick={onBack}>{t('All PCs')}</Button>
           <span className="grow" />
-          <Button disabled={!path || loading || !!error} onClick={() => path && onPick(path)}>Use this folder</Button>
+          <Button disabled={!path || loading || !!error} onClick={() => path && onPick(path)}>{t('Use this folder')}</Button>
         </>
       }
     >
       <div className="folder-path">
-        <IconButton label={path ? 'Up one folder' : 'Back'} small disabled={loading} onClick={() => (path ? up() : onBack())}>
-          <ArrowLeft size={18} />
+        <IconButton label={path ? t('Up one folder') : t('Back')} small disabled={loading} onClick={() => (path ? up() : onBack())}>
+          <ArrowLeft size={18} className="flip-rtl" />
         </IconButton>
-        <span className="ellipsis t-label-l" title={path ?? undefined}>{path ?? 'Places'}</span>
+        <span className="ellipsis t-label-l" title={path ?? undefined}>{path ? <bdi dir="ltr">{path}</bdi> : t('Places')}</span>
         {loading && <Spinner size={16} />}
       </div>
       {error ? (
         <p className="field-error" role="alert" style={{ margin: '12px 4px' }}>{error}</p>
       ) : (
         <div className="folder-list" role="list" aria-busy={loading}>
-          {!loading && entries.length === 0 && <p className="t-body c-3" style={{ margin: '16px 4px' }}>{path ? 'No folders here.' : 'Nothing to show.'}</p>}
+          {!loading && entries.length === 0 && <p className="t-body c-3" style={{ margin: '16px 4px' }}>{path ? t('No folders here.') : t('Nothing to show.')}</p>}
           {entries.map((f) => (
             <button key={f.path} type="button" role="listitem" className="folder-item" onClick={() => setPath(f.path)} title={f.path}>
               {/^[a-zA-Z]:\\?$/.test(f.path) ? <HardDrive size={18} /> : <Folder size={18} />}
-              <span className="ellipsis grow">{f.name}</span>
-              <ChevronRight size={16} className="c-3" />
+              <span className="ellipsis grow"><bdi>{f.name}</bdi></span>
+              <ChevronRight size={16} className="c-3 flip-rtl" />
             </button>
           ))}
         </div>
